@@ -1,0 +1,202 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+// ─── Auth Models ────────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  passwordHash  String?
+  image         String?
+  role          Role      @default(USER)
+  balance       Decimal   @default(0) @db.Decimal(10, 2)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  orders        Order[]
+  vpnConfigs    VpnConfig[]
+  proxyAccounts ProxyAccount[]
+  emailAccounts EmailAccount[]
+  blogPosts     BlogPost[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── Business Models ────────────────────────────────────────────
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum ServiceType {
+  VPS
+  EMAIL
+  VPN
+  PROXY
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  REFUNDED
+}
+
+model Service {
+  id          String      @id @default(cuid())
+  name        String
+  type        ServiceType
+  description String      @db.Text
+  price       Decimal     @db.Decimal(10, 2)
+  specs       Json?
+  stock       Int         @default(-1) // -1 = unlimited
+  active      Boolean     @default(true)
+  featured    Boolean     @default(false)
+  imageUrl    String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  orders Order[]
+}
+
+model Order {
+  id         String      @id @default(cuid())
+  userId     String
+  serviceId  String
+  status     OrderStatus @default(PENDING)
+  config     Json?
+  totalPrice Decimal     @db.Decimal(10, 2)
+  notes      String?     @db.Text
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  service Service @relation(fields: [serviceId], references: [id])
+
+  vpnConfigs    VpnConfig[]
+  proxyAccounts ProxyAccount[]
+  emailAccounts EmailAccount[]
+
+  @@index([userId])
+  @@index([serviceId])
+}
+
+model VpnConfig {
+  id             String   @id @default(cuid())
+  userId         String
+  orderId        String
+  protocol       String   // wireguard, openvpn, ikev2
+  serverLocation String
+  configData     String   @db.LongText // encrypted config file content
+  expiresAt      DateTime
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([userId])
+}
+
+model ProxyAccount {
+  id       String  @id @default(cuid())
+  userId   String
+  orderId  String
+  protocol String  // http, socks5, residential
+  location String  // country code
+  host     String
+  port     Int
+  username String
+  password String
+  active   Boolean @default(true)
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([userId])
+  @@index([location])
+}
+
+model EmailAccount {
+  id           String   @id @default(cuid())
+  userId       String
+  orderId      String
+  domain       String
+  emailAddress String
+  serverType   String   // postfix, exchange
+  status       String   @default("active")
+  createdAt    DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([userId])
+}
+
+// ─── Blog Models ────────────────────────────────────────────────
+
+model BlogPost {
+  id         String   @id @default(cuid())
+  title      String
+  slug       String   @unique
+  excerpt    String?  @db.Text
+  content    String   @db.LongText
+  coverImage String?
+  published  Boolean  @default(false)
+  authorId   String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([authorId])
+  @@index([published])
+}
