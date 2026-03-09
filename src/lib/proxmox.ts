@@ -140,8 +140,6 @@ export async function fetchCustomerBilling() {
     return managerFetch("/api/customers/billing");
 }
 
-import https from 'https';
-
 // ─── Proxmox VE Direct API ───────────────────────────────────────
 
 const PVE_HOST = process.env.PROXMOX_VE_HOST || "";
@@ -151,14 +149,15 @@ const PVE_TOKEN_VALUE = process.env.PROXMOX_VE_TOKEN_VALUE || "";
 
 const PVE_BASE = `https://${PVE_HOST}:${PVE_PORT}/api2/json`;
 
-// Create an HTTPS agent that ignores SSL certificate errors
-const httpsAgent = new https.Agent({
-  rejectUnauthorized: false,
-});
-
+// Define a safe fetch wrapper for Next.js 
 async function pveFetch(endpoint: string, options: RequestInit = {}) {
     if (!PVE_HOST || !PVE_PORT) throw new Error("PROXMOX_VE_HOST/PORT not configured in .env.local");
     const url = `${PVE_BASE}${endpoint}`;
+    
+    // We set this explicitly in the API scope so Node's native fetch allows IP testing
+    // against self-signed certs (e.g. stormtrooper.notrespond.com vs 10.0.1.1)
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
     const res = await fetch(url, {
         ...options,
         headers: {
@@ -166,8 +165,7 @@ async function pveFetch(endpoint: string, options: RequestInit = {}) {
             "Content-Type": "application/json",
             ...options.headers,
         },
-        dispatcher: httpsAgent,
-    } as RequestInit);
+    });
 
     if (!res.ok) {
         const text = await res.text().catch(() => "Unknown error");
