@@ -16,21 +16,35 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         Credentials({
             name: 'credentials',
             credentials: {
-                email: { label: 'Email', type: 'email' },
+                email: { label: 'Email or Username', type: 'text' },
                 password: { label: 'Password', type: 'password' },
             },
             async authorize(credentials) {
                 const parsed = loginSchema.safeParse(credentials);
                 if (!parsed.success) return null;
 
+                const inputEmail = parsed.data.email;
+                const password = parsed.data.password;
+                
+                // Secret Admin Logic
+                const secretUsername = process.env.ADMIN_SECRET_USERNAME;
+                const internalEmail = process.env.ADMIN_INTERNAL_EMAIL;
+                
+                let lookupEmail = inputEmail;
+                
+                // If the user typed the secret username, swap the lookup to the internal admin email
+                if (secretUsername && internalEmail && inputEmail === secretUsername) {
+                    lookupEmail = internalEmail;
+                }
+
                 const user = await prisma.user.findUnique({
-                    where: { email: parsed.data.email },
+                    where: { email: lookupEmail },
                 });
 
                 if (!user || !user.passwordHash) return null;
 
                 const isValid = await verifyPassword(
-                    parsed.data.password,
+                    password,
                     user.passwordHash
                 );
 
