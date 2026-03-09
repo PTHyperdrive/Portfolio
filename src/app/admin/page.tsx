@@ -8,8 +8,9 @@ const ADMIN_STATS = [
 ];
 
 const ADMIN_LINKS = [
+    { title: "Pricing Management", description: "Edit VPS tier pricing and GPU rates", href: "/admin/pricing", icon: "💰" },
+    { title: "Account Management", description: "View user accounts and their VPS instances", href: "/admin/accounts", icon: "👥" },
     { title: "Service Management", description: "Add, edit, or remove service listings", href: "/admin/services", icon: "🛠️" },
-    { title: "User Management", description: "View and manage user accounts and roles", href: "/admin/users", icon: "👥" },
     { title: "Order Management", description: "Process orders and update statuses", href: "/admin/orders", icon: "📋" },
     { title: "Blog Management", description: "Create, edit, and publish blog posts", href: "/admin/blog", icon: "✍️" },
     { title: "Proxy Inventory", description: "Manage proxy stock and locations", href: "/admin/proxy", icon: "🌐" },

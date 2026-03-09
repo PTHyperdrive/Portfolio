@@ -28,6 +28,7 @@ model User {
   proxyAccounts ProxyAccount[]
   emailAccounts EmailAccount[]
   blogPosts     BlogPost[]
+  vpsInstances  VpsInstance[]
 }
 
 model Account {
@@ -122,6 +123,7 @@ model Order {
   vpnConfigs    VpnConfig[]
   proxyAccounts ProxyAccount[]
   emailAccounts EmailAccount[]
+  vpsInstances  VpsInstance[]
 
   @@index([userId])
   @@index([serviceId])
@@ -178,6 +180,30 @@ model EmailAccount {
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
   order Order @relation(fields: [orderId], references: [id])
 
+  @@index([userId])
+}
+
+// ─── VPS Instance (Proxmox VM Assignment) ───────────────────────
+
+model VpsInstance {
+  id             String    @id @default(cuid())
+  userId         String
+  orderId        String
+  vmId           String    // Proxmox VM ID (e.g., "104")
+  node           String    // Proxmox node name (e.g., "pve-01")
+  name           String    // Display name (e.g., "My Windows VPS")
+  os             String    // OS label (e.g., "Windows 11 23H2")
+  status         String    @default("stopped") // running, stopped, provisioning
+  specs          Json?     // {vcpu, ram_gb, disk_gb, gpu}
+  ipAddress      String?
+  expiresAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@unique([vmId, node])
   @@index([userId])
 }
 

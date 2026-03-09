@@ -12,6 +12,7 @@ const NAV_LINKS = [
     { href: "/services/vpn", label: "VPN" },
     { href: "/services/proxy", label: "Proxy" },
     { href: "/blog", label: "Blog" },
+    { href: "/dashboard/vps", label: "Dashboard" },
 ];
 
 export default function Navbar() {
