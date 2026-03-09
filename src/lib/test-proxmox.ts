@@ -1,6 +1,5 @@
 import dotenv from 'dotenv';
 import path from 'path';
-import https from 'https';
 
 // Load .env explicitly for the test script
 dotenv.config({ path: path.resolve(__dirname, '../../.env') });
@@ -12,10 +11,8 @@ const PVE_TOKEN_VALUE = process.env.PROXMOX_VE_TOKEN_VALUE || "";
 
 const PVE_BASE = `https://${PVE_HOST}:${PVE_PORT}/api2/json`;
 
-// Create an HTTPS agent that ignores SSL certificate errors
-const httpsAgent = new https.Agent({
-  rejectUnauthorized: false,
-});
+// For Node 18+ native fetch, we use NODE_TLS_REJECT_UNAUTHORIZED to bypass SSL for testing purposes
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 async function pveFetch(endpoint: string, options: RequestInit = {}) {
     if (!PVE_HOST || !PVE_PORT) throw new Error("PROXMOX_VE_HOST/PORT not configured in .env");
@@ -31,9 +28,7 @@ async function pveFetch(endpoint: string, options: RequestInit = {}) {
                 "Content-Type": "application/json",
                 ...options.headers,
             },
-            // Use the custom agent to bypass the hostname mismatch error
-            dispatcher: httpsAgent,
-        } as RequestInit); // cast needed or standard fetch typings may complain about dispatcher
+        });
 
         if (!res.ok) {
             const text = await res.text().catch(() => "Unknown error");
