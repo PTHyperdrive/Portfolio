@@ -140,6 +140,8 @@ export async function fetchCustomerBilling() {
     return managerFetch("/api/customers/billing");
 }
 
+import https from 'https';
+
 // ─── Proxmox VE Direct API ───────────────────────────────────────
 
 const PVE_HOST = process.env.PROXMOX_VE_HOST || "";
@@ -148,6 +150,11 @@ const PVE_TOKEN_ID = process.env.PROXMOX_VE_TOKEN_ID || "";
 const PVE_TOKEN_VALUE = process.env.PROXMOX_VE_TOKEN_VALUE || "";
 
 const PVE_BASE = `https://${PVE_HOST}:${PVE_PORT}/api2/json`;
+
+// Create an HTTPS agent that ignores SSL certificate errors
+const httpsAgent = new https.Agent({
+  rejectUnauthorized: false,
+});
 
 async function pveFetch(endpoint: string, options: RequestInit = {}) {
     if (!PVE_HOST || !PVE_PORT) throw new Error("PROXMOX_VE_HOST/PORT not configured in .env.local");
@@ -159,9 +166,8 @@ async function pveFetch(endpoint: string, options: RequestInit = {}) {
             "Content-Type": "application/json",
             ...options.headers,
         },
-        // @ts-expect-error -- Node.js fetch self-signed cert
-        rejectUnauthorized: false,
-    });
+        dispatcher: httpsAgent,
+    } as RequestInit);
 
     if (!res.ok) {
         const text = await res.text().catch(() => "Unknown error");
