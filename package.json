@@ -13,6 +13,7 @@
     "@prisma/adapter-mariadb": "^7.4.2",
     "@prisma/client": "^7.4.1",
     "bcryptjs": "^3.0.3",
+    "mariadb": "^3.5.2",
     "mysql2": "^3.19.1",
     "next": "16.1.6",
     "next-auth": "^5.0.0-beta.30",
