@@ -205,7 +205,7 @@ export default function Navbar() {
                                     )}
                                     <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", marginTop: "4px", paddingTop: "4px" }}>
                                         <button
-                                            onClick={() => signOut({ callbackUrl: "/" })}
+                                            onClick={() => signOut({ callbackUrl: window.location.origin })}
                                             style={{
                                                 display: "block", width: "100%", padding: "10px 12px", borderRadius: "8px", fontSize: "0.85rem",
                                                 color: "var(--accent-magenta)", background: "none", border: "none", cursor: "pointer", textAlign: "left",
@@ -293,7 +293,7 @@ export default function Navbar() {
                                     {displayName}
                                 </span>
                                 <button
-                                    onClick={() => signOut({ callbackUrl: "/" })}
+                                    onClick={() => signOut({ callbackUrl: window.location.origin })}
                                     className="btn btn-ghost"
                                     style={{ flex: 1 }}
                                 >
