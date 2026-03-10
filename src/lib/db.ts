@@ -1,9 +1,9 @@
 import { PrismaClient } from '@/generated/prisma';
-import { PrismaMariadb } from '@prisma/adapter-mariadb';
-import mariadb from 'mysql2/promise';
+import { PrismaMariaDb } from '@prisma/adapter-mariadb';
+import mysql from 'mysql2/promise';
 
-const pool = mariadb.createPool(process.env.DATABASE_URL!);
-const adapter = new PrismaMariadb(pool);
+const pool = mysql.createPool(process.env.DATABASE_URL!);
+const adapter = new PrismaMariaDb(pool);
 
 const globalForPrisma = globalThis as unknown as {
     prisma: PrismaClient | undefined;
