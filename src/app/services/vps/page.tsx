@@ -67,7 +67,7 @@ const VPS_PLANS = [
     },
 ];
 
-// ─── VPS Manager Types ──────────────────────────────────────────
+// ─── Types ──────────────────────────────────────────────────────
 
 interface VpsInstance {
     id: string;
@@ -79,6 +79,7 @@ interface VpsInstance {
     specs: { vcpu?: number; ram_gb?: number; disk_gb?: number; gpu?: string } | null;
     ipAddress: string | null;
     expiresAt: string | null;
+    user?: { name: string | null; email: string };
     liveData?: {
         status: string;
         uptime: number;
@@ -105,7 +106,8 @@ export default function VPSPage() {
     }
 
     if (status === "authenticated") {
-        return <VpsManager />;
+        const isAdmin = (session?.user as any)?.role === "ADMIN";
+        return <VpsManager isAdmin={isAdmin} />;
     }
 
     return <VpsPlans />;
@@ -116,7 +118,6 @@ export default function VPSPage() {
 function VpsPlans() {
     return (
         <>
-            {/* Hero */}
             <section style={{ paddingTop: "140px", paddingBottom: "80px", position: "relative" }}>
                 <div style={{ position: "absolute", top: 0, right: 0, width: "600px", height: "600px", background: "radial-gradient(circle, rgba(0,240,255,0.06) 0%, transparent 70%)", pointerEvents: "none" }} />
                 <div className="container">
@@ -126,30 +127,19 @@ function VpsPlans() {
                         <span className="gradient-text">with GPU Power</span>
                     </h1>
                     <p style={{ color: "var(--text-secondary)", fontSize: "1.1rem", maxWidth: "600px", lineHeight: 1.7 }}>
-                        From lightweight v-GPU instances to multi-GPU enterprise clusters. Run AI workloads,
-                        game servers, rendering pipelines, or any compute-intensive application.
+                        From lightweight v-GPU instances to multi-GPU enterprise clusters.
                     </p>
                 </div>
             </section>
-
-            {/* Pricing Cards */}
             <section className="section" style={{ paddingTop: "20px" }}>
                 <div className="container">
                     <div className="grid-3 stagger">
                         {VPS_PLANS.map((plan) => (
-                            <div
-                                key={plan.name}
-                                className={`glass-card pricing-card ${plan.featured ? "featured" : ""}`}
-                                style={{ padding: "36px", display: "flex", flexDirection: "column" }}
-                            >
-                                <span className="badge" style={{ background: `${plan.color}15`, color: plan.color, marginBottom: "16px", alignSelf: "flex-start" }}>
-                                    {plan.badge}
-                                </span>
+                            <div key={plan.name} className={`glass-card pricing-card ${plan.featured ? "featured" : ""}`} style={{ padding: "36px", display: "flex", flexDirection: "column" }}>
+                                <span className="badge" style={{ background: `${plan.color}15`, color: plan.color, marginBottom: "16px", alignSelf: "flex-start" }}>{plan.badge}</span>
                                 <h3 style={{ fontSize: "1.4rem", fontWeight: 700, marginBottom: "8px" }}>{plan.name}</h3>
                                 <div style={{ marginBottom: "24px" }}>
-                                    <span style={{ fontSize: "2.5rem", fontWeight: 800 }}>
-                                        <span className="gradient-text">${plan.price}</span>
-                                    </span>
+                                    <span style={{ fontSize: "2.5rem", fontWeight: 800 }}><span className="gradient-text">${plan.price}</span></span>
                                     <span style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>{plan.period}</span>
                                 </div>
                                 <div style={{ marginBottom: "24px" }}>
@@ -176,8 +166,6 @@ function VpsPlans() {
                     </div>
                 </div>
             </section>
-
-            {/* Technical Specs */}
             <section className="section" style={{ background: "rgba(255,255,255,0.01)" }}>
                 <div className="container">
                     <h2 style={{ fontSize: "2rem", fontWeight: 800, textAlign: "center", marginBottom: "50px" }}>
@@ -205,13 +193,204 @@ function VpsPlans() {
     );
 }
 
+// ─── Create VM Modal (Admin Only) ───────────────────────────────
+
+function CreateVMModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+    const [form, setForm] = useState({
+        node: "",
+        name: "",
+        cores: 2,
+        memory: 2048,
+        diskSize: 32,
+        diskStorage: "local-lvm",
+        iso: "",
+        osLabel: "",
+        ostype: "other",
+        bios: "seabios",
+        network: "virtio,bridge=vmbr0",
+        assignUserId: "",
+    });
+    const [nodes, setNodes] = useState<any[]>([]);
+    const [isos, setIsos] = useState<any[]>([]);
+    const [storages, setStorages] = useState<any[]>([]);
+    const [users, setUsers] = useState<any[]>([]);
+    const [creating, setCreating] = useState(false);
+    const [error, setError] = useState("");
+    const [success, setSuccess] = useState("");
+
+    // Load nodes + users on mount
+    useEffect(() => {
+        fetch("/api/admin/vms?action=nodes").then(r => r.json()).then(d => setNodes(d.nodes || [])).catch(() => { });
+        fetch("/api/admin/vms").then(r => r.json()).then(d => setUsers(d.users || [])).catch(() => { });
+    }, []);
+
+    // Load storages & ISOs when node changes
+    useEffect(() => {
+        if (!form.node) return;
+        fetch(`/api/admin/vms?action=storages&node=${form.node}`).then(r => r.json()).then(d => setStorages(d.storages || [])).catch(() => { });
+        fetch(`/api/admin/vms?action=isos&node=${form.node}`).then(r => r.json()).then(d => setIsos(d.isos || [])).catch(() => { });
+    }, [form.node]);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setCreating(true);
+        setError("");
+        setSuccess("");
+        try {
+            const res = await fetch("/api/admin/vms", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(form),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Failed");
+            setSuccess(data.message || "VM created!");
+            setTimeout(() => {
+                onCreated();
+                onClose();
+            }, 1500);
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed");
+        } finally {
+            setCreating(false);
+        }
+    };
+
+    const inputStyle: React.CSSProperties = {
+        width: "100%", padding: "10px 14px", borderRadius: "8px", border: "1px solid rgba(255,255,255,0.1)",
+        background: "rgba(255,255,255,0.04)", color: "var(--text-primary)", fontSize: "0.88rem", outline: "none",
+    };
+    const labelStyle: React.CSSProperties = { fontSize: "0.8rem", fontWeight: 600, color: "var(--text-muted)", marginBottom: "6px", display: "block" };
+
+    return (
+        <div style={{ position: "fixed", inset: 0, zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.6)", backdropFilter: "blur(6px)" }} onClick={onClose}>
+            <div
+                style={{ background: "rgba(15,15,20,0.98)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "16px", padding: "32px", width: "560px", maxWidth: "95vw", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 30px 60px rgba(0,0,0,0.7)" }}
+                onClick={e => e.stopPropagation()}
+            >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
+                    <h2 style={{ fontSize: "1.3rem", fontWeight: 800 }}>
+                        ➕ Create <span className="gradient-text">VM</span>
+                    </h2>
+                    <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--text-muted)", cursor: "pointer", fontSize: "1.2rem" }}>✕</button>
+                </div>
+
+                {error && <div style={{ padding: "10px 14px", borderRadius: "8px", background: "rgba(255,0,110,0.1)", border: "1px solid rgba(255,0,110,0.2)", color: "var(--accent-magenta)", marginBottom: "16px", fontSize: "0.85rem" }}>{error}</div>}
+                {success && <div style={{ padding: "10px 14px", borderRadius: "8px", background: "rgba(0,255,136,0.1)", border: "1px solid rgba(0,255,136,0.2)", color: "var(--accent-green)", marginBottom: "16px", fontSize: "0.85rem" }}>{success}</div>}
+
+                <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                    {/* Node */}
+                    <div>
+                        <label style={labelStyle}>Proxmox Node *</label>
+                        <select style={inputStyle} value={form.node} onChange={e => setForm({ ...form, node: e.target.value })} required>
+                            <option value="">Select node...</option>
+                            {nodes.map((n: any) => <option key={n.node} value={n.node}>{n.node} ({n.status})</option>)}
+                        </select>
+                    </div>
+
+                    {/* Name */}
+                    <div>
+                        <label style={labelStyle}>VM Name *</label>
+                        <input style={inputStyle} value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. client-win11-001" required />
+                    </div>
+
+                    {/* CPU + RAM row */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                        <div>
+                            <label style={labelStyle}>CPU Cores *</label>
+                            <input type="number" style={inputStyle} value={form.cores} onChange={e => setForm({ ...form, cores: parseInt(e.target.value) || 1 })} min={1} max={128} required />
+                        </div>
+                        <div>
+                            <label style={labelStyle}>RAM (MB) *</label>
+                            <input type="number" style={inputStyle} value={form.memory} onChange={e => setForm({ ...form, memory: parseInt(e.target.value) || 512 })} min={512} step={512} required />
+                        </div>
+                    </div>
+
+                    {/* Storage + Disk row */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                        <div>
+                            <label style={labelStyle}>Disk Storage</label>
+                            <select style={inputStyle} value={form.diskStorage} onChange={e => setForm({ ...form, diskStorage: e.target.value })}>
+                                <option value="local-lvm">local-lvm</option>
+                                {storages.map((s: any) => <option key={s.storage} value={s.storage}>{s.storage} ({s.type})</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label style={labelStyle}>Disk Size (GB)</label>
+                            <input type="number" style={inputStyle} value={form.diskSize} onChange={e => setForm({ ...form, diskSize: parseInt(e.target.value) || 8 })} min={8} />
+                        </div>
+                    </div>
+
+                    {/* ISO */}
+                    <div>
+                        <label style={labelStyle}>Installation ISO</label>
+                        <select style={inputStyle} value={form.iso} onChange={e => setForm({ ...form, iso: e.target.value })}>
+                            <option value="">None (no CD)</option>
+                            {isos.map((iso: any) => <option key={iso.volid} value={iso.volid}>{iso.volid}</option>)}
+                        </select>
+                    </div>
+
+                    {/* OS Type + BIOS row */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                        <div>
+                            <label style={labelStyle}>OS Type</label>
+                            <select style={inputStyle} value={form.ostype} onChange={e => setForm({ ...form, ostype: e.target.value })}>
+                                <option value="other">Other</option>
+                                <option value="l26">Linux 2.6+</option>
+                                <option value="win11">Windows 11</option>
+                                <option value="win10">Windows 10</option>
+                                <option value="win7">Windows 7</option>
+                                <option value="solaris">Solaris</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style={labelStyle}>BIOS</label>
+                            <select style={inputStyle} value={form.bios} onChange={e => setForm({ ...form, bios: e.target.value })}>
+                                <option value="seabios">SeaBIOS (Legacy)</option>
+                                <option value="ovmf">OVMF (UEFI)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* OS Label */}
+                    <div>
+                        <label style={labelStyle}>OS Display Label</label>
+                        <input style={inputStyle} value={form.osLabel} onChange={e => setForm({ ...form, osLabel: e.target.value })} placeholder="e.g. Windows 11 Pro 24H2" />
+                    </div>
+
+                    {/* Network */}
+                    <div>
+                        <label style={labelStyle}>Network</label>
+                        <input style={inputStyle} value={form.network} onChange={e => setForm({ ...form, network: e.target.value })} placeholder="virtio,bridge=vmbr0" />
+                    </div>
+
+                    {/* Assign to User */}
+                    <div>
+                        <label style={labelStyle}>Assign to User</label>
+                        <select style={inputStyle} value={form.assignUserId} onChange={e => setForm({ ...form, assignUserId: e.target.value })}>
+                            <option value="">Assign to myself (admin)</option>
+                            {users.map((u: any) => <option key={u.id} value={u.id}>{u.email} {u.name ? `(${u.name})` : ""}</option>)}
+                        </select>
+                    </div>
+
+                    {/* Submit */}
+                    <button type="submit" disabled={creating} className="btn btn-primary" style={{ width: "100%", marginTop: "8px", padding: "12px", fontSize: "0.92rem" }}>
+                        {creating ? "Creating VM..." : "🚀 Create VM on Proxmox"}
+                    </button>
+                </form>
+            </div>
+        </div>
+    );
+}
+
 // ─── VPS Manager View (Logged In) ──────────────────────────────
 
-function VpsManager() {
+function VpsManager({ isAdmin }: { isAdmin: boolean }) {
     const [instances, setInstances] = useState<VpsInstance[]>([]);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [error, setError] = useState("");
+    const [showCreateModal, setShowCreateModal] = useState(false);
 
     const loadInstances = useCallback(async () => {
         try {
@@ -295,13 +474,18 @@ function VpsManager() {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "40px", flexWrap: "wrap", gap: "16px" }}>
                     <div>
                         <h1 style={{ fontSize: "2rem", fontWeight: 800, marginBottom: "8px" }}>
-                            VPS <span className="gradient-text">Manager</span>
+                            VPS <span className="gradient-text">{isAdmin ? "Admin Manager" : "Manager"}</span>
                         </h1>
                         <p style={{ color: "var(--text-muted)", fontSize: "0.95rem" }}>
-                            Manage your virtual private servers
+                            {isAdmin ? "Manage all virtual private servers across users" : "Manage your virtual private servers"}
                         </p>
                     </div>
                     <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+                        {isAdmin && (
+                            <button onClick={() => setShowCreateModal(true)} className="btn btn-primary" style={{ padding: "8px 20px", fontSize: "0.85rem" }}>
+                                ➕ Create VM
+                            </button>
+                        )}
                         <button onClick={loadInstances} className="btn btn-ghost" style={{ padding: "8px 16px", fontSize: "0.85rem" }}>
                             🔄 Refresh
                         </button>
@@ -323,8 +507,13 @@ function VpsManager() {
                         <div style={{ fontSize: "3rem", marginBottom: "16px" }}>🖥️</div>
                         <h3 style={{ fontSize: "1.3rem", marginBottom: "8px" }}>No VPS Instances</h3>
                         <p style={{ color: "var(--text-muted)", marginBottom: "24px" }}>
-                            You don&apos;t have any VPS instances yet. Contact support to provision one.
+                            {isAdmin ? "No VMs provisioned yet. Click \"Create VM\" to get started." : "You don't have any VPS instances yet."}
                         </p>
+                        {isAdmin && (
+                            <button onClick={() => setShowCreateModal(true)} className="btn btn-primary">
+                                ➕ Create VM
+                            </button>
+                        )}
                     </div>
                 ) : (
                     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -356,6 +545,12 @@ function VpsManager() {
                                                         <span className="mono" style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>VM {vm.vmId}</span>
                                                         <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>•</span>
                                                         <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>{vm.node}</span>
+                                                        {isAdmin && vm.user && (
+                                                            <>
+                                                                <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>•</span>
+                                                                <span style={{ fontSize: "0.78rem", color: "var(--accent-purple)" }}>👤 {vm.user.name || vm.user.email}</span>
+                                                            </>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
@@ -372,20 +567,12 @@ function VpsManager() {
                                             {isRunning && live && (
                                                 <div style={{ display: "flex", gap: "16px" }}>
                                                     <div style={{ width: "100px" }}>
-                                                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "4px" }}>
-                                                            <span>CPU</span><span className="mono">{cpuPercent}%</span>
-                                                        </div>
-                                                        <div style={{ height: "4px", borderRadius: "2px", background: "rgba(255,255,255,0.06)" }}>
-                                                            <div style={{ height: "100%", borderRadius: "2px", background: "var(--accent-cyan)", width: `${Math.min(100, parseFloat(cpuPercent))}%`, transition: "width 0.3s" }} />
-                                                        </div>
+                                                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "4px" }}><span>CPU</span><span className="mono">{cpuPercent}%</span></div>
+                                                        <div style={{ height: "4px", borderRadius: "2px", background: "rgba(255,255,255,0.06)" }}><div style={{ height: "100%", borderRadius: "2px", background: "var(--accent-cyan)", width: `${Math.min(100, parseFloat(cpuPercent))}%`, transition: "width 0.3s" }} /></div>
                                                     </div>
                                                     <div style={{ width: "100px" }}>
-                                                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "4px" }}>
-                                                            <span>RAM</span><span className="mono">{formatBytes(memUsed)}</span>
-                                                        </div>
-                                                        <div style={{ height: "4px", borderRadius: "2px", background: "rgba(255,255,255,0.06)" }}>
-                                                            <div style={{ height: "100%", borderRadius: "2px", background: "var(--accent-purple)", width: `${Math.min(100, parseFloat(memPercent))}%`, transition: "width 0.3s" }} />
-                                                        </div>
+                                                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "4px" }}><span>RAM</span><span className="mono">{formatBytes(memUsed)}</span></div>
+                                                        <div style={{ height: "4px", borderRadius: "2px", background: "rgba(255,255,255,0.06)" }}><div style={{ height: "100%", borderRadius: "2px", background: "var(--accent-purple)", width: `${Math.min(100, parseFloat(memPercent))}%`, transition: "width 0.3s" }} /></div>
                                                     </div>
                                                     <div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>⏱ {formatUptime(live.uptime)}</div>
                                                 </div>
@@ -402,24 +589,14 @@ function VpsManager() {
                                         <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                                             {isRunning ? (
                                                 <>
-                                                    <Link href={`/dashboard/vps/${vm.vmId}?node=${vm.node}&tab=console`} className="btn btn-primary" style={{ padding: "8px 16px", fontSize: "0.8rem" }}>
-                                                        🖥 Console
-                                                    </Link>
-                                                    <button onClick={() => handleAction(vm.vmId, vm.node, "restart")} disabled={actionLoading === `${vm.vmId}-restart`} className="btn btn-ghost" style={{ padding: "8px 12px", fontSize: "0.8rem" }}>
-                                                        {actionLoading === `${vm.vmId}-restart` ? "..." : "🔄"}
-                                                    </button>
-                                                    <button onClick={() => handleAction(vm.vmId, vm.node, "stop")} disabled={actionLoading === `${vm.vmId}-stop`} className="btn btn-danger" style={{ padding: "8px 16px", fontSize: "0.8rem" }}>
-                                                        {actionLoading === `${vm.vmId}-stop` ? "Stopping..." : "⏹ Stop"}
-                                                    </button>
+                                                    <Link href={`/dashboard/vps/${vm.vmId}?node=${vm.node}&tab=console`} className="btn btn-primary" style={{ padding: "8px 16px", fontSize: "0.8rem" }}>🖥 Console</Link>
+                                                    <button onClick={() => handleAction(vm.vmId, vm.node, "restart")} disabled={actionLoading === `${vm.vmId}-restart`} className="btn btn-ghost" style={{ padding: "8px 12px", fontSize: "0.8rem" }}>{actionLoading === `${vm.vmId}-restart` ? "..." : "🔄"}</button>
+                                                    <button onClick={() => handleAction(vm.vmId, vm.node, "stop")} disabled={actionLoading === `${vm.vmId}-stop`} className="btn btn-danger" style={{ padding: "8px 16px", fontSize: "0.8rem" }}>{actionLoading === `${vm.vmId}-stop` ? "Stopping..." : "⏹ Stop"}</button>
                                                 </>
                                             ) : (
-                                                <button onClick={() => handleAction(vm.vmId, vm.node, "start")} disabled={actionLoading === `${vm.vmId}-start`} className="btn btn-primary" style={{ padding: "8px 20px", fontSize: "0.8rem" }}>
-                                                    {actionLoading === `${vm.vmId}-start` ? "Starting..." : "▶ Start"}
-                                                </button>
+                                                <button onClick={() => handleAction(vm.vmId, vm.node, "start")} disabled={actionLoading === `${vm.vmId}-start`} className="btn btn-primary" style={{ padding: "8px 20px", fontSize: "0.8rem" }}>{actionLoading === `${vm.vmId}-start` ? "Starting..." : "▶ Start"}</button>
                                             )}
-                                            <Link href={`/dashboard/vps/${vm.vmId}?node=${vm.node}`} className="btn btn-ghost" style={{ padding: "8px 12px", fontSize: "0.8rem" }}>
-                                                ⚙️
-                                            </Link>
+                                            <Link href={`/dashboard/vps/${vm.vmId}?node=${vm.node}`} className="btn btn-ghost" style={{ padding: "8px 12px", fontSize: "0.8rem" }}>⚙️</Link>
                                         </div>
                                     </div>
                                 </div>
@@ -428,6 +605,9 @@ function VpsManager() {
                     </div>
                 )}
             </div>
+
+            {/* Create VM Modal */}
+            {showCreateModal && <CreateVMModal onClose={() => setShowCreateModal(false)} onCreated={loadInstances} />}
         </div>
     );
 }

@@ -63,9 +63,10 @@ export async function POST(
         const body = await req.json();
         const { action, node, isoId } = body;
 
-        // Verify ownership
+        // Verify ownership (admin can control any VM)
+        const isAdmin = (session.user as { role?: string }).role === "ADMIN";
         const instance = await prisma.vpsInstance.findFirst({
-            where: { vmId, node, userId: session.user.id },
+            where: isAdmin ? { vmId, node } : { vmId, node, userId: session.user.id },
         });
 
         if (!instance) {

@@ -236,3 +236,70 @@ export async function changeVMIso(node: string, vmId: string, isoPath: string) {
         body: JSON.stringify({ ide2: `${isoPath},media=cdrom` }),
     });
 }
+
+// ─── Admin: VM Creation & Discovery ──────────────────────────────
+
+/**
+ * Get the next available VMID from the Proxmox cluster
+ */
+export async function getNextVMID() {
+    return pveFetch("/cluster/nextid");
+}
+
+/**
+ * List all nodes in the Proxmox cluster
+ */
+export async function listPVENodes() {
+    return pveFetch("/nodes");
+}
+
+/**
+ * List ISO images available on a node's storage
+ */
+export async function listISOs(node: string, storage: string = "local") {
+    return pveFetch(`/nodes/${node}/storage/${storage}/content?content=iso`);
+}
+
+/**
+ * List storages available on a node
+ */
+export async function listStorages(node: string) {
+    return pveFetch(`/nodes/${node}/storage`);
+}
+
+/**
+ * Create a new QEMU VM on a Proxmox node
+ */
+export async function createVM(node: string, config: {
+    vmid: number;
+    name: string;
+    memory: number; // in MB
+    cores: number;
+    sockets?: number;
+    cpu?: string;
+    ostype?: string;
+    scsihw?: string;
+    scsi0?: string; // disk config, e.g. "local-lvm:32,format=raw"
+    ide2?: string; // ISO, e.g. "local:iso/Win11.iso,media=cdrom"
+    net0?: string; // network, e.g. "virtio,bridge=vmbr0"
+    boot?: string;
+    bios?: string;
+    machine?: string;
+    efidisk0?: string;
+    tpmstate0?: string;
+    agent?: string;
+    [key: string]: unknown;
+}) {
+    return pveFetch(`/nodes/${node}/qemu`, {
+        method: "POST",
+        body: JSON.stringify(config),
+    });
+}
+
+/**
+ * List all QEMU VMs on a node (admin discovery)
+ */
+export async function listNodeVMs(node: string) {
+    return pveFetch(`/nodes/${node}/qemu`);
+}
+

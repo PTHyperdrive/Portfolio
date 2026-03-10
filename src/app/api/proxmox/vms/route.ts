@@ -15,8 +15,11 @@ export async function GET() {
         }
 
         // Get user's VPS instances from our database
+        // Admin sees ALL instances; regular users see only their own
+        const isAdmin = (session.user as { role?: string }).role === "ADMIN";
         const instances = await prisma.vpsInstance.findMany({
-            where: { userId: session.user.id },
+            where: isAdmin ? {} : { userId: session.user.id },
+            include: { user: { select: { name: true, email: true } } },
             orderBy: { createdAt: "desc" },
         });
 
