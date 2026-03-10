@@ -3,6 +3,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
+import Providers from "@/components/Providers";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -35,13 +36,16 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`}>
       <body>
-        <div className="particles-bg" aria-hidden="true" />
-        <Navbar />
-        <main style={{ position: "relative", zIndex: 1, minHeight: "100vh" }}>
-          {children}
-        </main>
-        <Footer />
+        <Providers>
+          <div className="particles-bg" aria-hidden="true" />
+          <Navbar />
+          <main style={{ position: "relative", zIndex: 1, minHeight: "100vh" }}>
+            {children}
+          </main>
+          <Footer />
+        </Providers>
       </body>
     </html>
   );
 }
+
