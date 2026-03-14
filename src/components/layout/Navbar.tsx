@@ -73,11 +73,11 @@ export default function Navbar() {
                 {/* Logo */}
                 <Link href="/" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: "10px" }}>
                     <Image
-                        src="/logo.png"
-                        alt="Notrespond.com"
-                        width={140}
-                        height={36}
-                        style={{ objectFit: "contain" }}
+                        src="/nrsp-icon.png"
+                        alt="NRSP"
+                        width={32}
+                        height={32}
+                        style={{ objectFit: "contain", borderRadius: "6px" }}
                         priority
                     />
                     <span
