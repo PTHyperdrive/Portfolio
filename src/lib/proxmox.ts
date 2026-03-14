@@ -193,23 +193,27 @@ const PVE_TOKEN_VALUE = process.env.PROXMOX_VE_TOKEN_VALUE || "";
 
 const PVE_BASE = `https://${PVE_HOST}:${PVE_PORT}/api2/json`;
 
-// Define a safe fetch wrapper for Next.js 
+// Define a safe fetch wrapper for Next.js
 async function pveFetch(endpoint: string, options: RequestInit = {}) {
     if (!PVE_HOST || !PVE_PORT) throw new Error("PROXMOX_VE_HOST/PORT not configured in .env.local");
     const url = `${PVE_BASE}${endpoint}`;
-    
+
     // We set this explicitly in the API scope so Node's native fetch allows IP testing
     // against self-signed certs (e.g. stormtrooper.notrespond.com vs 10.0.1.1)
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
-    const res = await fetch(url, {
-        ...options,
-        headers: {
-            "Authorization": `PVEAPIToken=${PVE_TOKEN_ID}=${PVE_TOKEN_VALUE}`,
-            "Content-Type": "application/json",
-            ...options.headers,
-        },
-    });
+    // Only send Content-Type: application/json when there is actually a request body.
+    // Sending this header with NO body causes PVE's Perl JSON parser to throw:
+    //   "malformed JSON string at character 0 (before (end of string))" → HTTP 500
+    const headers: Record<string, string> = {
+        "Authorization": `PVEAPIToken=${PVE_TOKEN_ID}=${PVE_TOKEN_VALUE}`,
+        ...(options.headers as Record<string, string> | undefined),
+    };
+    if (options.body) {
+        headers["Content-Type"] = "application/json";
+    }
+
+    const res = await fetch(url, { ...options, headers });
 
     if (!res.ok) {
         const text = await res.text().catch(() => "Unknown error");
@@ -217,15 +221,12 @@ async function pveFetch(endpoint: string, options: RequestInit = {}) {
     }
 
     // PVE action endpoints (start/stop/restart/delete) return an empty body on success.
-    // Calling res.json() on an empty body causes: "malformed JSON string at character 0 (before end of string)"
-    const contentLength = res.headers.get("content-length");
-    const contentType   = res.headers.get("content-type") ?? "";
-    const hasBody = contentType.includes("application/json") && contentLength !== "0";
+    // Calling res.json() on an empty body causes a second malformed JSON error on our side.
+    const contentType = res.headers.get("content-type") ?? "";
+    const text = await res.text().catch(() => "");
+    if (!text.trim()) return null;
 
-    if (!hasBody) {
-        // Try to parse anyway in case content-length is absent; fall back to null silently
-        const text = await res.text().catch(() => "");
-        if (!text.trim()) return null;
+    if (contentType.includes("application/json")) {
         try {
             const json = JSON.parse(text);
             return json?.data ?? json ?? null;
@@ -234,10 +235,8 @@ async function pveFetch(endpoint: string, options: RequestInit = {}) {
         }
     }
 
-    const json = await res.json();
-    return json.data;
+    return null;
 }
-
 
 /**
  * Request a VNC proxy ticket for a VM.
@@ -436,9 +435,9 @@ export async function setCloudInit(
         ipconfig0: config.ipConfig,
     };
 
-    if (config.ciUser)       body.ciuser       = config.ciUser;
-    if (config.ciPassword)   body.cipassword   = config.ciPassword;
-    if (config.nameserver)   body.nameserver   = config.nameserver;
+    if (config.ciUser) body.ciuser = config.ciUser;
+    if (config.ciPassword) body.cipassword = config.ciPassword;
+    if (config.nameserver) body.nameserver = config.nameserver;
     if (config.searchdomain) body.searchdomain = config.searchdomain;
 
     // PVE requires SSH keys to be URL-encoded
@@ -512,33 +511,32 @@ export async function getClusterResources(): Promise<ClusterVMResource[]> {
 
     return raw
         .map((vm): ClusterVMResource => {
-            const cpu     = (vm.cpu     as number) ?? 0;
-            const mem     = (vm.mem     as number) ?? 0;
-            const maxmem  = (vm.maxmem  as number) ?? 1; // avoid /0
-            const disk    = (vm.disk    as number) ?? 0;
+            const cpu = (vm.cpu as number) ?? 0;
+            const mem = (vm.mem as number) ?? 0;
+            const maxmem = (vm.maxmem as number) ?? 1; // avoid /0
+            const disk = (vm.disk as number) ?? 0;
             const maxdisk = (vm.maxdisk as number) ?? 1;
 
             return {
-                vmid:        (vm.vmid    as number),
-                name:        (vm.name    as string) ?? `vm-${vm.vmid}`,
-                node:        (vm.node    as string),
-                type:        (vm.type    as "qemu" | "lxc"),
-                status:      (vm.status  as string),
+                vmid: (vm.vmid as number),
+                name: (vm.name as string) ?? `vm-${vm.vmid}`,
+                node: (vm.node as string),
+                type: (vm.type as "qemu" | "lxc"),
+                status: (vm.status as string),
                 cpu,
-                cpuPercent:  `${(cpu * 100).toFixed(1)}%`,
-                maxcpu:      (vm.maxcpu  as number) ?? 1,
+                cpuPercent: `${(cpu * 100).toFixed(1)}%`,
+                maxcpu: (vm.maxcpu as number) ?? 1,
                 mem,
-                maxmem:      (vm.maxmem  as number),
-                ramPercent:  `${((mem / maxmem) * 100).toFixed(1)}%`,
+                maxmem: (vm.maxmem as number),
+                ramPercent: `${((mem / maxmem) * 100).toFixed(1)}%`,
                 disk,
-                maxdisk:     (vm.maxdisk as number),
+                maxdisk: (vm.maxdisk as number),
                 diskPercent: `${((disk / maxdisk) * 100).toFixed(1)}%`,
-                uptime:      (vm.uptime  as number) ?? 0,
-                template:    Boolean(vm.template),
+                uptime: (vm.uptime as number) ?? 0,
+                template: Boolean(vm.template),
             };
         })
         .sort((a, b) =>
             a.node.localeCompare(b.node) || a.vmid - b.vmid
         );
 }
-
