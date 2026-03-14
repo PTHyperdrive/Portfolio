@@ -96,12 +96,14 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "node, name, cores, memory are required" }, { status: 400 });
         }
 
-        // Get next available VMID
-        const vmid = await getNextVMID();
+        // Get next available VMID — enforce minimum of 150 so customer VMs
+        // never clash with existing infra nodes (IDs 100-149 are reserved)
+        let vmid = parseInt(await getNextVMID());
+        if (vmid < 150) vmid = 150;
 
         // Build Proxmox VM config
         const vmConfig: Record<string, unknown> = {
-            vmid: parseInt(vmid),
+            vmid: vmid,
             name,
             cores,
             memory,
@@ -180,8 +182,24 @@ export async function POST(req: NextRequest) {
             orderId = order.id;
         }
 
-        const instance = await prisma.vpsInstance.create({
-            data: {
+        // Upsert the VpsInstance to avoid Prisma unique constraint crash
+        // when an admin retries after a partial failure (VM exists on PVE but
+        // the DB write previously failed).  vmId + node is the natural key.
+        const instance = await prisma.vpsInstance.upsert({
+            where: {
+                vmId_node: { vmId: vmid.toString(), node },
+            },
+            update: {
+                name,
+                os: osLabel || "Unknown OS",
+                status: "stopped",
+                specs: {
+                    vcpu: cores,
+                    ram_gb: Math.round(memory / 1024),
+                    disk_gb: diskSize || 0,
+                },
+            },
+            create: {
                 userId,
                 orderId,
                 vmId: vmid.toString(),

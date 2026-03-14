@@ -216,9 +216,28 @@ async function pveFetch(endpoint: string, options: RequestInit = {}) {
         throw new Error(`Proxmox VE ${res.status}: ${text}`);
     }
 
+    // PVE action endpoints (start/stop/restart/delete) return an empty body on success.
+    // Calling res.json() on an empty body causes: "malformed JSON string at character 0 (before end of string)"
+    const contentLength = res.headers.get("content-length");
+    const contentType   = res.headers.get("content-type") ?? "";
+    const hasBody = contentType.includes("application/json") && contentLength !== "0";
+
+    if (!hasBody) {
+        // Try to parse anyway in case content-length is absent; fall back to null silently
+        const text = await res.text().catch(() => "");
+        if (!text.trim()) return null;
+        try {
+            const json = JSON.parse(text);
+            return json?.data ?? json ?? null;
+        } catch {
+            return null;
+        }
+    }
+
     const json = await res.json();
     return json.data;
 }
+
 
 /**
  * Request a VNC proxy ticket for a VM.
@@ -345,6 +364,24 @@ export async function createVM(node: string, config: {
  */
 export async function listNodeVMs(node: string) {
     return pveFetch(`/nodes/${node}/qemu`);
+}
+
+/**
+ * Delete (destroy) a QEMU VM from Proxmox VE.
+ * The VM should be stopped before calling this.
+ * PVE returns an empty body on success — handled by pveFetch.
+ *
+ * @param node   - Proxmox node name
+ * @param vmId   - VMID of the VM to delete
+ * @param purge  - true = also remove from replication jobs and pending config
+ */
+export async function deleteVM(
+    node: string,
+    vmId: number | string,
+    purge = true,
+): Promise<void> {
+    const qs = purge ? "?purge=1&destroy-unreferenced-disks=1" : "";
+    await pveFetch(`/nodes/${node}/qemu/${vmId}${qs}`, { method: "DELETE" });
 }
 
 // ─── Admin: VPS Provisioning Pipeline ────────────────────────────

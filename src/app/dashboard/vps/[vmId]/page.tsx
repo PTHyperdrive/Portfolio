@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { use } from "react";
 import Link from "next/link";
 import VncConsole from "@/components/vps/VncConsole";
@@ -35,6 +35,7 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
     const searchParams = useSearchParams();
     const node = searchParams.get("node") || "";
     const initialTab = searchParams.get("tab") || "overview";
+    const router = useRouter();
 
     const [vm, setVm] = useState<VmDetail | null>(null);
     const [loading, setLoading] = useState(true);
@@ -79,6 +80,28 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
         } catch (err) {
             setError(err instanceof Error ? err.message : "Action failed");
         } finally {
+            setActionLoading("");
+        }
+    };
+
+    const handleDelete = async () => {
+        if (!confirm(`⚠️ Permanently destroy VM "${vm?.name}" (${vmId})? This will stop the VM, delete all disks, and remove it from the system. This CANNOT be undone.`)) return;
+        setActionLoading("delete");
+        setError("");
+        try {
+            const res = await fetch(`/api/proxmox/vms/${vmId}`, {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ node, force: true }),
+            });
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || "Delete failed");
+            }
+            // Redirect back to VPS list after successful deletion
+            router.push("/dashboard/vps");
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Delete failed");
             setActionLoading("");
         }
     };
@@ -353,7 +376,7 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
                         </div>
 
                         {/* VM Info */}
-                        <div className="glass-card" style={{ padding: "28px" }}>
+                        <div className="glass-card" style={{ padding: "28px", marginBottom: "20px" }}>
                             <h3 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "16px" }}>📋 Instance Information</h3>
                             <div className="mono" style={{ fontSize: "0.82rem", color: "var(--text-muted)", padding: "16px", background: "rgba(0,0,0,0.3)", borderRadius: "var(--radius-sm)" }}>
                                 <div>Instance ID: {vm.id}</div>
@@ -361,6 +384,26 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
                                 <div>Node: {vm.node}</div>
                                 <div>Created: {new Date(vm.expiresAt || "").toLocaleDateString() || "—"}</div>
                             </div>
+                        </div>
+
+                        {/* Danger Zone */}
+                        <div className="glass-card" style={{ padding: "28px", border: "1px solid rgba(255,0,110,0.25)", background: "rgba(255,0,110,0.04)" }}>
+                            <h3 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "8px", color: "var(--accent-magenta)" }}>
+                                ☠️ Danger Zone
+                            </h3>
+                            <p style={{ color: "var(--text-muted)", fontSize: "0.88rem", marginBottom: "20px" }}>
+                                Permanently destroy this VM. The VM will be stopped, all disks will be deleted from Proxmox, and the instance will be removed from your account.
+                                <br />
+                                <strong style={{ color: "var(--accent-magenta)" }}>This action is irreversible.</strong>
+                            </p>
+                            <button
+                                onClick={handleDelete}
+                                disabled={!!actionLoading}
+                                className="btn btn-danger"
+                                style={{ padding: "12px 28px", fontWeight: 700 }}
+                            >
+                                {actionLoading === "delete" ? "Destroying VM..." : "🗑️ Delete VM"}
+                            </button>
                         </div>
                     </div>
                 )}

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { startVM, stopVM, restartVM, getVMStatus, changeVMIso } from "@/lib/proxmox";
+import { startVM, stopVM, restartVM, getVMStatus, changeVMIso, deleteVM } from "@/lib/proxmox";
 import { getIsoById } from "@/lib/windows-isos";
 
 /**
@@ -88,7 +88,7 @@ export async function POST(
                 await restartVM(node, vmId);
                 break;
 
-            case "reinstall":
+            case "reinstall": {
                 if (!isoId) {
                     return NextResponse.json({ error: "ISO ID is required" }, { status: 400 });
                 }
@@ -107,6 +107,7 @@ export async function POST(
                 await startVM(node, vmId);
                 await prisma.vpsInstance.update({ where: { id: instance.id }, data: { status: "running" } });
                 break;
+            }
 
             default:
                 return NextResponse.json({ error: "Invalid action" }, { status: 400 });
@@ -117,6 +118,75 @@ export async function POST(
         console.error("VM action error:", error);
         return NextResponse.json(
             { error: error instanceof Error ? error.message : "Action failed" },
+            { status: 500 }
+        );
+    }
+}
+
+/**
+ * DELETE /api/proxmox/vms/[vmId]
+ *
+ * Destroys a VM from Proxmox VE and removes it from the database.
+ * Admin: can delete any VM.
+ * User: can only delete their own VMs.
+ *
+ * Body: { node: string, force?: boolean }
+ *   force=true stops the VM first before deleting (default true)
+ */
+export async function DELETE(
+    req: NextRequest,
+    { params }: { params: Promise<{ vmId: string }> }
+) {
+    try {
+        const session = await auth();
+        if (!session?.user?.id) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        const { vmId } = await params;
+        const body = await req.json().catch(() => ({}));
+        const { node, force = true } = body as { node: string; force?: boolean };
+
+        if (!node) {
+            return NextResponse.json({ error: "node is required" }, { status: 400 });
+        }
+
+        // Verify ownership — admin can delete any VM
+        const isAdmin = (session.user as { role?: string }).role === "ADMIN";
+        const instance = await prisma.vpsInstance.findFirst({
+            where: isAdmin ? { vmId, node } : { vmId, node, userId: session.user.id },
+        });
+
+        if (!instance) {
+            return NextResponse.json({ error: "VM not found or not yours" }, { status: 404 });
+        }
+
+        // Step 1: Force-stop the VM if requested (ignore errors — it may already be stopped)
+        if (force) {
+            try {
+                await stopVM(node, vmId);
+                // Give PVE a moment to halt the VM before destroying
+                await new Promise((r) => setTimeout(r, 3000));
+            } catch {
+                // Already stopped — continue
+            }
+        }
+
+        // Step 2: Delete the VM from Proxmox (purge disks)
+        await deleteVM(node, vmId, true);
+
+        // Step 3: Remove from our database
+        await prisma.vpsInstance.delete({ where: { id: instance.id } });
+
+        return NextResponse.json({
+            success: true,
+            message: `VM ${vmId} (${instance.name}) has been destroyed and removed.`,
+        });
+
+    } catch (error) {
+        console.error("[delete_vm] Error:", error);
+        return NextResponse.json(
+            { error: error instanceof Error ? error.message : "Delete failed" },
             { status: 500 }
         );
     }
