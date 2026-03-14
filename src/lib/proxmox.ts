@@ -1,10 +1,54 @@
 /**
  * Proxmox API Client
- * 
+ *
  * Centralized HTTP client for communicating with:
  * 1. Proxmox Manager API (proxmox-renting-upkeep) — VM tracking, pricing, rentals
- * 2. Proxmox VE API — Direct VNC ticket generation
+ * 2. Proxmox VE API — Direct VNC ticket, VM lifecycle & provisioning
  */
+
+// ─── Shared Types ─────────────────────────────────────────────────
+
+export interface CloudInitConfig {
+    /** e.g. "ip=10.0.1.50/24,gw=10.0.1.1" or "ip=dhcp" */
+    ipConfig: string;
+    /** Linux user to create inside the VM */
+    ciUser?: string;
+    /** Password for the Cloud-Init user */
+    ciPassword?: string;
+    /** Public SSH key(s) — newline separated. URL-encoded when sent to PVE. */
+    sshKey?: string;
+    /** Optional: cloud-init nameservers e.g. "1.1.1.1 8.8.8.8" */
+    nameserver?: string;
+    /** Optional: search domain e.g. "example.com" */
+    searchdomain?: string;
+}
+
+export interface ClusterVMResource {
+    vmid: number;
+    name: string;
+    node: string;
+    type: "qemu" | "lxc";
+    status: "running" | "stopped" | "paused" | string;
+    /** fraction of allocated vCPU capacity currently used (0–1) */
+    cpu: number;
+    cpuPercent: string;
+    /** number of allocated vCPUs */
+    maxcpu: number;
+    /** bytes of RAM currently consumed */
+    mem: number;
+    /** bytes of RAM allocated */
+    maxmem: number;
+    ramPercent: string;
+    /** bytes of disk currently used */
+    disk: number;
+    /** bytes of disk allocated */
+    maxdisk: number;
+    diskPercent: string;
+    /** uptime in seconds (0 if stopped) */
+    uptime: number;
+    /** true when this VM is a template */
+    template: boolean;
+}
 
 // ─── Manager API Client ──────────────────────────────────────────
 
@@ -301,5 +345,163 @@ export async function createVM(node: string, config: {
  */
 export async function listNodeVMs(node: string) {
     return pveFetch(`/nodes/${node}/qemu`);
+}
+
+// ─── Admin: VPS Provisioning Pipeline ────────────────────────────
+
+/**
+ * Clone a template VM into a new VM.
+ * Returns the Proxmox UPID string that tracks the async clone task.
+ *
+ * @param node       - Proxmox node name (e.g. "pve1")
+ * @param templateId - VMID of the template to clone
+ * @param newVmId    - VMID to assign to the clone (use getNextVMID())
+ * @param name       - Friendly name for the new VM
+ * @param storage    - Target storage pool (e.g. "local-lvm")
+ * @param full       - true = full clone (independent disk), false = linked clone
+ */
+export async function cloneVM(
+    node: string,
+    templateId: number,
+    newVmId: number,
+    name: string,
+    storage: string,
+    full = true,
+): Promise<string> {
+    // Proxmox returns the UPID as a bare string (not wrapped in .data)
+    const upid = await pveFetch(`/nodes/${node}/qemu/${templateId}/clone`, {
+        method: "POST",
+        body: JSON.stringify({
+            newid: newVmId,
+            name,
+            target: node,
+            storage,
+            full: full ? 1 : 0,
+        }),
+    });
+    return upid as string;
+}
+
+/**
+ * Apply Cloud-Init parameters to a cloned VM's config.
+ * Must be called AFTER the clone UPID has resolved successfully.
+ *
+ * @param node   - Proxmox node name
+ * @param vmId   - Target VM ID
+ * @param config - Cloud-Init parameters (IP, user, password, SSH key)
+ */
+export async function setCloudInit(
+    node: string,
+    vmId: number | string,
+    config: CloudInitConfig,
+): Promise<void> {
+    const body: Record<string, string> = {
+        ipconfig0: config.ipConfig,
+    };
+
+    if (config.ciUser)       body.ciuser       = config.ciUser;
+    if (config.ciPassword)   body.cipassword   = config.ciPassword;
+    if (config.nameserver)   body.nameserver   = config.nameserver;
+    if (config.searchdomain) body.searchdomain = config.searchdomain;
+
+    // PVE requires SSH keys to be URL-encoded
+    if (config.sshKey) {
+        body.sshkeys = encodeURIComponent(config.sshKey.trim());
+    }
+
+    await pveFetch(`/nodes/${node}/qemu/${vmId}/config`, {
+        method: "PUT",
+        body: JSON.stringify(body),
+    });
+}
+
+/**
+ * Poll a Proxmox UPID until the task completes or times out.
+ *
+ * Proxmox operations (clone, resize, snapshot, …) are asynchronous —
+ * they return a UPID string immediately. This function polls the task
+ * status endpoint at `intervalMs` intervals until:
+ *   - exitstatus === "OK"  → resolves
+ *   - exitstatus is set but !== "OK" → rejects with the error message
+ *   - `timeoutMs` elapses without completion → rejects with timeout error
+ *
+ * @param node       - Proxmox node that owns the task
+ * @param upid       - UPID string returned by cloneVM / other PVE calls
+ * @param timeoutMs  - Maximum wait time in ms (default 120 000 = 2 min)
+ * @param intervalMs - Polling interval in ms (default 2 000 = 2 s)
+ */
+export async function pollTask(
+    node: string,
+    upid: string,
+    timeoutMs = 120_000,
+    intervalMs = 2_000,
+): Promise<void> {
+    const encodedUpid = encodeURIComponent(upid);
+    const deadline = Date.now() + timeoutMs;
+
+    while (Date.now() < deadline) {
+        const status = await pveFetch(`/nodes/${node}/tasks/${encodedUpid}/status`) as {
+            status: string;
+            exitstatus?: string;
+        };
+
+        if (status.status === "stopped") {
+            if (status.exitstatus === "OK") {
+                return; // ✅ Task completed successfully
+            }
+            throw new Error(
+                `Proxmox task ${upid} failed: exitstatus = "${status.exitstatus}"`
+            );
+        }
+
+        // Task still running — wait before next poll
+        await new Promise<void>((resolve) => setTimeout(resolve, intervalMs));
+    }
+
+    throw new Error(
+        `Proxmox task ${upid} timed out after ${timeoutMs / 1000}s`
+    );
+}
+
+/**
+ * Fetch all VMs/LXC containers from the entire cluster with live resource usage.
+ * Uses the cluster aggregator endpoint — no per-node loop required.
+ *
+ * Returns an array of ClusterVMResource objects, sorted by node then vmid.
+ * Templates are included (filter client-side if needed).
+ */
+export async function getClusterResources(): Promise<ClusterVMResource[]> {
+    const raw = await pveFetch("/cluster/resources?type=vm") as Array<Record<string, unknown>>;
+
+    return raw
+        .map((vm): ClusterVMResource => {
+            const cpu     = (vm.cpu     as number) ?? 0;
+            const mem     = (vm.mem     as number) ?? 0;
+            const maxmem  = (vm.maxmem  as number) ?? 1; // avoid /0
+            const disk    = (vm.disk    as number) ?? 0;
+            const maxdisk = (vm.maxdisk as number) ?? 1;
+
+            return {
+                vmid:        (vm.vmid    as number),
+                name:        (vm.name    as string) ?? `vm-${vm.vmid}`,
+                node:        (vm.node    as string),
+                type:        (vm.type    as "qemu" | "lxc"),
+                status:      (vm.status  as string),
+                cpu,
+                cpuPercent:  `${(cpu * 100).toFixed(1)}%`,
+                maxcpu:      (vm.maxcpu  as number) ?? 1,
+                mem,
+                maxmem:      (vm.maxmem  as number),
+                ramPercent:  `${((mem / maxmem) * 100).toFixed(1)}%`,
+                disk,
+                maxdisk:     (vm.maxdisk as number),
+                diskPercent: `${((disk / maxdisk) * 100).toFixed(1)}%`,
+                uptime:      (vm.uptime  as number) ?? 0,
+                template:    Boolean(vm.template),
+            };
+        })
+        .sort((a, b) =>
+            a.node.localeCompare(b.node) || a.vmid - b.vmid
+        );
 }
 
