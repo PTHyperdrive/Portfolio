@@ -1,8 +1,8 @@
 "use client";
 
+import * as React from "react";
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { use } from "react";
 import Link from "next/link";
 import VncConsole from "@/components/vps/VncConsole";
 import { WINDOWS_ISOS, getIsosByCategory } from "@/lib/windows-isos";
@@ -380,8 +380,6 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
                             <h3 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "16px" }}>📋 Instance Information</h3>
                             <div className="mono" style={{ fontSize: "0.82rem", color: "var(--text-muted)", padding: "16px", background: "rgba(0,0,0,0.3)", borderRadius: "var(--radius-sm)" }}>
                                 <div>Instance ID: {vm.id}</div>
-                                <div>Proxmox VM ID: {vm.vmId}</div>
-                                <div>Node: {vm.node}</div>
                                 <div>Created: {new Date(vm.expiresAt || "").toLocaleDateString() || "—"}</div>
                             </div>
                         </div>

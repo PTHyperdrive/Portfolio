@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { VPS_PLANS } from "@/lib/vps-plans";
 
 interface VpsInstance {
     id: string;
@@ -124,6 +125,11 @@ export default function VpsDashboard() {
                         <span className="badge badge-cyan">
                             {instances.length} Instance{instances.length !== 1 ? "s" : ""}
                         </span>
+                        {instances.length > 0 && (
+                            <Link href="/dashboard/vps/checkout" className="btn btn-primary" style={{ padding: "8px 16px", fontSize: "0.85rem", textDecoration: "none" }}>
+                                ➕ New VPS
+                            </Link>
+                        )}
                     </div>
                 </div>
 
@@ -135,15 +141,83 @@ export default function VpsDashboard() {
                 )}
 
                 {instances.length === 0 ? (
-                    <div className="glass-card" style={{ padding: "80px 40px", textAlign: "center" }}>
-                        <div style={{ fontSize: "3rem", marginBottom: "16px" }}>🖥️</div>
-                        <h3 style={{ fontSize: "1.3rem", marginBottom: "8px" }}>No VPS Instances</h3>
-                        <p style={{ color: "var(--text-muted)", marginBottom: "24px" }}>
-                            You don&apos;t have any VPS instances yet. Purchase a plan to get started.
-                        </p>
-                        <Link href="/services/vps" className="btn btn-primary">
-                            Browse VPS Plans
-                        </Link>
+                    <div>
+                        <div style={{ textAlign: "center", marginBottom: "40px" }}>
+                            <div style={{ fontSize: "3rem", marginBottom: "16px" }}>🖥️</div>
+                            <h3 style={{ fontSize: "1.5rem", marginBottom: "8px", fontWeight: 800 }}>No VPS Instances</h3>
+                            <p style={{ color: "var(--text-muted)" }}>
+                                You don&apos;t have any virtual private servers yet. Choose a plan below to deploy your first server instantly.
+                            </p>
+                        </div>
+                        
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "24px" }}>
+                            {VPS_PLANS.map((plan) => (
+                                <div key={plan.id} className="glass-card" style={{ 
+                                    padding: "32px 24px", 
+                                    display: "flex", 
+                                    flexDirection: "column",
+                                    border: plan.featured ? `1px solid ${plan.color}55` : undefined,
+                                    transform: plan.featured ? "scale(1.02)" : "auto",
+                                    zIndex: plan.featured ? 10 : 1,
+                                    boxShadow: plan.featured ? `0 8px 32px ${plan.color}22` : undefined,
+                                }}>
+                                    {plan.featured && (
+                                        <div style={{ 
+                                            position: "absolute", top: 0, left: "50%", transform: "translate(-50%, -50%)",
+                                            background: plan.color, color: "#fff", padding: "4px 12px", borderRadius: "20px",
+                                            fontSize: "0.7rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: "1px"
+                                        }}>
+                                            Most Popular
+                                        </div>
+                                    )}
+                                    <div style={{ fontSize: "2.5rem", marginBottom: "16px" }}>{plan.icon}</div>
+                                    <h3 style={{ fontSize: "1.3rem", fontWeight: 800, marginBottom: "8px" }}>{plan.name}</h3>
+                                    <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginBottom: "24px", minHeight: "40px" }}>{plan.tagline}</p>
+                                    
+                                    {!plan.negotiate ? (
+                                        <div style={{ marginBottom: "24px" }}>
+                                            <span style={{ fontSize: "2rem", fontWeight: 800, color: plan.color }}>${plan.price}</span>
+                                            <span style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>/mo</span>
+                                        </div>
+                                    ) : (
+                                        <div style={{ marginBottom: "24px", height: "42px", display: "flex", alignItems: "center" }}>
+                                            <span style={{ fontSize: "1.2rem", fontWeight: 800, color: plan.color }}>Custom Pricing</span>
+                                        </div>
+                                    )}
+
+                                    <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "32px", flexGrow: 1 }}>
+                                        {!plan.negotiate ? (
+                                            <>
+                                                <div style={{ fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "8px" }}><span style={{ color: plan.color }}>✓</span> {plan.specs.vcpu} vCPU</div>
+                                                <div style={{ fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "8px" }}><span style={{ color: plan.color }}>✓</span> {plan.specs.ram_gb} GB RAM</div>
+                                                <div style={{ fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "8px" }}><span style={{ color: plan.color }}>✓</span> {plan.specs.disk_gb} GB NVMe Disk</div>
+                                                <div style={{ fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "8px" }}><span style={{ color: plan.color }}>✓</span> {plan.specs.bandwidth} Bandwidth</div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div style={{ fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "8px" }}><span style={{ color: plan.color }}>✓</span> Custom vCPU & RAM</div>
+                                                <div style={{ fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "8px" }}><span style={{ color: plan.color }}>✓</span> Custom NVMe Storage</div>
+                                                <div style={{ fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "8px" }}><span style={{ color: plan.color }}>✓</span> Custom Bandwidth</div>
+                                                <div style={{ fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "8px" }}><span style={{ color: plan.color }}>✓</span> SLA & Support</div>
+                                            </>
+                                        )}
+                                    </div>
+
+                                    <Link 
+                                        href={`/dashboard/vps/checkout?plan=${plan.id}`} 
+                                        className="btn btn-primary" 
+                                        style={{ 
+                                            width: "100%", textAlign: "center", padding: "12px", 
+                                            background: plan.featured ? plan.color : undefined,
+                                            border: plan.featured ? "none" : undefined,
+                                            color: plan.featured ? "#000" : undefined,
+                                        }}
+                                    >
+                                        {plan.negotiate ? "Contact Us" : "Deploy Now"}
+                                    </Link>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 ) : (
                     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -176,9 +250,7 @@ export default function VpsDashboard() {
                                                         {vm.name}
                                                     </Link>
                                                     <div style={{ display: "flex", gap: "8px", alignItems: "center", marginTop: "4px" }}>
-                                                        <span className="mono" style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>VM {vm.vmId}</span>
-                                                        <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>•</span>
-                                                        <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>{vm.node}</span>
+                                                        <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>{vm.os}</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -203,10 +275,7 @@ export default function VpsDashboard() {
                                                         <span className="mono" style={{ color: "var(--accent-cyan)", fontWeight: 600 }}>{vm.ipAddress}</span>
                                                     </div>
                                                 )}
-                                                <div style={{ fontSize: "0.82rem" }}>
-                                                    <span style={{ color: "var(--text-muted)" }}>OS </span>
-                                                    <span style={{ color: "var(--text-secondary)", fontWeight: 500 }}>{vm.os}</span>
-                                                </div>
+                                                {/* OS moved to subtitle */}
                                             </div>
 
                                             {/* Live Stats */}
