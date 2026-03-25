@@ -58,7 +58,7 @@ export default function BillingPage() {
         setDeploying(true);
         setError("");
         try {
-            const res = await fetch("/api/proxmox/provision", {
+            const res = await fetch("/api/vps/deploy", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ plan: data.activePlan, isoId: selectedIso }),
@@ -143,13 +143,16 @@ export default function BillingPage() {
                                     className="btn btn-primary"
                                     style={{ width: "100%", padding: "10px", fontSize: "0.85rem", display: "flex", justifyContent: "center", alignItems: "center", gap: "8px" }}
                                 >
-                                    {deploying ? "Deploying..." : "Activate VPS"}
+                                    {deploying ? "Deploying..." : "Create machine"}
                                 </button>
                             </div>
                         )}
                         {data?.activePlan && data.vpsCount > 0 && (
-                            <div style={{ marginTop: "auto", paddingTop: "20px" }}>
-                                <Link href="/dashboard/vps" className="btn btn-secondary" style={{ width: "100%", display: "block", textAlign: "center", padding: "8px", fontSize: "0.85rem" }}>
+                            <div style={{ marginTop: "20px", paddingTop: "20px", borderTop: "1px solid rgba(255,255,255,0.06)", textAlign: "center" }}>
+                                <p style={{ fontSize: "0.85rem", color: "var(--accent-magenta)", lineHeight: "1.4" }}>
+                                    VM is already created. Destroy the existing VM in the VPS Instances tab to recreate it.
+                                </p>
+                                <Link href="/dashboard/vps" className="btn btn-secondary" style={{ marginTop: "12px", width: "100%", display: "block", padding: "8px", fontSize: "0.85rem" }}>
                                     Manage Instance
                                 </Link>
                             </div>
