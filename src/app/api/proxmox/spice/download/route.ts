@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
         const vvContent = [
             "[virt-viewer]",
             `type=${spice.type || "spice"}`,
-            `host=${fqdn.toLowerCase()}`,
+            `host=${spice.host}`,
             `tls-port=${spice["tls-port"]}`,
             `password=${spice.password}`,
             `proxy=${proxy}`,
