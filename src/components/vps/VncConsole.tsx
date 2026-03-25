@@ -51,10 +51,18 @@ export default function VncConsole({ vmId, node }: VncConsoleProps) {
                 rfbRef.current = null;
             }
 
+            // Wake up the Next.js API route to attach the WebSocket upgrade listener
+            // (Pages API routes don't natively intercept ws:// until initialized)
+            await fetch("/api/proxmox/vnc-proxy").catch(() => { });
+
             // 4. Construct WebSocket URL pointing to our Next.js API route proxy
             const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-            const encodedTicket = encodeURIComponent(ticket);
-            const wsUrl = `${protocol}//${window.location.host}/api/proxmox/vnc-proxy?node=${node}&vmId=${vmId}&port=${port}&vncticket=${encodedTicket}`;
+            // The ticket is likely already URL safe from Proxmox, but let's ensure it's not double-encoded 
+            const safeTicket = typeof ticket === 'string' && ticket.includes('%3A')
+                ? ticket // Already encoded
+                : encodeURIComponent(ticket);
+
+            const wsUrl = `${protocol}//${window.location.host}/api/proxmox/vnc-proxy?node=${node}&vmId=${vmId}&port=${port}&vncticket=${safeTicket}`;
 
             if (!canvasRef.current) throw new Error("Canvas container not ready");
 

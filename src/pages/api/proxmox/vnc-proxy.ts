@@ -23,7 +23,15 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
         }
 
         console.log(`[VNC Relay] Initializing WebSocket Proxy v${PROXY_VERSION}...`);
-        const wss = new WebSocketServer({ noServer: true });
+        const wss = new WebSocketServer({
+            noServer: true,
+            handleProtocols: (protocols: Set<string>) => {
+                // noVNC requires the server to explicitly accept the 'binary' sub-protocol
+                if (protocols.has("binary")) return "binary";
+                if (protocols.has("base64")) return "base64";
+                return false;
+            }
+        });
         server.vncWss = wss;
 
         // Listen for standard HTTP upgrades
