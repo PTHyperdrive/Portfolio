@@ -4,21 +4,35 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
 
-const NAV_LINKS = [
+// Links shown to logged-OUT visitors
+const PUBLIC_LINKS = [
     { href: "/", label: "Home" },
     { href: "/services/vps", label: "VPS" },
     { href: "/services/email", label: "Email" },
     { href: "/services/vpn", label: "VPN" },
     { href: "/services/proxy", label: "Proxy" },
     { href: "/blog", label: "Blog" },
+];
+
+// Links shown to logged-IN users
+const AUTH_LINKS = [
+    { href: "/", label: "Home" },
+    { href: "/blog", label: "Blog" },
     { href: "/dashboard/vps", label: "Dashboard" },
+    { href: "/settings", label: "Settings" },
+    { href: "/payment", label: "Payment" },
 ];
 
 export default function Navbar() {
     const [scrolled, setScrolled] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
     const pathname = usePathname();
+    const { data: session, status } = useSession();
+
+    const isLoggedIn = status === "authenticated";
+    const navLinks = isLoggedIn ? AUTH_LINKS : PUBLIC_LINKS;
 
     useEffect(() => {
         const onScroll = () => setScrolled(window.scrollY > 20);
@@ -39,13 +53,9 @@ export default function Navbar() {
                 right: 0,
                 zIndex: 1000,
                 padding: scrolled ? "12px 0" : "20px 0",
-                background: scrolled
-                    ? "rgba(10, 10, 15, 0.85)"
-                    : "transparent",
+                background: scrolled ? "rgba(10, 10, 15, 0.85)" : "transparent",
                 backdropFilter: scrolled ? "blur(20px)" : "none",
-                borderBottom: scrolled
-                    ? "1px solid rgba(255,255,255,0.06)"
-                    : "none",
+                borderBottom: scrolled ? "1px solid rgba(255,255,255,0.06)" : "none",
                 transition: "all 0.3s ease",
             }}
         >
@@ -60,26 +70,15 @@ export default function Navbar() {
                         style={{ objectFit: "contain", width: "auto", height: "36px" }}
                         priority
                     />
-                    <span
-                        style={{
-                            fontWeight: 700,
-                            fontSize: "1.15rem",
-                            color: "var(--text-primary)",
-                            letterSpacing: "-0.02em",
-                        }}
-                    >
+                    <span style={{ fontWeight: 700, fontSize: "1.15rem", color: "var(--text-primary)", letterSpacing: "-0.02em" }}>
                         Notrespond<span style={{ color: "var(--accent-cyan)" }}>.com</span>
                     </span>
                 </Link>
 
                 {/* Desktop Nav */}
                 <div style={{ display: "flex", alignItems: "center", gap: "6px" }} className="nav-desktop">
-                    {NAV_LINKS.map((link) => {
-                        const isActive =
-                            link.href === "/"
-                                ? pathname === "/"
-                                : pathname.startsWith(link.href);
-
+                    {navLinks.map((link) => {
+                        const isActive = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
                         return (
                             <Link
                                 key={link.href}
@@ -101,28 +100,52 @@ export default function Navbar() {
                     })}
                 </div>
 
-                {/* Auth Buttons */}
+                {/* Auth Area */}
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }} className="nav-auth">
-                    <Link href="/auth/login" className="btn btn-ghost" style={{ padding: "8px 20px", fontSize: "0.85rem" }}>
-                        Log In
-                    </Link>
-                    <Link href="/auth/register" className="btn btn-primary" style={{ padding: "8px 20px", fontSize: "0.85rem" }}>
-                        Sign Up
-                    </Link>
+                    {status === "loading" ? (
+                        // Skeleton placeholder to prevent layout shift
+                        <div style={{ width: 80, height: 34, borderRadius: 8, background: "rgba(255,255,255,0.06)" }} />
+                    ) : isLoggedIn ? (
+                        <>
+                            {/* Avatar + name */}
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                <div style={{
+                                    width: 32, height: 32, borderRadius: "10px",
+                                    background: "var(--gradient-primary)",
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    fontWeight: 700, fontSize: "0.8rem", color: "#fff",
+                                }}>
+                                    {(session.user?.name || session.user?.email || "U")[0].toUpperCase()}
+                                </div>
+                                <span style={{ fontSize: "0.85rem", color: "var(--text-secondary)", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                    {session.user?.name || session.user?.email}
+                                </span>
+                            </div>
+                            <button
+                                onClick={() => signOut({ callbackUrl: "/" })}
+                                className="btn btn-ghost"
+                                style={{ padding: "7px 16px", fontSize: "0.82rem" }}
+                            >
+                                Sign Out
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <Link href="/auth/login" className="btn btn-ghost" style={{ padding: "8px 20px", fontSize: "0.85rem" }}>
+                                Log In
+                            </Link>
+                            <Link href="/auth/register" className="btn btn-primary" style={{ padding: "8px 20px", fontSize: "0.85rem" }}>
+                                Sign Up
+                            </Link>
+                        </>
+                    )}
                 </div>
 
                 {/* Mobile Menu Button */}
                 <button
                     onClick={() => setMobileOpen(!mobileOpen)}
                     className="nav-mobile-btn"
-                    style={{
-                        display: "none",
-                        background: "none",
-                        border: "none",
-                        color: "var(--text-primary)",
-                        cursor: "pointer",
-                        padding: 8,
-                    }}
+                    style={{ display: "none", background: "none", border: "none", color: "var(--text-primary)", cursor: "pointer", padding: 8 }}
                     aria-label="Toggle menu"
                 >
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -140,45 +163,45 @@ export default function Navbar() {
                 <div
                     className="nav-mobile-menu"
                     style={{
-                        position: "absolute",
-                        top: "100%",
-                        left: 0,
-                        right: 0,
+                        position: "absolute", top: "100%", left: 0, right: 0,
                         background: "rgba(10, 10, 15, 0.95)",
                         backdropFilter: "blur(20px)",
                         borderBottom: "1px solid var(--glass-border)",
                         padding: "16px 24px",
-                        display: "flex",
-                        flexDirection: "column",
-                        gap: "4px",
+                        display: "flex", flexDirection: "column", gap: "4px",
                     }}
                 >
-                    {NAV_LINKS.map((link) => (
+                    {navLinks.map((link) => (
                         <Link
                             key={link.href}
                             href={link.href}
                             style={{
-                                padding: "12px 16px",
-                                borderRadius: "8px",
+                                padding: "12px 16px", borderRadius: "8px",
                                 color: pathname === link.href ? "var(--accent-cyan)" : "var(--text-secondary)",
-                                textDecoration: "none",
-                                fontSize: "0.95rem",
+                                textDecoration: "none", fontSize: "0.95rem",
                             }}
                         >
                             {link.label}
                         </Link>
                     ))}
                     <div style={{ borderTop: "1px solid var(--glass-border)", margin: "8px 0", paddingTop: "12px", display: "flex", gap: "10px" }}>
-                        <Link href="/auth/login" className="btn btn-ghost" style={{ flex: 1 }}>
-                            Log In
-                        </Link>
-                        <Link href="/auth/register" className="btn btn-primary" style={{ flex: 1 }}>
-                            Sign Up
-                        </Link>
+                        {isLoggedIn ? (
+                            <button
+                                onClick={() => signOut({ callbackUrl: "/" })}
+                                className="btn btn-ghost"
+                                style={{ flex: 1 }}
+                            >
+                                Sign Out
+                            </button>
+                        ) : (
+                            <>
+                                <Link href="/auth/login" className="btn btn-ghost" style={{ flex: 1 }}>Log In</Link>
+                                <Link href="/auth/register" className="btn btn-primary" style={{ flex: 1 }}>Sign Up</Link>
+                            </>
+                        )}
                     </div>
                 </div>
             )}
-
         </nav>
     );
 }

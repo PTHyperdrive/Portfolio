@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 
 interface BlogPostSummary {
     id: string;
@@ -16,6 +17,8 @@ interface BlogPostSummary {
 export default function BlogPage() {
     const [posts, setPosts] = useState<BlogPostSummary[]>([]);
     const [loading, setLoading] = useState(true);
+    const { data: session } = useSession();
+    const isAdmin = (session?.user as { role?: string })?.role === "ADMIN";
 
     useEffect(() => {
         fetch("/api/blog")
@@ -81,17 +84,10 @@ export default function BlogPage() {
                 {!loading && posts.length === 0 && (
                     <div
                         className="glass-card"
-                        style={{
-                            padding: "80px 40px",
-                            textAlign: "center",
-                            maxWidth: "500px",
-                            margin: "0 auto",
-                        }}
+                        style={{ padding: "80px 40px", textAlign: "center", maxWidth: "500px", margin: "0 auto" }}
                     >
                         <div style={{ fontSize: "3rem", marginBottom: "16px" }}>📝</div>
-                        <h3 style={{ fontSize: "1.3rem", fontWeight: 700, marginBottom: "8px" }}>
-                            No posts yet
-                        </h3>
+                        <h3 style={{ fontSize: "1.3rem", fontWeight: 700, marginBottom: "8px" }}>No posts yet</h3>
                         <p style={{ color: "var(--text-muted)", fontSize: "0.95rem" }}>
                             Stay tuned — new articles are coming soon.
                         </p>
@@ -141,12 +137,8 @@ export default function BlogPage() {
                                     {/* Date & Author */}
                                     <div
                                         style={{
-                                            display: "flex",
-                                            alignItems: "center",
-                                            gap: "12px",
-                                            marginBottom: "12px",
-                                            fontSize: "0.8rem",
-                                            color: "var(--text-muted)",
+                                            display: "flex", alignItems: "center", gap: "12px",
+                                            marginBottom: "12px", fontSize: "0.8rem", color: "var(--text-muted)",
                                         }}
                                     >
                                         <span className="mono">{formatDate(post.createdAt)}</span>
@@ -161,11 +153,8 @@ export default function BlogPage() {
                                     {/* Title */}
                                     <h2
                                         style={{
-                                            fontSize: "1.25rem",
-                                            fontWeight: 700,
-                                            color: "var(--text-primary)",
-                                            marginBottom: "10px",
-                                            lineHeight: 1.3,
+                                            fontSize: "1.25rem", fontWeight: 700,
+                                            color: "var(--text-primary)", marginBottom: "10px", lineHeight: 1.3,
                                         }}
                                     >
                                         {post.title}
@@ -175,28 +164,17 @@ export default function BlogPage() {
                                     {post.excerpt && (
                                         <p
                                             style={{
-                                                color: "var(--text-secondary)",
-                                                fontSize: "0.92rem",
-                                                lineHeight: 1.6,
-                                                marginBottom: "16px",
-                                                display: "-webkit-box",
-                                                WebkitLineClamp: 3,
-                                                WebkitBoxOrient: "vertical",
-                                                overflow: "hidden",
+                                                color: "var(--text-secondary)", fontSize: "0.92rem",
+                                                lineHeight: 1.6, marginBottom: "16px",
+                                                display: "-webkit-box", WebkitLineClamp: 3,
+                                                WebkitBoxOrient: "vertical", overflow: "hidden",
                                             }}
                                         >
                                             {post.excerpt}
                                         </p>
                                     )}
 
-                                    {/* Read More */}
-                                    <span
-                                        style={{
-                                            color: "var(--accent-cyan)",
-                                            fontSize: "0.85rem",
-                                            fontWeight: 600,
-                                        }}
-                                    >
+                                    <span style={{ color: "var(--accent-cyan)", fontSize: "0.85rem", fontWeight: 600 }}>
                                         Read more →
                                     </span>
                                 </div>
@@ -205,6 +183,42 @@ export default function BlogPage() {
                     </div>
                 )}
             </div>
+
+            {/* Admin FAB — Create Post */}
+            {isAdmin && (
+                <Link
+                    href="/admin/blog/new"
+                    title="Create new post"
+                    style={{
+                        position: "fixed",
+                        bottom: "32px",
+                        right: "32px",
+                        width: "58px",
+                        height: "58px",
+                        borderRadius: "50%",
+                        background: "var(--gradient-primary)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        boxShadow: "0 0 24px rgba(0, 240, 255, 0.4), 0 8px 24px rgba(0,0,0,0.4)",
+                        textDecoration: "none",
+                        zIndex: 900,
+                        transition: "transform 0.2s ease, box-shadow 0.2s ease",
+                    }}
+                    onMouseEnter={(e) => {
+                        (e.currentTarget as HTMLElement).style.transform = "scale(1.12)";
+                        (e.currentTarget as HTMLElement).style.boxShadow = "0 0 36px rgba(0, 240, 255, 0.6), 0 12px 32px rgba(0,0,0,0.5)";
+                    }}
+                    onMouseLeave={(e) => {
+                        (e.currentTarget as HTMLElement).style.transform = "scale(1)";
+                        (e.currentTarget as HTMLElement).style.boxShadow = "0 0 24px rgba(0, 240, 255, 0.4), 0 8px 24px rgba(0,0,0,0.4)";
+                    }}
+                >
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 5v14M5 12h14" />
+                    </svg>
+                </Link>
+            )}
         </div>
     );
 }
