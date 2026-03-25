@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, use } from "react";
 import { useSearchParams } from "next/navigation";
-import { use } from "react";
+
 import Link from "next/link";
 import VncConsole from "@/components/vps/VncConsole";
 import { WINDOWS_ISOS, getIsosByCategory } from "@/lib/windows-isos";
