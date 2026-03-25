@@ -1,4 +1,4 @@
-declare module "@novnc/novnc/core/rfb.js" {
+declare module "@novnc/novnc/lib/rfb.js" {
     interface RFBOptions {
         credentials?: { password?: string };
         wsProtocols?: string[];

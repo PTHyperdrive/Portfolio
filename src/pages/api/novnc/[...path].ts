@@ -28,23 +28,31 @@ const MIME: Record<string, string> = {
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
     const segments = req.query.path as string[];
+    console.log("[novnc] req.query.path:", JSON.stringify(segments));
+
     if (!segments || segments.length === 0) {
         return res.status(400).send("No path specified");
     }
 
     // Prevent directory traversal
     const relative = path.normalize(segments.join("/"));
+    const filePath = path.join(NOVNC_ROOT, relative);
+    console.log("[novnc] relative:", relative, "| filePath:", filePath, "| exists:", fs.existsSync(filePath));
+
     if (relative.startsWith("..")) {
         return res.status(403).send("Forbidden");
     }
-
-    const filePath = path.join(NOVNC_ROOT, relative);
 
     if (!filePath.startsWith(NOVNC_ROOT)) {
         return res.status(403).send("Forbidden");
     }
 
     if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
+        // List what IS in that directory for debugging
+        const dir = path.dirname(filePath);
+        if (fs.existsSync(dir)) {
+            console.log("[novnc] contents of", dir, ":", fs.readdirSync(dir).slice(0, 10));
+        }
         return res.status(404).send("Not found");
     }
 
