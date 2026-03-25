@@ -14,6 +14,7 @@ import path from "node:path";
  */
 
 const NOVNC_ROOT = path.join(process.cwd(), "node_modules/@novnc/novnc");
+console.log("[novnc] Serving from:", NOVNC_ROOT, "| exists:", fs.existsSync(NOVNC_ROOT));
 
 const MIME: Record<string, string> = {
     ".js": "application/javascript",
