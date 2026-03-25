@@ -58,7 +58,6 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
             const proxmoxWsUrl = `wss://${pveHost}:${pvePort}/api2/json/nodes/${node}/qemu/${vmId}/vncwebsocket?port=${port}&vncticket=${encodeURIComponent(vncticket)}`;
 
             const wsHeaders = {
-                "Cookie": `PVEAuthCookie=${encodeURIComponent(vncticket)}`,
                 "Authorization": `PVEAPIToken=${pveTokenId}=${pveTokenValue}`,
             };
 
