@@ -12,11 +12,19 @@ function initPool(): Pool {
     const url = process.env.DATABASE_URL;
     if (!url) throw new Error('DATABASE_URL is not set');
 
-    // The `mariadb` npm driver requires mariadb:// scheme but works
-    // fine with MySQL servers — just swap the protocol prefix.
-    const connStr = url.replace(/^mysql:\/\//, 'mariadb://');
+    // Parse the mysql:// URL ourselves because the mariadb driver's
+    // URL parser chokes on URL-encoded special characters in passwords.
+    const parsed = new URL(url.replace(/^mysql:\/\//, 'mariadb://'));
 
-    return createPool(connStr);
+    return createPool({
+        host: parsed.hostname,
+        port: parseInt(parsed.port || '3306', 10),
+        user: decodeURIComponent(parsed.username),
+        password: decodeURIComponent(parsed.password),
+        database: parsed.pathname.replace(/^\//, ''),
+        connectionLimit: 10,
+        connectTimeout: 30000,
+    });
 }
 
 const pool = globalForPrisma.__pool ?? initPool();
