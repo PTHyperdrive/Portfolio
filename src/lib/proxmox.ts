@@ -150,7 +150,6 @@ const PVE_TOKEN_VALUE = process.env.PROXMOX_VE_TOKEN_VALUE || "";
 const PVE_BASE = `https://${PVE_HOST}:${PVE_PORT}/api2/json`;
 
 async function pveFetch(endpoint: string, options: RequestInit = {}) {
-    if (!PVE_HOST || !PVE_PORT) throw new Error("PROXMOX_VE_HOST/PORT not configured in .env.local");
     const url = `${PVE_BASE}${endpoint}`;
     const res = await fetch(url, {
         ...options,

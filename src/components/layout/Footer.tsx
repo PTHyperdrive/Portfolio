@@ -53,7 +53,7 @@ export default function Footer() {
                                 alt="Notrespond.com"
                                 width={120}
                                 height={32}
-                                style={{ objectFit: "contain" }}
+                                style={{ objectFit: "contain", width: "auto", height: "32px" }}
                             />
                             <span style={{ fontWeight: 700, fontSize: "1.1rem", color: "var(--text-primary)" }}>
                                 Notrespond<span style={{ color: "var(--accent-cyan)" }}>.com</span>

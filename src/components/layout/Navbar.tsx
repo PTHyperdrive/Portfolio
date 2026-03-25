@@ -57,7 +57,7 @@ export default function Navbar() {
                         alt="Notrespond.com"
                         width={140}
                         height={36}
-                        style={{ objectFit: "contain" }}
+                        style={{ objectFit: "contain", width: "auto", height: "36px" }}
                         priority
                     />
                     <span
