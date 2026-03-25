@@ -15,19 +15,10 @@ declare global {
     }
 }
 
-const NOVNC_CDN = "https://cdn.jsdelivr.net/npm/@novnc/novnc@1.5.0/core/rfb.js";
+// noVNC served from our own server via /api/novnc/ (node_modules on server)
+// Browser never sees Proxmox host in network inspection
+const NOVNC_RFB_URL = "/api/novnc/core/rfb.js";
 
-function loadNoVNC(): Promise<void> {
-    return new Promise((resolve, reject) => {
-        if (window.RFB) return resolve();
-        const script = document.createElement("script");
-        script.src = NOVNC_CDN;
-        script.type = "module";
-        script.onload = () => resolve();
-        script.onerror = () => reject(new Error("Failed to load noVNC library"));
-        document.head.appendChild(script);
-    });
-}
 
 export default function VncConsole({ vmId, node }: VncConsoleProps) {
     const [status, setStatus] = useState<"idle" | "connecting" | "connected" | "error">("idle");
@@ -73,11 +64,10 @@ export default function VncConsole({ vmId, node }: VncConsoleProps) {
             const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
             const wsUrl = `${protocol}//${window.location.host}/api/proxmox/vnc-proxy?node=${node}&vmId=${vmId}&port=${port}&vncticket=${encodedTicket}`;
 
-            // 4. Load noVNC from CDN (module script sets window.RFB via import)
-            //    We use a workaround: import the RFB class via a blob URL re-export
-            //    so it lands on window.RFB for our access.
+            // 4. Load noVNC from our own server (served via /api/novnc/)
+            //    webpackIgnore prevents the bundler from trying to process it.
             if (!window.RFB) {
-                const mod = await import(/* webpackIgnore: true */ NOVNC_CDN);
+                const mod = await import(/* webpackIgnore: true */ NOVNC_RFB_URL);
                 window.RFB = mod.default ?? mod;
             }
 
