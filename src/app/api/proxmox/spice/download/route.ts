@@ -33,15 +33,27 @@ export async function GET(req: NextRequest) {
         // Request SPICE ticket from Proxmox VE
         const spice = await getSpiceTicket(node, vmId);
 
+        // Auto-resolve internal IP to FQDN from the host-subject CN field
+        // e.g. "OU=PVE Cluster Node,O=Proxmox Virtual Environment,CN=Timox-1.notrespond.com"
+        const cnMatch = spice["host-subject"]?.match(/CN=([^,]+)/i);
+        const fqdn = cnMatch?.[1] || spice.host;
+
+        // Replace internal IPs with the resolved FQDN in proxy and host fields
+        let proxy = spice.proxy || "";
+        if (fqdn && proxy) {
+            // proxy format: "http://10.0.1.1:3128" → "http://timox-1.notrespond.com:3128"
+            proxy = proxy.replace(/\/\/[\d.]+/, `//${fqdn.toLowerCase()}`);
+        }
+
         // Build the .vv file content in exact virt-viewer INI format
         // Field order matches the Go reference implementation
         const vvContent = [
             "[virt-viewer]",
             `type=${spice.type || "spice"}`,
-            `host=${spice.host}`,
+            `host=${fqdn.toLowerCase()}`,
             `tls-port=${spice["tls-port"]}`,
             `password=${spice.password}`,
-            `proxy=${spice.proxy}`,
+            `proxy=${proxy}`,
             `host-subject=${spice["host-subject"]}`,
             `title=VM ${vmId}`,
             `toggle-fullscreen=${spice["toggle-fullscreen"] || "Shift+F11"}`,
