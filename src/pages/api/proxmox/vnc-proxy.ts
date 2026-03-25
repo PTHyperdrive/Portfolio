@@ -14,10 +14,17 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const server = (res.socket as any).server;
 
-    // Prevent multiple WebSocketServer instances during Next.js HMR or multiple calls
-    if (!server.vncProxyInitialized) {
-        console.log("[VNC Relay] Initializing Next.js WebSocket Proxy...");
+    // Re-initialize on each code change by tracking a version
+    const PROXY_VERSION = 3;
+    if (server.vncProxyVersion !== PROXY_VERSION) {
+        // Clean up old WSS if any
+        if (server.vncWss) {
+            server.vncWss.close();
+        }
+
+        console.log(`[VNC Relay] Initializing WebSocket Proxy v${PROXY_VERSION}...`);
         const wss = new WebSocketServer({ noServer: true });
+        server.vncWss = wss;
 
         // Listen for standard HTTP upgrades
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -47,18 +54,26 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
             const pveTokenId = process.env.PROXMOX_VE_TOKEN_ID || "";
             const pveTokenValue = process.env.PROXMOX_VE_TOKEN_VALUE || "";
 
-            // Reconstruct the Proxmox websocket URL targeting the Proxmox instance
+            // Reconstruct the Proxmox websocket URL
             const proxmoxWsUrl = `wss://${pveHost}:${pvePort}/api2/json/nodes/${node}/qemu/${vmId}/vncwebsocket?port=${port}&vncticket=${encodeURIComponent(vncticket)}`;
-            console.log(`[VNC Relay] Proxying connection for VM ${vmId} on ${node}`);
+
+            const wsHeaders = {
+                "Cookie": `PVEAuthCookie=${encodeURIComponent(vncticket)}`,
+                "Authorization": `PVEAPIToken=${pveTokenId}=${pveTokenValue}`,
+            };
+
+            console.log(`[VNC Relay] Proxying VM ${vmId} on ${node}`);
+            console.log(`[VNC Relay] URL: ${proxmoxWsUrl.substring(0, 80)}...`);
+            console.log(`[VNC Relay] Auth: token=${pveTokenId ? "set" : "MISSING"}, cookie=set`);
 
             // Connect to Proxmox VE with binary sub-protocol and auth headers
-            // Proxmox requires the VNC ticket as a PVEAuthCookie AND the API token
             const proxmoxWs = new WebSocket(proxmoxWsUrl, ["binary"], {
                 rejectUnauthorized: false,
-                headers: {
-                    "Cookie": `PVEAuthCookie=${encodeURIComponent(vncticket)}`,
-                    "Authorization": `PVEAPIToken=${pveTokenId}=${pveTokenValue}`,
-                },
+                headers: wsHeaders,
+            });
+
+            proxmoxWs.on("open", () => {
+                console.log("[VNC Relay] Connected to Proxmox VE successfully!");
             });
 
             // Proxy messages from Client -> Proxmox (binary frames)
@@ -76,7 +91,8 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
             });
 
             // Cleanup when either side closes
-            proxmoxWs.on("close", () => {
+            proxmoxWs.on("close", (code: number, reason: Buffer) => {
+                console.log(`[VNC Relay] Proxmox WS closed: code=${code} reason=${reason.toString()}`);
                 if (clientWs.readyState === WebSocket.OPEN) clientWs.close();
             });
             clientWs.on("close", () => {
@@ -94,7 +110,7 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
             });
         });
 
-        server.vncProxyInitialized = true;
+        server.vncProxyVersion = PROXY_VERSION;
     }
 
     // End the HTTP request, leaving the WebSocket server to handle the upgrade
