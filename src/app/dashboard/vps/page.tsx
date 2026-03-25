@@ -2,6 +2,17 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
+
+interface TrialStatus {
+    hasUsedTrial: boolean;
+    isActive: boolean;
+    isExpired: boolean;
+    isPastGrace: boolean;
+    daysRemaining: number;
+    daysUntilDeletion: number;
+}
+
 
 interface VpsInstance {
     id: string;
@@ -23,10 +34,25 @@ interface VpsInstance {
 }
 
 export default function VpsDashboard() {
+    const { data: session } = useSession();
     const [instances, setInstances] = useState<VpsInstance[]>([]);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [error, setError] = useState("");
+    const [trialStatus, setTrialStatus] = useState<TrialStatus | null>(null);
+
+    const userMeta = session?.user as Record<string, unknown> | undefined;
+    const hasUsedTrial = userMeta?.hasUsedTrial === true;
+
+    // Load trial status when user has a trial
+    useEffect(() => {
+        if (!hasUsedTrial) return;
+        fetch("/api/proxmox/check-trial")
+            .then((r) => r.json())
+            .then((d) => setTrialStatus(d.status ?? null))
+            .catch(() => null);
+    }, [hasUsedTrial]);
+
 
     const loadInstances = useCallback(async () => {
         try {
@@ -134,7 +160,27 @@ export default function VpsDashboard() {
                     </div>
                 )}
 
+                {/* ── Trial Expiry Banner ────────────────────────────────── */}
+                {trialStatus?.isPastGrace && (
+                    <div style={{ padding: "16px 20px", borderRadius: "var(--radius-sm)", background: "rgba(255,0,110,0.1)", border: "1px solid rgba(255,0,110,0.2)", color: "var(--accent-magenta)", marginBottom: "24px", fontSize: "0.9rem", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
+                        <span>⚠️ Your trial data has been permanently deleted (33-day limit exceeded).</span>
+                        <Link href="/services/vps" className="btn btn-primary" style={{ padding: "8px 20px", fontSize: "0.82rem" }}>View Plans</Link>
+                    </div>
+                )}
+                {trialStatus?.isExpired && !trialStatus.isPastGrace && (
+                    <div style={{ padding: "16px 20px", borderRadius: "var(--radius-sm)", background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.2)", color: "#FBBF24", marginBottom: "24px", fontSize: "0.9rem", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px" }}>
+                        <span>⏰ <strong>Trial Expired.</strong> Upgrade to Cloud Starter to keep your data, or your VM will be deleted in <strong>{trialStatus.daysUntilDeletion} day{trialStatus.daysUntilDeletion !== 1 ? "s" : ""}</strong>.</span>
+                        <Link href="/payment?plan=Cloud+Starter" className="btn btn-primary" style={{ padding: "8px 20px", fontSize: "0.82rem" }}>Upgrade Now</Link>
+                    </div>
+                )}
+                {trialStatus?.isActive && (
+                    <div style={{ padding: "12px 20px", borderRadius: "var(--radius-sm)", background: "rgba(0,240,255,0.05)", border: "1px solid rgba(0,240,255,0.15)", color: "var(--accent-cyan)", marginBottom: "24px", fontSize: "0.85rem" }}>
+                        ✅ Trial active — <strong>{trialStatus.daysRemaining} day{trialStatus.daysRemaining !== 1 ? "s" : ""}</strong> remaining.
+                    </div>
+                )}
+
                 {instances.length === 0 ? (
+
                     <div className="glass-card" style={{ padding: "80px 40px", textAlign: "center" }}>
                         <div style={{ fontSize: "3rem", marginBottom: "16px" }}>🖥️</div>
                         <h3 style={{ fontSize: "1.3rem", marginBottom: "8px" }}>No VPS Instances</h3>

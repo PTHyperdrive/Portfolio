@@ -51,12 +51,30 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 token.role = (user as Record<string, unknown>).role as string;
                 token.id = user.id;
             }
+            // Always refresh trial/plan data from DB on session refresh
+            if (token.id) {
+                const dbUser = await prisma.user.findUnique({
+                    where: { id: token.id as string },
+                    select: { hasUsedTrial: true, trialExpiresAt: true, activePlan: true, planActivatedAt: true },
+                });
+                if (dbUser) {
+                    token.hasUsedTrial = dbUser.hasUsedTrial;
+                    token.trialExpiresAt = dbUser.trialExpiresAt?.toISOString() ?? null;
+                    token.activePlan = dbUser.activePlan;
+                    token.planActivatedAt = dbUser.planActivatedAt?.toISOString() ?? null;
+                }
+            }
             return token;
         },
         async session({ session, token }) {
             if (session.user) {
                 session.user.id = token.id as string;
-                (session.user as unknown as Record<string, unknown>).role = token.role as string;
+                const u = session.user as unknown as Record<string, unknown>;
+                u.role = token.role as string;
+                u.hasUsedTrial = token.hasUsedTrial as boolean;
+                u.trialExpiresAt = token.trialExpiresAt as string | null;
+                u.activePlan = token.activePlan as string | null;
+                u.planActivatedAt = token.planActivatedAt as string | null;
             }
             return session;
         },

@@ -145,7 +145,7 @@ export default function Navbar() {
                                     {session.user?.name || session.user?.email}
                                 </span>
                             </div>
-                            <button onClick={() => signOut({ callbackUrl: "/" })} className="btn btn-ghost" style={{ padding: "7px 16px", fontSize: "0.82rem" }}>
+                            <button onClick={() => signOut({ callbackUrl: typeof window !== "undefined" ? window.location.origin : "/" })} className="btn btn-ghost" style={{ padding: "7px 16px", fontSize: "0.82rem" }}>
                                 Sign Out
                             </button>
                         </>
@@ -198,7 +198,7 @@ export default function Navbar() {
 
                     <div style={{ borderTop: "1px solid var(--glass-border)", margin: "8px 0", paddingTop: "12px", display: "flex", gap: "10px" }}>
                         {loggedIn ? (
-                            <button onClick={() => signOut({ callbackUrl: "/" })} className="btn btn-ghost" style={{ flex: 1 }}>Sign Out</button>
+                            <button onClick={() => signOut({ callbackUrl: typeof window !== "undefined" ? window.location.origin : "/" })} className="btn btn-ghost" style={{ flex: 1 }}>Sign Out</button>
                         ) : (
                             <>
                                 <Link href="/auth/login" className="btn btn-ghost" style={{ flex: 1 }}>Log In</Link>

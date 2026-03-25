@@ -142,9 +142,9 @@ export default function HomePage() {
             <Link href="/services/vps" className="btn btn-primary" style={{ padding: "14px 36px", fontSize: "1rem" }}>
               Explore Services
             </Link>
-            <Link href="/auth/register" className="btn btn-secondary" style={{ padding: "14px 36px", fontSize: "1rem" }}>
+            <a href="#services" className="btn btn-secondary" style={{ padding: "14px 36px", fontSize: "1rem" }}>
               Get Started Free →
-            </Link>
+            </a>
           </div>
 
           {/* Tech Stack Tags */}
@@ -196,7 +196,7 @@ export default function HomePage() {
       </section>
 
       {/* ─── Services Grid ────────────────────────────────────── */}
-      <section className="section">
+      <section id="services" className="section">
         <div className="container">
           <div style={{ textAlign: "center", marginBottom: "60px" }}>
             <h2 style={{ fontSize: "2.5rem", fontWeight: 800, marginBottom: "16px" }}>

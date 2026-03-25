@@ -18,6 +18,10 @@ model User {
   image         String?
   role          Role      @default(USER)
   balance       Decimal   @default(0) @db.Decimal(10, 2)
+  hasUsedTrial  Boolean   @default(false)
+  trialExpiresAt DateTime?
+  activePlan    String?
+  planActivatedAt DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -29,6 +33,7 @@ model User {
   emailAccounts EmailAccount[]
   blogPosts     BlogPost[]
   vpsInstances  VpsInstance[]
+  transactions  Transaction[]
 }
 
 model Account {
@@ -225,4 +230,21 @@ model BlogPost {
 
   @@index([authorId])
   @@index([published])
+}
+
+// ─── Billing & Transactions ────────────────────────────────
+
+model Transaction {
+  id        String   @id @default(cuid())
+  userId    String
+  plan      String
+  amount    Decimal  @db.Decimal(10, 2)
+  currency  String   @default("USD")
+  method    String   @default("dev_bypass") // btc, eth, dev_bypass
+  status    String   @default("paid")       // paid, pending, failed
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

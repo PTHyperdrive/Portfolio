@@ -1,10 +1,7 @@
-import type { Metadata } from "next";
-import Link from "next/link";
+"use client";
 
-export const metadata: Metadata = {
-    title: "VPS Hosting | Notrespond.com",
-    description: "High-performance VPS with v-GPU, dedicated GPU, and cloud server options. NVMe SSD, DDoS protection, 99.9% uptime SLA.",
-};
+import Link from "next/link";
+import { useSession } from "next-auth/react";
 
 const VPS_PLANS = [
     {
@@ -21,6 +18,7 @@ const VPS_PLANS = [
         features: ["24/7 Operation", "Limited Network", "Dedicated Manager", "Customized Config"],
         featured: false,
         color: "var(--accent-purple)",
+        isTrial: true,
     },
     {
         name: "Cloud Starter",
@@ -34,9 +32,10 @@ const VPS_PLANS = [
             Bandwidth: "100Mbit/s",
             GPU: "N/A",
         },
-        features: ["Private Network", "DDoS Protection", "SIEM ready", "24/7 Monitoring", "Service ready",],
+        features: ["Private Network", "DDoS Protection", "SIEM ready", "24/7 Monitoring", "Service ready"],
         featured: false,
         color: "var(--accent-cyan)",
+        isTrial: false,
     },
     {
         name: "Cloud Gaming",
@@ -53,6 +52,7 @@ const VPS_PLANS = [
         features: ["Tailscale Supported", "Account Protection", "Parsec & Sunshine ready", "Always up to date"],
         featured: false,
         color: "var(--accent-cyan)",
+        isTrial: false,
     },
     {
         name: "Cloud Workstation",
@@ -69,6 +69,7 @@ const VPS_PLANS = [
         features: ["DirectML Support", "PCIe Passthrough", "Priority Support", "Auto-Scaling", "File 3-2-1 Backup system", "Hourly Snapshots", "Full workstation applications supports"],
         featured: true,
         color: "var(--accent-magenta)",
+        isTrial: false,
     },
     {
         name: "Enterprise",
@@ -85,6 +86,7 @@ const VPS_PLANS = [
         features: ["Multi-GPU Cluster", "Dedicated Static IP", "Dedicated SDN", "CUDA & Tensor Supported", "Customized Config", "A.I Optimized"],
         featured: false,
         color: "var(--accent-purple)",
+        isTrial: false,
     },
     {
         name: "Anti-Detect VPS",
@@ -100,10 +102,17 @@ const VPS_PLANS = [
         features: ["VM full control", "Allow VM present obfuscation", "Dedicated custom network", "Customized CPU instructions", "Heavily customized VM", "Wireshark capturing supported"],
         featured: false,
         color: "var(--accent-cyan)",
+        isTrial: false,
     },
 ];
 
 export default function VPSPage() {
+    const { data: session } = useSession();
+    // hasUsedTrial comes from our custom session field; default false if not present
+    const hasUsedTrial = (session?.user as Record<string, unknown> | undefined)?.hasUsedTrial === true;
+
+    const visiblePlans = VPS_PLANS.filter((p) => !(p.isTrial && hasUsedTrial));
+
     return (
         <>
             {/* Hero */}
@@ -136,7 +145,7 @@ export default function VPSPage() {
             <section className="section" style={{ paddingTop: "20px" }}>
                 <div className="container">
                     <div className="grid-3 stagger">
-                        {VPS_PLANS.map((plan) => (
+                        {visiblePlans.map((plan) => (
                             <div
                                 key={plan.name}
                                 className={`glass-card pricing-card ${plan.featured ? "featured" : ""}`}
@@ -159,7 +168,7 @@ export default function VPSPage() {
                                     <span style={{ fontSize: "2.5rem", fontWeight: 800 }}>
                                         <span className="gradient-text">${plan.price}</span>
                                     </span>
-                                    <span style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>{plan.period}</span>
+                                    {"period" in plan && <span style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>{(plan as typeof plan & { period?: string }).period}</span>}
                                 </div>
 
                                 {/* Specs Table */}
@@ -194,7 +203,7 @@ export default function VPSPage() {
                                 </div>
 
                                 <Link
-                                    href="/auth/register"
+                                    href={`/payment?plan=${encodeURIComponent(plan.name)}`}
                                     className={plan.featured ? "btn btn-primary" : "btn btn-secondary"}
                                     style={{ width: "100%", textAlign: "center" }}
                                 >

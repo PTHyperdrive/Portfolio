@@ -274,3 +274,19 @@ export async function changeVMIso(node: string, vmId: string, isoPath: string) {
         body: JSON.stringify({ ide2: `${isoPath},media=cdrom` }),
     });
 }
+
+/**
+ * Destroy (delete) a VM and all its disks.
+ * Stops the VM first if it's running.
+ */
+export async function destroyVM(node: string, vmId: string, vmType: "qemu" | "lxc" = "qemu") {
+    try {
+        // Stop first (ignore errors if already stopped)
+        await pveFetch(`/nodes/${node}/${vmType}/${vmId}/status/stop`, { method: "POST" });
+        await new Promise((r) => setTimeout(r, 3000)); // brief wait for shutdown
+    } catch { /* already stopped */ }
+    return pveFetch(`/nodes/${node}/${vmType}/${vmId}`, {
+        method: "DELETE",
+        body: JSON.stringify({ purge: 1, "destroy-unreferenced-disks": 1 }),
+    });
+}
