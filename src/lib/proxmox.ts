@@ -199,6 +199,7 @@ export async function getVncTicket(node: string, vmId: string, vmType: "qemu" | 
     return {
         ticket: data.ticket as string,
         port: data.port as number,
+        password: data.password as string,
     };
 }
 

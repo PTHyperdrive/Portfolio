@@ -39,7 +39,7 @@ export default function VncConsole({ vmId, node }: VncConsoleProps) {
                 throw new Error(data.error || "Failed to get VNC ticket");
             }
 
-            const { ticket, port } = await res.json();
+            const { ticket, port, password } = await res.json();
 
             // 2. Load noVNC library dynamically from our server's public directory
             // This bypasses webpack bundling issues and avoids external CDNs
@@ -74,8 +74,10 @@ export default function VncConsole({ vmId, node }: VncConsoleProps) {
             };
 
             // 5. Create RFB connection — noVNC creates its own canvas inside the div
+            // IMPORTANT: With generate-password=1, Proxmox uses the ticket for the WS handshake,
+            // and the generated 10-second password specifically for the VNC RFB protocol handshake.
             const rfb = new noVNC.default(canvasRef.current, wsUrl, {
-                credentials: { password: ticket },
+                credentials: { password: password || ticket },
             });
 
             // Restore original console.error

@@ -69,9 +69,12 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
             console.log(`[VNC Relay] URL: ${proxmoxWsUrl.substring(0, 80)}...`);
 
             // Connect to Proxmox VE with binary sub-protocol
-            // Authentication is handled purely by the generated one-time password in the URL
+            // Authentication requires the PVEAPIToken for the HTTP Upgrade hook
             const proxmoxWs = new WebSocket(proxmoxWsUrl, ["binary"], {
                 rejectUnauthorized: false,
+                headers: {
+                    "Authorization": `PVEAPIToken=${pveTokenId}=${pveTokenValue}`,
+                },
             });
 
             proxmoxWs.on("open", () => {

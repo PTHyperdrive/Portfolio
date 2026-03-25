@@ -31,13 +31,14 @@ export async function POST(req: NextRequest) {
         }
 
         // Request VNC ticket from Proxmox VE
-        const { ticket, port } = await getVncTicket(node, vmId);
+        const { ticket, port, password } = await getVncTicket(node, vmId);
         const wsUrl = getVncWebsocketUrl(node, vmId, port, ticket);
 
         return NextResponse.json({
             ticket,
             port,
             wsUrl,
+            password,
             pveHost: process.env.PROXMOX_VE_HOST,
             pvePort: process.env.PROXMOX_VE_PORT,
         });
