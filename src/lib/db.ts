@@ -16,12 +16,21 @@ function initPool(): Pool {
     // URL parser chokes on URL-encoded special characters in passwords.
     const parsed = new URL(url.replace(/^mysql:\/\//, 'mariadb://'));
 
+    const host = parsed.hostname;
+    const port = parseInt(parsed.port || '3306', 10);
+    const user = decodeURIComponent(parsed.username);
+    const database = parsed.pathname.replace(/^\//, '');
+
+    // ── DEBUG: log what we're connecting to ──
+    console.log('[db.ts] DATABASE_URL env:', url.substring(0, 30) + '...');
+    console.log('[db.ts] Connecting to:', { host, port, user, database });
+
     return createPool({
-        host: parsed.hostname,
-        port: parseInt(parsed.port || '3306', 10),
-        user: decodeURIComponent(parsed.username),
+        host,
+        port,
+        user,
         password: decodeURIComponent(parsed.password),
-        database: parsed.pathname.replace(/^\//, ''),
+        database,
         connectionLimit: 10,
         connectTimeout: 30000,
     });
