@@ -49,22 +49,22 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
             const proxmoxWsUrl = `wss://${pveHost}:${pvePort}/api2/json/nodes/${node}/qemu/${vmId}/vncwebsocket?port=${port}&vncticket=${encodeURIComponent(vncticket)}`;
             console.log(`[VNC Relay] Proxying connection for VM ${vmId} on ${node}`);
 
-            // Connect to Proxmox VE bypassing TLS cert validation since they are usually self-signed
-            const proxmoxWs = new WebSocket(proxmoxWsUrl, {
+            // Connect to Proxmox VE with binary sub-protocol (required by noVNC/Proxmox)
+            const proxmoxWs = new WebSocket(proxmoxWsUrl, ["binary"], {
                 rejectUnauthorized: false,
             });
 
-            // Proxy messages from Client -> Proxmox
-            clientWs.on("message", (msg: WebSocket.RawData) => {
+            // Proxy messages from Client -> Proxmox (binary frames)
+            clientWs.on("message", (msg: WebSocket.RawData, isBinary: boolean) => {
                 if (proxmoxWs.readyState === WebSocket.OPEN) {
-                    proxmoxWs.send(msg);
+                    proxmoxWs.send(msg, { binary: isBinary });
                 }
             });
 
-            // Proxy messages from Proxmox -> Client
-            proxmoxWs.on("message", (msg: WebSocket.RawData) => {
+            // Proxy messages from Proxmox -> Client (binary frames)
+            proxmoxWs.on("message", (msg: WebSocket.RawData, isBinary: boolean) => {
                 if (clientWs.readyState === WebSocket.OPEN) {
-                    clientWs.send(msg);
+                    clientWs.send(msg, { binary: isBinary });
                 }
             });
 
