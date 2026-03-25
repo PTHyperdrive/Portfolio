@@ -106,8 +106,6 @@ export async function POST(req: Request) {
             boot: "order=ide2;scsi0",
             // Display
             vga: "qxl",
-            // SPICE
-            spice_enhancements: "foldersharing=0",
             // Misc
             onboot: 0,
             agent: "enabled=1,fstrim_cloned_disks=1",
