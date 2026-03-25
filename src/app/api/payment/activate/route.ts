@@ -28,9 +28,9 @@ export async function POST(req: Request) {
         if (plan === "Trial Plan") {
             const user = await prisma.user.findUnique({
                 where: { id: session.user.id },
-                select: { hasUsedTrial: true },
+                select: { hasUsedTrial: true, role: true },
             });
-            if (user?.hasUsedTrial) {
+            if (user?.hasUsedTrial && user.role !== "ADMIN") {
                 return NextResponse.json({ error: "You have already claimed your one-time free trial." }, { status: 403 });
             }
         }

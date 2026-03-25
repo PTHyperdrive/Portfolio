@@ -25,7 +25,8 @@ export default function PaymentPage() {
 
     const userMeta = session?.user as Record<string, unknown> | undefined;
     const hasUsedTrial = userMeta?.hasUsedTrial === true;
-    const isTrialLocked = plan === "Trial Plan" && hasUsedTrial;
+    const isAdmin = userMeta?.role === "ADMIN";
+    const isTrialLocked = plan === "Trial Plan" && hasUsedTrial && !isAdmin;
 
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState<"idle" | "processing" | "success" | "error">("idle");
@@ -41,24 +42,46 @@ export default function PaymentPage() {
         setStatus("processing");
         setMsg("");
         try {
+            // 1. Record the simulated transaction & update active plan
             const res = await fetch("/api/payment/activate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ plan, amount: price }),
             });
             const data = await res.json();
-            if (res.ok) {
-                setStatus("success");
-                setMsg("Payment recorded! Redirecting to billing...");
-                setTimeout(() => router.push("/dashboard/billing"), 1500);
-            } else {
+
+            if (!res.ok) {
                 setStatus("error");
                 setMsg(data.error || "Activation failed");
+                setLoading(false);
+                return;
             }
+
+            // 2. If it is a Trial Plan, automatically provision the VM
+            //    This will also lock the user's hasUsedTrial = true to prevent re-purchasing
+            if (plan === "Trial Plan") {
+                const provRes = await fetch("/api/proxmox/provision", {
+                    method: "POST",
+                });
+                const provData = await provRes.json();
+                if (!provRes.ok) {
+                    setStatus("error");
+                    setMsg(provData.error || "Payment succeeded but VM provisioning failed");
+                    setLoading(false);
+                    return;
+                }
+            }
+
+            setStatus("success");
+            setMsg("Payment recorded! Redirecting to billing...");
+
+            // Redirect using location.href to ensure a full page reload and NextAuth session refresh
+            setTimeout(() => {
+                window.location.href = "/dashboard/billing";
+            }, 1500);
         } catch {
             setStatus("error");
             setMsg("Network error. Please try again.");
-        } finally {
             setLoading(false);
         }
     };

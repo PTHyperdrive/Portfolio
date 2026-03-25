@@ -21,14 +21,14 @@ export async function POST(req: Request) {
         // ── Anti-bypass: re-read from DB, never trust session alone ──
         const dbUser = await prisma.user.findUnique({
             where: { id: userId },
-            select: { hasUsedTrial: true },
+            select: { hasUsedTrial: true, role: true },
         });
 
         if (!dbUser) {
             return NextResponse.json({ error: "User not found" }, { status: 404 });
         }
 
-        if (dbUser.hasUsedTrial) {
+        if (dbUser.hasUsedTrial && dbUser.role !== "ADMIN") {
             return NextResponse.json(
                 { error: "Trial already used. Each account is limited to one free trial." },
                 { status: 403 }

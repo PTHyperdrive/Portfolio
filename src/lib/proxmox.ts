@@ -285,8 +285,7 @@ export async function destroyVM(node: string, vmId: string, vmType: "qemu" | "lx
         await pveFetch(`/nodes/${node}/${vmType}/${vmId}/status/stop`, { method: "POST" });
         await new Promise((r) => setTimeout(r, 3000)); // brief wait for shutdown
     } catch { /* already stopped */ }
-    return pveFetch(`/nodes/${node}/${vmType}/${vmId}`, {
+    return pveFetch(`/nodes/${node}/${vmType}/${vmId}?purge=1&destroy-unreferenced-disks=1`, {
         method: "DELETE",
-        body: JSON.stringify({ purge: 1, "destroy-unreferenced-disks": 1 }),
     });
 }

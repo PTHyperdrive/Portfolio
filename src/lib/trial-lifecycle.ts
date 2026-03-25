@@ -77,10 +77,10 @@ export async function getTrialStatus(userId: string): Promise<TrialStatus> {
 export async function startTrial(userId: string): Promise<void> {
     const user = await prisma.user.findUnique({
         where: { id: userId },
-        select: { hasUsedTrial: true },
+        select: { hasUsedTrial: true, role: true },
     });
 
-    if (user?.hasUsedTrial) {
+    if (user?.hasUsedTrial && user.role !== "ADMIN") {
         throw new Error("Trial already used");
     }
 

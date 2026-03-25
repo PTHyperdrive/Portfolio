@@ -52,9 +52,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ vmId: s
         // 3. Trigger Proxmox API to destroy the VM
         try {
             await destroyVM(node, vmId);
-        } catch (proxmoxErr) {
+        } catch (proxmoxErr: any) {
             console.error("Proxmox destroy fallback error:", proxmoxErr);
-            // We'll continue to delete from DB even if Proxmox fails (e.g. if VM was already deleted manually)
+            const msg = proxmoxErr.message || String(proxmoxErr);
+            // If Proxmox returns an error other than "Configuration file doesn't exist" (meaning already deleted),
+            // we should not proceed to delete the DB record.
+            if (!msg.includes("does not exist") && !msg.includes("404")) {
+                return NextResponse.json({ error: `Proxmox error: ${msg}` }, { status: 500 });
+            }
         }
 
         // 4. Clean up DB record

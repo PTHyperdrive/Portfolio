@@ -108,10 +108,11 @@ const VPS_PLANS = [
 
 export default function VPSPage() {
     const { data: session } = useSession();
-    // hasUsedTrial comes from our custom session field; default false if not present
-    const hasUsedTrial = (session?.user as Record<string, unknown> | undefined)?.hasUsedTrial === true;
+    const userMeta = session?.user as Record<string, unknown> | undefined;
+    const hasUsedTrial = userMeta?.hasUsedTrial === true;
+    const isAdmin = userMeta?.role === "ADMIN";
 
-    const visiblePlans = VPS_PLANS.filter((p) => !(p.isTrial && hasUsedTrial));
+    const visiblePlans = VPS_PLANS.filter((p) => !(p.isTrial && hasUsedTrial && !isAdmin));
 
     return (
         <>
