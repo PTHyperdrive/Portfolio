@@ -57,18 +57,12 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
             // Reconstruct the Proxmox websocket URL
             const proxmoxWsUrl = `wss://${pveHost}:${pvePort}/api2/json/nodes/${node}/qemu/${vmId}/vncwebsocket?port=${port}&vncticket=${encodeURIComponent(vncticket)}`;
 
-            const wsHeaders = {
-                "Authorization": `PVEAPIToken=${pveTokenId}=${pveTokenValue}`,
-            };
-
             console.log(`[VNC Relay] Proxying VM ${vmId} on ${node}`);
             console.log(`[VNC Relay] URL: ${proxmoxWsUrl.substring(0, 80)}...`);
-            console.log(`[VNC Relay] Auth: token=${pveTokenId ? "set" : "MISSING"}, cookie=set`);
 
-            // Connect to Proxmox VE with binary sub-protocol and auth headers
+            // Connect to Proxmox VE with binary sub-protocol (no auth headers, vncticket is sufficient)
             const proxmoxWs = new WebSocket(proxmoxWsUrl, ["binary"], {
                 rejectUnauthorized: false,
-                headers: wsHeaders,
             });
 
             proxmoxWs.on("open", () => {
