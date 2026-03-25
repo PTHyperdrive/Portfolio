@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["@prisma/client", "mysql2"],
+  serverExternalPackages: ["@prisma/client"],
   allowedDevOrigins: ["lab.notrespond.com"],
   turbopack: {
     resolveAlias: {

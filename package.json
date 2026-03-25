@@ -10,9 +10,7 @@
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
-    "@prisma/adapter-mysql2": "^7.4.1",
     "@prisma/client": "^7.4.1",
-    "mysql2": "^3.14.0",
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.3.1",
     "next": "16.1.6",
