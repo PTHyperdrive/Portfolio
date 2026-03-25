@@ -7,17 +7,24 @@ interface VncConsoleProps {
     node: string;
 }
 
+// noVNC ESM source served from public/novnc/core/ (static files)
+// Browser never sees Proxmox host in network inspection
+const NOVNC_RFB_URL = "/novnc/core/rfb.js";
+
+
 export default function VncConsole({ vmId, node }: VncConsoleProps) {
     const [status, setStatus] = useState<"idle" | "connecting" | "connected" | "error">("idle");
     const [error, setError] = useState("");
-    const [iframeUrl, setIframeUrl] = useState("");
     const [isFullscreen, setIsFullscreen] = useState(false);
+
     const containerRef = useRef<HTMLDivElement>(null);
+    const canvasRef = useRef<HTMLDivElement>(null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rfbRef = useRef<any>(null);
 
     const connect = async () => {
         setStatus("connecting");
         setError("");
-        setIframeUrl("");
 
         try {
             // 1. Get VNC ticket from our API
@@ -34,31 +41,74 @@ export default function VncConsole({ vmId, node }: VncConsoleProps) {
 
             const { ticket, port } = await res.json();
 
-            // 2. Build the Proxmox built-in noVNC URL
-            // Replace internal IP/port with the external one the user specified
-            const externalDomain = "timox-1.notrespond.com:8000";
+            // 2. Load noVNC library dynamically from our server's public directory
+            // This bypasses webpack bundling issues and avoids external CDNs
+            const noVNC = await import(/* webpackIgnore: true */ NOVNC_RFB_URL);
 
-            const url = new URL(`https://${externalDomain}/`);
-            url.searchParams.set("console", "kvm");
-            url.searchParams.set("novnc", "1");
-            url.searchParams.set("vmid", vmId);
-            url.searchParams.set("vmname", `VM ${vmId}`); // optional
-            url.searchParams.set("node", node);
-            url.searchParams.set("resize", "scale");
-            url.searchParams.set("cmd", "");
-            url.searchParams.set("port", port.toString());
-            url.searchParams.set("vncticket", ticket);
+            // 3. Close existing connection if any
+            if (rfbRef.current) {
+                rfbRef.current.disconnect();
+                rfbRef.current = null;
+            }
 
-            setIframeUrl(url.toString());
-            setStatus("connected");
+            // 4. Construct WebSocket URL pointing to our Next.js API route proxy
+            const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+            const encodedTicket = encodeURIComponent(ticket);
+            const wsUrl = `${protocol}//${window.location.host}/api/proxmox/vnc-proxy?node=${node}&vmId=${vmId}&port=${port}&vncticket=${encodedTicket}`;
+
+            if (!canvasRef.current) throw new Error("Canvas container not ready");
+
+            // Suppress the harmless noVNC "secure context" warning which triggers Next.js Error Overlay on http://
+            const originalConsoleError = console.error;
+            console.error = (...args: any[]) => {
+                if (typeof args[0] === "string" && args[0].includes("secure context")) return;
+                originalConsoleError.apply(console, args);
+            };
+
+            // 5. Create RFB connection — noVNC creates its own canvas inside the div
+            const rfb = new noVNC.default(canvasRef.current, wsUrl, {
+                credentials: { password: ticket },
+            });
+
+            // Restore original console.error
+            console.error = originalConsoleError;
+
+            rfb.scaleViewport = true;
+            rfb.resizeSession = true;
+
+            // 6. Handle events
+            rfb.addEventListener("connect", () => {
+                setStatus("connected");
+            });
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            rfb.addEventListener("disconnect", (e: any) => {
+                setStatus("error");
+                if (e.detail.clean) {
+                    setError("Connection closed normally");
+                } else {
+                    setError("Connection lost unexpectedly");
+                }
+            });
+
+            rfbRef.current = rfb;
+
         } catch (err) {
-            setError(err instanceof Error ? err.message : "Failed to load console");
+            console.error("VNC Setup Error:", err);
+            setError(err instanceof Error ? err.message : "Failed to load VNC console");
             setStatus("error");
         }
     };
 
     useEffect(() => {
         connect();
+
+        // Cleanup on unmount
+        return () => {
+            if (rfbRef.current) {
+                rfbRef.current.disconnect();
+            }
+        };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [vmId, node]);
 
@@ -73,11 +123,18 @@ export default function VncConsole({ vmId, node }: VncConsoleProps) {
         }
     };
 
+    // Listen for escape key to update fullscreen state
     useEffect(() => {
         const handler = () => setIsFullscreen(!!document.fullscreenElement);
         document.addEventListener("fullscreenchange", handler);
         return () => document.removeEventListener("fullscreenchange", handler);
     }, []);
+
+    const sendCtrlAltDel = () => {
+        if (rfbRef.current) {
+            rfbRef.current.sendCtrlAltDel();
+        }
+    };
 
     return (
         <div ref={containerRef} style={{ position: "relative" }}>
@@ -100,8 +157,8 @@ export default function VncConsole({ vmId, node }: VncConsoleProps) {
                         boxShadow: status === "connected" ? "0 0 8px var(--accent-green)" : "none",
                     }} />
                     <span style={{ fontSize: "0.82rem", fontWeight: 600, color: "var(--text-secondary)" }}>
-                        {status === "connected" ? "Console Target Acquired" :
-                            status === "connecting" ? "Generating Ticket..." :
+                        {status === "connected" ? "Secure Relay Active" :
+                            status === "connecting" ? "Establishing Relay..." :
                                 status === "error" ? "Connection Failed" : "Ready"}
                     </span>
                     <span className="mono" style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
@@ -109,14 +166,14 @@ export default function VncConsole({ vmId, node }: VncConsoleProps) {
                     </span>
                 </div>
                 <div style={{ display: "flex", gap: "8px" }}>
-                    {status === "error" && (
-                        <button onClick={connect} className="btn btn-secondary" style={{ padding: "4px 12px", fontSize: "0.78rem" }}>
-                            🔄 Retry
+                    {status === "connected" && (
+                        <button onClick={sendCtrlAltDel} className="btn btn-ghost" style={{ padding: "4px 12px", fontSize: "0.78rem" }}>
+                            ⎈ Ctrl+Alt+Del
                         </button>
                     )}
-                    {status === "connected" && (
-                        <button onClick={connect} className="btn btn-ghost" style={{ padding: "4px 12px", fontSize: "0.78rem" }}>
-                            🔄 Reconnect
+                    {(status === "error" || status === "idle") && (
+                        <button onClick={connect} className="btn btn-secondary" style={{ padding: "4px 12px", fontSize: "0.78rem" }}>
+                            🔄 Retry
                         </button>
                     )}
                     <button onClick={toggleFullscreen} className="btn btn-ghost" style={{ padding: "4px 12px", fontSize: "0.78rem" }}>
@@ -125,7 +182,7 @@ export default function VncConsole({ vmId, node }: VncConsoleProps) {
                 </div>
             </div>
 
-            {/* Console Area */}
+            {/* Console Area - noVNC injects canvas here */}
             <div style={{
                 background: "#000",
                 border: "1px solid var(--glass-border)",
@@ -133,36 +190,18 @@ export default function VncConsole({ vmId, node }: VncConsoleProps) {
                 overflow: "hidden",
                 minHeight: isFullscreen ? "100vh" : "500px",
                 position: "relative",
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
             }}>
-                {status === "connected" && iframeUrl && (
-                    <div style={{ textAlign: "center", maxWidth: "400px" }}>
-                        <div style={{ fontSize: "3rem", marginBottom: "20px" }}>🖥️</div>
-                        <h3 style={{ marginBottom: "12px", color: "var(--text-primary)" }}>Console Ready</h3>
-                        <p style={{ color: "var(--text-muted)", fontSize: "0.95rem", marginBottom: "24px" }}>
-                            Proxmox security policies (CSP) block embedding the console directly into this page. Please open the console in a new window.
-                        </p>
-                        <a
-                            href={iframeUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="btn btn-primary"
-                            style={{
-                                padding: "12px 24px",
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: "8px",
-                                fontSize: "1rem",
-                                textDecoration: "none"
-                            }}
-                        >
-                            Open Web Console ↗
-                        </a>
-                    </div>
-                )}
+                {/* The div where noVNC will render the canvas */}
+                <div
+                    ref={canvasRef}
+                    style={{
+                        width: "100%",
+                        height: isFullscreen ? "100vh" : "500px",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                    }}
+                />
 
                 {status === "connecting" && (
                     <div style={{
@@ -180,7 +219,7 @@ export default function VncConsole({ vmId, node }: VncConsoleProps) {
                                 🖥
                             </div>
                             <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem" }}>
-                                Loading VNC console from Proxmox...
+                                Connecting to hypervisor...
                             </p>
                         </div>
                     </div>
@@ -194,7 +233,7 @@ export default function VncConsole({ vmId, node }: VncConsoleProps) {
                     }}>
                         <div style={{ textAlign: "center", maxWidth: "400px" }}>
                             <div style={{ fontSize: "2.5rem", marginBottom: "16px" }}>⚠️</div>
-                            <h3 style={{ marginBottom: "8px", color: "var(--accent-magenta)" }}>Failed to Load Console</h3>
+                            <h3 style={{ marginBottom: "8px", color: "var(--accent-magenta)" }}>Connection Failed</h3>
                             <p style={{ color: "var(--text-muted)", fontSize: "0.88rem", marginBottom: "20px" }}>{error}</p>
                             <button onClick={connect} className="btn btn-primary" style={{ padding: "10px 24px" }}>
                                 Try Again
