@@ -21,13 +21,18 @@ const MANAGER_API_KEY = process.env.PROXMOX_API_KEY || "";
 async function managerFetch(endpoint: string, options: RequestInit = {}) {
     if (!MANAGER_URL) throw new Error("PROXMOX_MANAGER_URL is not configured in the server");
     const url = `${MANAGER_URL}${endpoint}`;
+    const headers: Record<string, string> = {
+        "X-API-Key": MANAGER_API_KEY,
+        ...(options.headers as Record<string, string>),
+    };
+
+    if (options.body && typeof options.body === "string" && !headers["Content-Type"]) {
+        headers["Content-Type"] = "application/json";
+    }
+
     const res = await fetch(url, {
         ...options,
-        headers: {
-            "Content-Type": "application/json",
-            "X-API-Key": MANAGER_API_KEY,
-            ...options.headers,
-        },
+        headers,
         // @ts-expect-error -- undici dispatcher for TLS bypass
         dispatcher: insecureAgent,
     });
@@ -157,13 +162,18 @@ const PVE_BASE = `https://${PVE_HOST}:${PVE_PORT}/api2/json`;
 
 async function pveFetch(endpoint: string, options: RequestInit = {}) {
     const url = `${PVE_BASE}${endpoint}`;
+    const headers: Record<string, string> = {
+        "Authorization": `PVEAPIToken=${PVE_TOKEN_ID}=${PVE_TOKEN_VALUE}`,
+        ...(options.headers as Record<string, string>),
+    };
+
+    if (options.body && typeof options.body === "string" && !headers["Content-Type"]) {
+        headers["Content-Type"] = "application/json";
+    }
+
     const res = await fetch(url, {
         ...options,
-        headers: {
-            "Authorization": `PVEAPIToken=${PVE_TOKEN_ID}=${PVE_TOKEN_VALUE}`,
-            "Content-Type": "application/json",
-            ...options.headers,
-        },
+        headers,
         // @ts-expect-error -- undici dispatcher for TLS bypass
         dispatcher: insecureAgent,
     });
