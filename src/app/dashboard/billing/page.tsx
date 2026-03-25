@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { WINDOWS_ISOS, getIsosByCategory } from "@/lib/windows-isos";
 
 interface Transaction {
     id: string;
@@ -16,13 +18,20 @@ interface BillingData {
     activePlan: string | null;
     planActivatedAt: string | null;
     totalSpent: number;
+    vpsCount: number;
     transactions: Transaction[];
 }
 
 export default function BillingPage() {
+    const router = useRouter();
     const [data, setData] = useState<BillingData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
+    const [deploying, setDeploying] = useState(false);
+
+    const isoCategories = getIsosByCategory();
+    const defaultIso = WINDOWS_ISOS[0].id as string;
+    const [selectedIso, setSelectedIso] = useState<string>(defaultIso);
 
     useEffect(() => {
         fetch("/api/payment/history")
@@ -43,6 +52,26 @@ export default function BillingPage() {
 
     const statusColor = (status: string) =>
         status === "paid" ? "var(--accent-green)" : status === "pending" ? "#FBBF24" : "var(--accent-magenta)";
+
+    const handleDeploy = async () => {
+        if (!data?.activePlan) return;
+        setDeploying(true);
+        setError("");
+        try {
+            const res = await fetch("/api/proxmox/provision", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ plan: data.activePlan, isoId: selectedIso }),
+            });
+            const resData = await res.json();
+            if (!res.ok) throw new Error(resData.error || "Provisioning failed");
+            // Success! Redirect to VPS dashboard to see the new instance
+            router.push("/dashboard/vps");
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Deployment failed");
+            setDeploying(false);
+        }
+    };
 
     if (loading) {
         return (
@@ -74,7 +103,7 @@ export default function BillingPage() {
                 {/* Stats Row */}
                 <div className="grid-3" style={{ marginBottom: "32px", gap: "20px" }}>
                     {/* Active Plan */}
-                    <div className="glass-card" style={{ padding: "24px" }}>
+                    <div className="glass-card" style={{ padding: "24px", display: "flex", flexDirection: "column" }}>
                         <div style={{ fontSize: "1.4rem", marginBottom: "8px" }}>🖥️</div>
                         <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "6px" }}>Active Plan</p>
                         <p style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--accent-cyan)" }}>
@@ -84,6 +113,46 @@ export default function BillingPage() {
                             <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "4px" }}>
                                 Since {fmtDate(data.planActivatedAt)}
                             </p>
+                        )}
+
+                        {data?.activePlan && data.vpsCount === 0 && (
+                            <div style={{ marginTop: "20px", paddingTop: "20px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                                <label style={{ display: "block", fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "8px", fontWeight: 600, textTransform: "uppercase" }}>
+                                    Select OS for Deployment
+                                </label>
+                                <select
+                                    value={selectedIso}
+                                    onChange={(e) => setSelectedIso(e.target.value)}
+                                    className="input-field"
+                                    style={{ width: "100%", cursor: "pointer", padding: "8px 12px", fontSize: "0.85rem", marginBottom: "12px" }}
+                                    disabled={deploying}
+                                >
+                                    {Object.entries(isoCategories).map(([category, isos]) => (
+                                        <optgroup key={category} label={category} style={{ color: "#000", background: "#fff" }}>
+                                            {isos.map((iso) => (
+                                                <option key={iso.id} value={iso.id} style={{ color: "#000", background: "#fff" }}>
+                                                    {iso.name}
+                                                </option>
+                                            ))}
+                                        </optgroup>
+                                    ))}
+                                </select>
+                                <button
+                                    onClick={handleDeploy}
+                                    disabled={deploying}
+                                    className="btn btn-primary"
+                                    style={{ width: "100%", padding: "10px", fontSize: "0.85rem", display: "flex", justifyContent: "center", alignItems: "center", gap: "8px" }}
+                                >
+                                    {deploying ? "Deploying..." : "Activate VPS"}
+                                </button>
+                            </div>
+                        )}
+                        {data?.activePlan && data.vpsCount > 0 && (
+                            <div style={{ marginTop: "auto", paddingTop: "20px" }}>
+                                <Link href="/dashboard/vps" className="btn btn-secondary" style={{ width: "100%", display: "block", textAlign: "center", padding: "8px", fontSize: "0.85rem" }}>
+                                    Manage Instance
+                                </Link>
+                            </div>
                         )}
                     </div>
 

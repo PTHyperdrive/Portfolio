@@ -13,7 +13,7 @@ export async function GET() {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const [user, transactions] = await Promise.all([
+        const [user, transactions, vpsCount] = await Promise.all([
             prisma.user.findUnique({
                 where: { id: session.user.id },
                 select: { activePlan: true, planActivatedAt: true, balance: true },
@@ -22,6 +22,9 @@ export async function GET() {
                 where: { userId: session.user.id },
                 orderBy: { createdAt: "desc" },
             }),
+            prisma.vpsInstance.count({
+                where: { userId: session.user.id }
+            })
         ]);
 
         const totalSpent = transactions.reduce(
@@ -33,6 +36,7 @@ export async function GET() {
             activePlan: user?.activePlan ?? null,
             planActivatedAt: user?.planActivatedAt ?? null,
             balance: user?.balance ?? 0,
+            vpsCount,
             totalSpent,
             transactions,
         });

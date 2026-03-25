@@ -125,7 +125,7 @@ export default function Navbar() {
                     {/* Authenticated-only */}
                     {loggedIn && <NavLink href="/dashboard/vps" label="Dashboard" pathname={pathname} />}
                     {loggedIn && <NavLink href="/settings" label="Settings" pathname={pathname} />}
-                    {loggedIn && <NavLink href="/payment" label="Payment" pathname={pathname} />}
+                    {loggedIn && <NavLink href="/dashboard/billing" label="Billing" pathname={pathname} />}
                 </div>
 
                 {/* Auth Area */}
@@ -194,7 +194,7 @@ export default function Navbar() {
 
                     {loggedIn && <MobileLink href="/dashboard/vps" label="Dashboard" pathname={pathname} />}
                     {loggedIn && <MobileLink href="/settings" label="Settings" pathname={pathname} />}
-                    {loggedIn && <MobileLink href="/payment" label="Payment" pathname={pathname} />}
+                    {loggedIn && <MobileLink href="/dashboard/billing" label="Billing" pathname={pathname} />}
 
                     <div style={{ borderTop: "1px solid var(--glass-border)", margin: "8px 0", paddingTop: "12px", display: "flex", gap: "10px" }}>
                         {loggedIn ? (

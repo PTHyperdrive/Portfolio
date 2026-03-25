@@ -43,6 +43,7 @@ export default function VpsDashboard() {
 
     const userMeta = session?.user as Record<string, unknown> | undefined;
     const hasUsedTrial = userMeta?.hasUsedTrial === true;
+    const hasActivePlan = !!userMeta?.activePlan;
 
     // Load trial status when user has a trial
     useEffect(() => {
@@ -185,11 +186,19 @@ export default function VpsDashboard() {
                         <div style={{ fontSize: "3rem", marginBottom: "16px" }}>🖥️</div>
                         <h3 style={{ fontSize: "1.3rem", marginBottom: "8px" }}>No VPS Instances</h3>
                         <p style={{ color: "var(--text-muted)", marginBottom: "24px" }}>
-                            You don&apos;t have any VPS instances yet. Purchase a plan to get started.
+                            {hasActivePlan
+                                ? "You have an active plan but no deployed instances. Activate your VM to get started."
+                                : "You don't have any VPS instances yet. Purchase a plan to get started."}
                         </p>
-                        <Link href="/services/vps" className="btn btn-primary">
-                            Browse VPS Plans
-                        </Link>
+                        {hasActivePlan ? (
+                            <Link href="/dashboard/billing" className="btn btn-primary">
+                                Activate VM
+                            </Link>
+                        ) : (
+                            <Link href="/services/vps" className="btn btn-primary">
+                                Browse VPS Plans
+                            </Link>
+                        )}
                     </div>
                 ) : (
                     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
