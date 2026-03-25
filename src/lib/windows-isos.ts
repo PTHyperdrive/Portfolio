@@ -19,12 +19,12 @@ export const WINDOWS_ISOS = [
     { id: "ubuntu-2204-server", name: "Ubuntu 22.04 LTS (Server)", iso: "local:iso/ubuntu-22.04.4-live-server-amd64.iso", category: "Ubuntu" },
 
     // ─── Windows 11 ───────────────────────────────────────────────
-    { id: "win11-24h2", name: "Windows 11 24H2", iso: "local:iso/Win11_24H2.iso", category: "Windows 11" },
-    { id: "win11-23h2", name: "Windows 11 23H2", iso: "local:iso/Win11_23H2.iso", category: "Windows 11" },
-    { id: "win11-22h2", name: "Windows 11 22H2", iso: "local:iso/Win11_22H2.iso", category: "Windows 11" },
+    { id: "win11-24h2", name: "Windows 11 24H2", iso: "local:iso/WIN11_24H2.iso", category: "Windows 11" },
+    { id: "win11-23h2", name: "Windows 11 23H2", iso: "local:iso/WIN11_23H2.iso", category: "Windows 11" },
+    { id: "win11-22h2", name: "Windows 11 22H2", iso: "local:iso/WIN11_22H2.iso", category: "Windows 11" },
 
     // ─── Windows 10 ───────────────────────────────────────────────
-    { id: "win10-22h2", name: "Windows 10 22H2", iso: "local:iso/Win10_22H2.iso", category: "Windows 10" },
+    { id: "win10-22h2", name: "Windows 10 22H2", iso: "local:iso/WIN10_22H2.iso", category: "Windows 10" },
 
     // ─── Windows Server ───────────────────────────────────────────
     { id: "ws2022", name: "Windows Server 2022", iso: "local:iso/WinServer2022.iso", category: "Server" },
