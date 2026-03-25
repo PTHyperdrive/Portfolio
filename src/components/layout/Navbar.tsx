@@ -56,9 +56,7 @@ export default function Navbar() {
         return () => window.removeEventListener("scroll", onScroll);
     }, []);
 
-    useEffect(() => {
-        setMobileOpen(false);
-    }, [pathname]);
+    // Removed useEffect for pathname change, instead we rely on mobileOpen conditionally
 
     // ── While session is loading, render a skeleton to prevent flash ──
     if (status === "loading") {

@@ -9,21 +9,21 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "undici": "^6.21.2",
-    "@novnc/novnc": "^1.5.0",
-    "ws": "^8.16.0",
     "@auth/prisma-adapter": "^2.11.1",
-    "@prisma/adapter-mariadb": "^7.4.1",
+    "@novnc/novnc": "^1.5.0",
+    "@prisma/adapter-mariadb": "^7.5.0",
     "@prisma/client": "^7.4.1",
-    "mariadb": "^3.4.0",
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.3.1",
+    "mariadb": "^3.5.2",
     "next": "16.1.6",
     "next-auth": "^5.0.0-beta.30",
     "prisma": "^7.4.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "undici": "^6.21.2",
     "uuid": "^13.0.0",
+    "ws": "^8.16.0",
     "zod": "^4.3.6"
   },
   "devDependencies": {

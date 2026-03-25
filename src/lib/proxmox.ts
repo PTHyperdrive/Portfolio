@@ -3,9 +3,10 @@
  * 
  * Centralized HTTP client for communicating with:
  * 1. Proxmox Manager API (proxmox-renting-upkeep) — VM tracking, pricing, rentals
- * 2. Proxmox VE API — Direct VNC ticket generation
+ * 2. Proxmox VE API — Direct spice ticket generation
  */
-import { Agent } from 'undici';
+
+import { Agent } from "undici";
 
 // Shared dispatcher that skips TLS validation for internal APIs
 // (Proxmox uses self-signed certs / certs issued for FQDN, not IP)

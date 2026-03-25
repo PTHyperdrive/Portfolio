@@ -1,7 +1,6 @@
 import { PrismaClient } from '@/generated/prisma';
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 
-// ── Singleton client, survives HMR in dev ────────────────────────
 const globalForPrisma = globalThis as unknown as {
     __prisma: PrismaClient | undefined;
 };
@@ -10,20 +9,12 @@ function createAdapter(): PrismaMariaDb {
     const url = process.env.DATABASE_URL;
     if (!url) throw new Error('DATABASE_URL is not set');
 
-    // Parse the mysql:// URL ourselves because the mariadb driver's
-    // URL parser chokes on URL-encoded special characters in passwords.
     const parsed = new URL(url.replace(/^mysql:\/\//, 'mariadb://'));
-
     const host = parsed.hostname;
     const port = parseInt(parsed.port || '3306', 10);
     const user = decodeURIComponent(parsed.username);
     const database = parsed.pathname.replace(/^\//, '');
 
-    // ── DEBUG: log what we're connecting to ──
-    console.log('[db.ts] DATABASE_URL env:', url.substring(0, 30) + '...');
-    console.log('[db.ts] Connecting to:', { host, port, user, database });
-
-    // Pass connection options directly to PrismaMariaDb (Prisma 7.x API)
     return new PrismaMariaDb({
         host,
         port,
