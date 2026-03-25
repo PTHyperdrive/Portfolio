@@ -21,8 +21,12 @@ export default function VncConsole({ vmId, node }: VncConsoleProps) {
     const canvasRef = useRef<HTMLDivElement>(null);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rfbRef = useRef<any>(null);
+    const connectionRequested = useRef(false);
 
     const connect = async () => {
+        if (connectionRequested.current) return;
+        connectionRequested.current = true;
+
         setStatus("connecting");
         setError("");
 
