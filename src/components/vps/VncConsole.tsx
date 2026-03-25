@@ -133,18 +133,35 @@ export default function VncConsole({ vmId, node }: VncConsoleProps) {
                 overflow: "hidden",
                 minHeight: isFullscreen ? "100vh" : "500px",
                 position: "relative",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
             }}>
                 {status === "connected" && iframeUrl && (
-                    <iframe
-                        src={iframeUrl}
-                        style={{
-                            width: "100%",
-                            height: isFullscreen ? "calc(100vh - 48px)" : "500px",
-                            border: "none",
-                            background: "#000",
-                        }}
-                        allow="clipboard-write; fullscreen"
-                    />
+                    <div style={{ textAlign: "center", maxWidth: "400px" }}>
+                        <div style={{ fontSize: "3rem", marginBottom: "20px" }}>🖥️</div>
+                        <h3 style={{ marginBottom: "12px", color: "var(--text-primary)" }}>Console Ready</h3>
+                        <p style={{ color: "var(--text-muted)", fontSize: "0.95rem", marginBottom: "24px" }}>
+                            Proxmox security policies (CSP) block embedding the console directly into this page. Please open the console in a new window.
+                        </p>
+                        <a
+                            href={iframeUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn btn-primary"
+                            style={{
+                                padding: "12px 24px",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "8px",
+                                fontSize: "1rem",
+                                textDecoration: "none"
+                            }}
+                        >
+                            Open Web Console ↗
+                        </a>
+                    </div>
                 )}
 
                 {status === "connecting" && (
