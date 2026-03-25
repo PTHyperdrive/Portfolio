@@ -1,11 +1,32 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import type RFB from "@novnc/novnc/core/rfb.js";
 
 interface VncConsoleProps {
     vmId: string;
     node: string;
+}
+
+// noVNC RFB type (loaded at runtime via CDN script tag)
+declare global {
+    interface Window {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        RFB: any;
+    }
+}
+
+const NOVNC_CDN = "https://cdn.jsdelivr.net/npm/@novnc/novnc@1.5.0/core/rfb.js";
+
+function loadNoVNC(): Promise<void> {
+    return new Promise((resolve, reject) => {
+        if (window.RFB) return resolve();
+        const script = document.createElement("script");
+        script.src = NOVNC_CDN;
+        script.type = "module";
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error("Failed to load noVNC library"));
+        document.head.appendChild(script);
+    });
 }
 
 export default function VncConsole({ vmId, node }: VncConsoleProps) {
@@ -14,7 +35,8 @@ export default function VncConsole({ vmId, node }: VncConsoleProps) {
     const [isFullscreen, setIsFullscreen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLDivElement>(null);
-    const rfbRef = useRef<RFB | null>(null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rfbRef = useRef<any>(null);
 
     const disconnect = useCallback(() => {
         if (rfbRef.current) {
@@ -29,7 +51,7 @@ export default function VncConsole({ vmId, node }: VncConsoleProps) {
         setError("");
 
         try {
-            // 1. Get VNC ticket + websocket URL from our API
+            // 1. Get VNC ticket from our API
             const res = await fetch("/api/proxmox/vnc", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -41,25 +63,28 @@ export default function VncConsole({ vmId, node }: VncConsoleProps) {
                 throw new Error(data.error || "Failed to get VNC ticket");
             }
 
-            const { ticket, port, pveHost, pvePort } = await res.json();
+            const { ticket, port } = await res.json();
 
-            // 2. Dynamically import noVNC (client-side only)
-            const { default: RFB } = await import("@novnc/novnc/core/rfb.js");
-
-            if (!canvasRef.current) throw new Error("Canvas container not ready");
-
-            // 2b. Initialize WebSocket Proxy on Next.js server
-            // Since the proxy binds to the upgrade event transparently, we just send
-            // a dummy HTTP request to ensure the route handler runs and the WS Server starts.
+            // 2. Warm up the WebSocket proxy server
             await fetch("/api/proxmox/vnc-proxy").catch(() => { });
 
-            // 3. Build the Proxmox VNC websocket URL pointing to our internal Next.js Relay
+            // 3. Build the WebSocket URL pointing to our internal Next.js relay
             const encodedTicket = encodeURIComponent(ticket);
             const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
             const wsUrl = `${protocol}//${window.location.host}/api/proxmox/vnc-proxy?node=${node}&vmId=${vmId}&port=${port}&vncticket=${encodedTicket}`;
 
-            // 4. Create RFB connection — noVNC handles the canvas internally
-            const rfb = new RFB(canvasRef.current, wsUrl, {
+            // 4. Load noVNC from CDN (module script sets window.RFB via import)
+            //    We use a workaround: import the RFB class via a blob URL re-export
+            //    so it lands on window.RFB for our access.
+            if (!window.RFB) {
+                const mod = await import(/* webpackIgnore: true */ NOVNC_CDN);
+                window.RFB = mod.default ?? mod;
+            }
+
+            if (!canvasRef.current) throw new Error("Canvas container not ready");
+
+            // 5. Create RFB connection — noVNC creates its own canvas inside the div
+            const rfb = new window.RFB(canvasRef.current, wsUrl, {
                 credentials: { password: ticket },
             });
 
