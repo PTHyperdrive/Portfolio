@@ -184,7 +184,7 @@ async function pveFetch(endpoint: string, options: RequestInit = {}) {
 export async function getVncTicket(node: string, vmId: string, vmType: "qemu" | "lxc" = "qemu") {
     const data = await pveFetch(`/nodes/${node}/${vmType}/${vmId}/vncproxy`, {
         method: "POST",
-        body: JSON.stringify({ websocket: 1 }),
+        body: JSON.stringify({ websocket: 1, "generate-password": 1 }),
     });
     return {
         ticket: data.ticket as string,

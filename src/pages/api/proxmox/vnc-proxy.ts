@@ -68,7 +68,8 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
             console.log(`[VNC Relay] Proxying VM ${vmId} on ${node}`);
             console.log(`[VNC Relay] URL: ${proxmoxWsUrl.substring(0, 80)}...`);
 
-            // Connect to Proxmox VE with binary sub-protocol (no auth headers, vncticket is sufficient)
+            // Connect to Proxmox VE with binary sub-protocol
+            // Authentication is handled purely by the generated one-time password in the URL
             const proxmoxWs = new WebSocket(proxmoxWsUrl, ["binary"], {
                 rejectUnauthorized: false,
             });
