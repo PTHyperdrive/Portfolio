@@ -23,8 +23,8 @@ export default function VncConsole({ vmId, node }: VncConsoleProps) {
     const rfbRef = useRef<any>(null);
     const connectionRequested = useRef(false);
 
-    const connect = async () => {
-        if (connectionRequested.current) return;
+    const connect = async (isRetry = false) => {
+        if (!isRetry && connectionRequested.current) return;
         connectionRequested.current = true;
 
         setStatus("connecting");
@@ -186,7 +186,7 @@ export default function VncConsole({ vmId, node }: VncConsoleProps) {
                         </button>
                     )}
                     {(status === "error" || status === "idle") && (
-                        <button onClick={connect} className="btn btn-secondary" style={{ padding: "4px 12px", fontSize: "0.78rem" }}>
+                        <button onClick={() => connect(true)} className="btn btn-secondary" style={{ padding: "4px 12px", fontSize: "0.78rem" }}>
                             🔄 Retry
                         </button>
                     )}
@@ -249,7 +249,7 @@ export default function VncConsole({ vmId, node }: VncConsoleProps) {
                             <div style={{ fontSize: "2.5rem", marginBottom: "16px" }}>⚠️</div>
                             <h3 style={{ marginBottom: "8px", color: "var(--accent-magenta)" }}>Connection Failed</h3>
                             <p style={{ color: "var(--text-muted)", fontSize: "0.88rem", marginBottom: "20px" }}>{error}</p>
-                            <button onClick={connect} className="btn btn-primary" style={{ padding: "10px 24px" }}>
+                            <button onClick={() => connect(true)} className="btn btn-primary" style={{ padding: "10px 24px" }}>
                                 Try Again
                             </button>
                         </div>
