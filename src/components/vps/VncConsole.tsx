@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import type RFB from "@novnc/novnc/core/rfb.js";
 
 interface VncConsoleProps {
     vmId: string;
@@ -10,15 +11,25 @@ interface VncConsoleProps {
 export default function VncConsole({ vmId, node }: VncConsoleProps) {
     const [status, setStatus] = useState<"idle" | "connecting" | "connected" | "error">("idle");
     const [error, setError] = useState("");
-    const [vncUrl, setVncUrl] = useState("");
     const [isFullscreen, setIsFullscreen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
+    const canvasRef = useRef<HTMLDivElement>(null);
+    const rfbRef = useRef<RFB | null>(null);
+
+    const disconnect = useCallback(() => {
+        if (rfbRef.current) {
+            try { rfbRef.current.disconnect(); } catch { /* ignore */ }
+            rfbRef.current = null;
+        }
+    }, []);
 
     const connect = useCallback(async () => {
+        disconnect();
         setStatus("connecting");
         setError("");
 
         try {
+            // 1. Get VNC ticket + websocket URL from our API
             const res = await fetch("/api/proxmox/vnc", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -31,21 +42,43 @@ export default function VncConsole({ vmId, node }: VncConsoleProps) {
             }
 
             const { ticket, port, pveHost, pvePort } = await res.json();
-            const encodedTicket = encodeURIComponent(ticket);
 
-            // Build noVNC URL pointing to Proxmox's built-in noVNC
-            const noVncUrl = `https://${pveHost}:${pvePort}/?console=kvm&novnc=1&vmid=${vmId}&vmname=VPS&node=${node}&resize=scale&cmd=&port=${port}&vncticket=${encodedTicket}`;
-            setVncUrl(noVncUrl);
-            setStatus("connected");
+            // 2. Dynamically import noVNC (client-side only)
+            const { default: RFB } = await import("@novnc/novnc/core/rfb.js");
+
+            if (!canvasRef.current) throw new Error("Canvas container not ready");
+
+            // 3. Build the Proxmox VNC websocket URL
+            const encodedTicket = encodeURIComponent(ticket);
+            const wsUrl = `wss://${pveHost}:${pvePort}/api2/json/nodes/${node}/qemu/${vmId}/vncwebsocket?port=${port}&vncticket=${encodedTicket}`;
+
+            // 4. Create RFB connection — noVNC handles the canvas internally
+            const rfb = new RFB(canvasRef.current, wsUrl, {
+                credentials: { password: ticket },
+            });
+
+            rfb.scaleViewport = true;
+            rfb.resizeSession = true;
+
+            rfb.addEventListener("connect", () => setStatus("connected"));
+            rfb.addEventListener("disconnect", (e: { detail: { clean: boolean } }) => {
+                if (!e.detail.clean) {
+                    setError("Connection lost unexpectedly");
+                    setStatus("error");
+                }
+            });
+
+            rfbRef.current = rfb;
         } catch (err) {
             setError(err instanceof Error ? err.message : "Connection failed");
             setStatus("error");
         }
-    }, [vmId, node]);
+    }, [vmId, node, disconnect]);
 
     useEffect(() => {
         connect();
-    }, [connect]);
+        return () => disconnect();
+    }, [connect, disconnect]);
 
     const toggleFullscreen = () => {
         if (!containerRef.current) return;
@@ -99,6 +132,11 @@ export default function VncConsole({ vmId, node }: VncConsoleProps) {
                             🔄 Retry
                         </button>
                     )}
+                    {status === "connected" && (
+                        <button onClick={connect} className="btn btn-ghost" style={{ padding: "4px 12px", fontSize: "0.78rem" }}>
+                            🔄 Reconnect
+                        </button>
+                    )}
                     <button onClick={toggleFullscreen} className="btn btn-ghost" style={{ padding: "4px 12px", fontSize: "0.78rem" }}>
                         {isFullscreen ? "⛶ Exit" : "⛶ Fullscreen"}
                     </button>
@@ -114,6 +152,15 @@ export default function VncConsole({ vmId, node }: VncConsoleProps) {
                 minHeight: isFullscreen ? "100vh" : "500px",
                 position: "relative",
             }}>
+                {/* noVNC mounts its canvas here */}
+                <div
+                    ref={canvasRef}
+                    style={{
+                        width: "100%",
+                        height: isFullscreen ? "calc(100vh - 48px)" : "500px",
+                    }}
+                />
+
                 {status === "connecting" && (
                     <div style={{
                         position: "absolute", inset: 0,
@@ -151,19 +198,6 @@ export default function VncConsole({ vmId, node }: VncConsoleProps) {
                             </button>
                         </div>
                     </div>
-                )}
-
-                {status === "connected" && vncUrl && (
-                    <iframe
-                        src={vncUrl}
-                        style={{
-                            width: "100%",
-                            height: isFullscreen ? "calc(100vh - 48px)" : "500px",
-                            border: "none",
-                        }}
-                        allow="clipboard-read; clipboard-write"
-                        title={`VNC Console - VM ${vmId}`}
-                    />
                 )}
             </div>
         </div>
