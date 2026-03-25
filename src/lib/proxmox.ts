@@ -5,6 +5,13 @@
  * 1. Proxmox Manager API (proxmox-renting-upkeep) — VM tracking, pricing, rentals
  * 2. Proxmox VE API — Direct VNC ticket generation
  */
+import { Agent } from 'undici';
+
+// Shared dispatcher that skips TLS validation for internal APIs
+// (Proxmox uses self-signed certs / certs issued for FQDN, not IP)
+const insecureAgent = new Agent({
+    connect: { rejectUnauthorized: false },
+});
 
 // ─── Manager API Client ──────────────────────────────────────────
 
@@ -21,9 +28,8 @@ async function managerFetch(endpoint: string, options: RequestInit = {}) {
             "X-API-Key": MANAGER_API_KEY,
             ...options.headers,
         },
-        // Allow self-signed certs in Node.js
-        // @ts-expect-error -- Node.js fetch option
-        rejectUnauthorized: false,
+        // @ts-expect-error -- undici dispatcher for TLS bypass
+        dispatcher: insecureAgent,
     });
 
     if (!res.ok) {
@@ -158,8 +164,8 @@ async function pveFetch(endpoint: string, options: RequestInit = {}) {
             "Content-Type": "application/json",
             ...options.headers,
         },
-        // @ts-expect-error -- Node.js fetch self-signed cert
-        rejectUnauthorized: false,
+        // @ts-expect-error -- undici dispatcher for TLS bypass
+        dispatcher: insecureAgent,
     });
 
     if (!res.ok) {
