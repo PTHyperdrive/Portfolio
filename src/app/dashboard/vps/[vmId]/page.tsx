@@ -42,6 +42,12 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
     const [selectedIso, setSelectedIso] = useState<string>(WINDOWS_ISOS[0].id);
     const [error, setError] = useState("");
 
+    // Destroy Modal State
+    const [showDestroy, setShowDestroy] = useState(false);
+    const [destroyPwd, setDestroyPwd] = useState("");
+    const [destroyLoading, setDestroyLoading] = useState(false);
+    const [destroyErr, setDestroyErr] = useState("");
+
     const loadVm = useCallback(async () => {
         try {
             const res = await fetch(`/api/proxmox/vms/${vmId}?node=${node}`);
@@ -79,6 +85,27 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
             setError(err instanceof Error ? err.message : "Action failed");
         } finally {
             setActionLoading("");
+        }
+    };
+
+    const handleDestroy = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setDestroyLoading(true);
+        setDestroyErr("");
+        try {
+            const res = await fetch(`/api/proxmox/vms/${vmId}/destroy`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ password: destroyPwd, node }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Destroy failed");
+
+            // Redirect away on success
+            window.location.href = "/dashboard/vps";
+        } catch (err) {
+            setDestroyErr(err instanceof Error ? err.message : "Failed to destroy the instance");
+            setDestroyLoading(false);
         }
     };
 
@@ -340,12 +367,12 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
                                         value={selectedIso}
                                         onChange={(e) => setSelectedIso(e.target.value)}
                                         className="input-field"
-                                        style={{ cursor: "pointer" }}
+                                        style={{ cursor: "pointer", color: "var(--text-primary)", background: "rgba(255,255,255,0.05)" }}
                                     >
                                         {Object.entries(isoCategories).map(([category, isos]) => (
-                                            <optgroup key={category} label={category}>
+                                            <optgroup key={category} label={category} style={{ color: "#000", background: "#fff" }}>
                                                 {isos.map((iso) => (
-                                                    <option key={iso.id} value={iso.id}>
+                                                    <option key={iso.id} value={iso.id} style={{ color: "#000", background: "#fff" }}>
                                                         {iso.name}
                                                     </option>
                                                 ))}
@@ -369,7 +396,7 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
                         </div>
 
                         {/* VM Info */}
-                        <div className="glass-card" style={{ padding: "28px" }}>
+                        <div className="glass-card" style={{ padding: "28px", marginBottom: "32px" }}>
                             <h3 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "16px" }}>📋 Instance Information</h3>
                             <div className="mono" style={{ fontSize: "0.82rem", color: "var(--text-muted)", padding: "16px", background: "rgba(0,0,0,0.3)", borderRadius: "var(--radius-sm)" }}>
                                 <div>Instance ID: {vm.id}</div>
@@ -378,9 +405,75 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
                                 <div>Created: {new Date(vm.expiresAt || "").toLocaleDateString() || "—"}</div>
                             </div>
                         </div>
+
+                        {/* Danger Zone */}
+                        <div>
+                            <h3 style={{ fontSize: "1.1rem", fontWeight: 700, color: "var(--accent-magenta)", marginBottom: "16px" }}>🔥 Danger Zone</h3>
+                            <div className="glass-card" style={{ padding: "28px", border: "1px solid rgba(255,0,110,0.3)", background: "rgba(255,0,110,0.03)" }}>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px" }}>
+                                    <div>
+                                        <h4 style={{ fontWeight: 700, marginBottom: "4px" }}>Destroy Instance</h4>
+                                        <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", maxWidth: "400px" }}>
+                                            Permanently delete this instance and all its associated data. This action cannot be undone.
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={() => setShowDestroy(true)}
+                                        className="btn btn-danger"
+                                        style={{ padding: "10px 24px", whiteSpace: "nowrap" }}
+                                    >
+                                        Destroy Instance
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 )}
             </div>
+
+            {/* Destroy Modal Overlay */}
+            {showDestroy && (
+                <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.8)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }}>
+                    <div className="glass-card" style={{ width: "100%", maxWidth: "480px", padding: "32px", border: "1px solid rgba(255,0,110,0.4)", boxShadow: "0 10px 40px rgba(255,0,110,0.2)" }}>
+                        <h2 style={{ fontSize: "1.4rem", fontWeight: 800, color: "var(--text-primary)", marginBottom: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
+                            <span style={{ color: "var(--accent-magenta)" }}>⚠️</span> Confirm Destruction
+                        </h2>
+                        <p style={{ color: "var(--text-muted)", fontSize: "0.95rem", marginBottom: "24px", lineHeight: 1.6 }}>
+                            Are you absolutely sure you want to completely destroy the instance <strong>{vm.name}</strong>? All data will be wiped permanently.
+                        </p>
+                        <form onSubmit={handleDestroy}>
+                            <label style={{ display: "block", fontSize: "0.85rem", color: "var(--text-secondary)", fontWeight: 600, marginBottom: "8px" }}>
+                                Enter your account password to verify:
+                            </label>
+                            <input
+                                type="password"
+                                required
+                                value={destroyPwd}
+                                onChange={(e) => setDestroyPwd(e.target.value)}
+                                className="input-field"
+                                style={{ width: "100%", marginBottom: "16px", background: "rgba(0,0,0,0.2)" }}
+                                placeholder="••••••••"
+                            />
+                            {destroyErr && (
+                                <p style={{ color: "var(--accent-magenta)", fontSize: "0.85rem", marginBottom: "16px" }}>{destroyErr}</p>
+                            )}
+                            <div style={{ display: "flex", gap: "12px", justifyContent: "flex-end" }}>
+                                <button
+                                    type="button"
+                                    onClick={() => { setShowDestroy(false); setDestroyPwd(""); setDestroyErr(""); }}
+                                    className="btn btn-ghost"
+                                    disabled={destroyLoading}
+                                >
+                                    Cancel
+                                </button>
+                                <button type="submit" disabled={destroyLoading || !destroyPwd} className="btn btn-danger" style={{ padding: "10px 24px" }}>
+                                    {destroyLoading ? "Destroying..." : "Confirm Destroy"}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

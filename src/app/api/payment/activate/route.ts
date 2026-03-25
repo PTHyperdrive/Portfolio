@@ -24,6 +24,17 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Plan name is required" }, { status: 400 });
         }
 
+        // Anti-bypass guard: If it's a Trial plan, check the DB directly to ensure they haven't used it
+        if (plan === "Trial Plan") {
+            const user = await prisma.user.findUnique({
+                where: { id: session.user.id },
+                select: { hasUsedTrial: true },
+            });
+            if (user?.hasUsedTrial) {
+                return NextResponse.json({ error: "You have already claimed your one-time free trial." }, { status: 403 });
+            }
+        }
+
         // Update user's active plan and record transaction atomically
         const [transaction] = await prisma.$transaction([
             prisma.transaction.create({

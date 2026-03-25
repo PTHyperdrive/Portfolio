@@ -23,6 +23,10 @@ export default function PaymentPage() {
     const plan = params.get("plan") || "Cloud Starter";
     const price = PLAN_PRICES[plan] ?? 0;
 
+    const userMeta = session?.user as Record<string, unknown> | undefined;
+    const hasUsedTrial = userMeta?.hasUsedTrial === true;
+    const isTrialLocked = plan === "Trial Plan" && hasUsedTrial;
+
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState<"idle" | "processing" | "success" | "error">("idle");
     const [msg, setMsg] = useState("");
@@ -138,12 +142,17 @@ export default function PaymentPage() {
                     <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "14px" }}>Skip payment processing and mark this order as paid immediately.</p>
                     <button
                         onClick={handleDevBypass}
-                        disabled={loading}
+                        disabled={loading || isTrialLocked}
                         className="btn btn-primary"
                         style={{ width: "100%", padding: "14px", fontSize: "0.95rem" }}
                     >
-                        {loading ? "Processing..." : "⚡ Dev Bypass: Mark as Paid"}
+                        {isTrialLocked ? "Trial Activated" : loading ? "Processing..." : "⚡ Dev Bypass: Mark as Paid"}
                     </button>
+                    {isTrialLocked && (
+                        <p style={{ fontSize: "0.8rem", color: "var(--accent-magenta)", marginTop: "12px", textAlign: "center" }}>
+                            You have already claimed your one-time free trial.
+                        </p>
+                    )}
                 </div>
 
                 {/* Status message */}
