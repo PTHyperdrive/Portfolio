@@ -353,10 +353,10 @@ export function selectBestStorage(
 }
 
 /**
- * Get the next available VM ID on a given node.
+ * Get the next available VM ID from the Proxmox cluster.
  */
-export async function getNextVmId(node: string): Promise<number> {
-    const data = await pveFetch(`/nodes/${node}/qemu/nextid`);
+export async function getNextVmId(): Promise<number> {
+    const data = await pveFetch("/cluster/nextid");
     return parseInt(data as string, 10);
 }
 

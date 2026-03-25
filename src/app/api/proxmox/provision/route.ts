@@ -73,7 +73,7 @@ export async function POST(req: Request) {
         const { node, storage } = best;
 
         // ── Get next VMID ────────────────────────────────────────────
-        const vmid = await getNextVmId(node);
+        const vmid = await getNextVmId();
         const vmName = `user-${userId.slice(0, 6)}-${vmid}`;
         const mac = generateMac();
 
