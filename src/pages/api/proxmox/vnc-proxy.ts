@@ -83,15 +83,19 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
 
             // Proxy messages from Client -> Proxmox (binary frames)
             clientWs.on("message", (msg: WebSocket.RawData, isBinary: boolean) => {
+                const len = Array.isArray(msg) ? msg.reduce((a, b) => a + b.length, 0) : (msg as Buffer).length;
+                console.log(`[VNC Relay] Client -> Proxmox (${isBinary ? "binary" : "text"}): ${len} bytes`);
                 if (proxmoxWs.readyState === WebSocket.OPEN) {
-                    proxmoxWs.send(msg, { binary: isBinary });
+                    proxmoxWs.send(msg, { binary: true }); // Always force binary to Proxmox
                 }
             });
 
             // Proxy messages from Proxmox -> Client (binary frames)
             proxmoxWs.on("message", (msg: WebSocket.RawData, isBinary: boolean) => {
+                const len = Array.isArray(msg) ? msg.reduce((a, b) => a + b.length, 0) : (msg as Buffer).length;
+                console.log(`[VNC Relay] Proxmox -> Client (${isBinary ? "binary" : "text"}): ${len} bytes`);
                 if (clientWs.readyState === WebSocket.OPEN) {
-                    clientWs.send(msg, { binary: isBinary });
+                    clientWs.send(msg, { binary: true }); // Always force binary to Browser
                 }
             });
 
