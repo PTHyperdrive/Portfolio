@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, use } from "react";
 import { useSearchParams } from "next/navigation";
 
 import Link from "next/link";
-import VncConsole from "@/components/vps/VncConsole";
 import { WINDOWS_ISOS, getIsosByCategory } from "@/lib/windows-isos";
 
 interface VmDetail {
@@ -289,7 +288,24 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
                 {tab === "console" && (
                     <div>
                         {isRunning ? (
-                            <VncConsole vmId={vmId} node={node} />
+                            <div className="glass-card" style={{ padding: "40px", textAlign: "center" }}>
+                                <div style={{ fontSize: "3rem", marginBottom: "16px" }}>🖥️</div>
+                                <h3 style={{ marginBottom: "8px", fontSize: "1.2rem" }}>Remote Console</h3>
+                                <p style={{ color: "var(--text-muted)", fontSize: "0.88rem", marginBottom: "24px", maxWidth: "480px", margin: "0 auto 24px" }}>
+                                    Download the SPICE connection file and open it with <strong style={{ color: "var(--text-secondary)" }}>virt-viewer</strong> to connect to your VM&apos;s console.
+                                </p>
+                                <a
+                                    href={`/api/proxmox/spice/download?vmId=${vm.vmId}&node=${vm.node}`}
+                                    download
+                                    className="btn btn-primary"
+                                    style={{ padding: "12px 28px", fontSize: "0.95rem", textDecoration: "none", display: "inline-block" }}
+                                >
+                                    📁 Download SPICE Console (.vv)
+                                </a>
+                                <p style={{ color: "var(--text-muted)", fontSize: "0.78rem", marginTop: "16px" }}>
+                                    Requires <a href="https://virt-manager.org/download/" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent-cyan)" }}>virt-viewer</a> installed on your system.
+                                </p>
+                            </div>
                         ) : (
                             <div className="glass-card" style={{ padding: "60px", textAlign: "center" }}>
                                 <div style={{ fontSize: "2.5rem", marginBottom: "16px" }}>🔌</div>

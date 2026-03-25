@@ -70,22 +70,12 @@ export default function VncConsole({ vmId, node }: VncConsoleProps) {
 
             if (!canvasRef.current) throw new Error("Canvas container not ready");
 
-            // Suppress the harmless noVNC "secure context" warning which triggers Next.js Error Overlay on http://
-            const originalConsoleError = console.error;
-            console.error = (...args: any[]) => {
-                if (typeof args[0] === "string" && args[0].includes("secure context")) return;
-                originalConsoleError.apply(console, args);
-            };
-
             // 5. Create RFB connection — noVNC creates its own canvas inside the div
             // IMPORTANT: With generate-password=1, Proxmox uses the ticket for the WS handshake,
             // and the generated 10-second password specifically for the VNC RFB protocol handshake.
             const rfb = new noVNC.default(canvasRef.current, wsUrl, {
                 credentials: { password: password || ticket },
             });
-
-            // Restore original console.error
-            console.error = originalConsoleError;
 
             rfb.scaleViewport = true;
             rfb.resizeSession = true;

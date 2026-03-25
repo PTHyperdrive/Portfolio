@@ -204,6 +204,31 @@ export async function getVncTicket(node: string, vmId: string, vmType: "qemu" | 
 }
 
 /**
+ * Request a SPICE proxy ticket for a VM.
+ * Returns the full SPICE config for generating a .vv file.
+ */
+export async function getSpiceTicket(node: string, vmId: string, vmType: "qemu" | "lxc" = "qemu") {
+    const data = await pveFetch(`/nodes/${node}/${vmType}/${vmId}/spiceproxy`, {
+        method: "POST",
+        body: JSON.stringify({ proxy: PVE_HOST }),
+    });
+    return data as {
+        host: string;
+        password: string;
+        proxy: string;
+        "tls-port": number;
+        type: string;
+        ca: string;
+        "host-subject": string;
+        "toggle-fullscreen"?: string;
+        "release-cursor"?: string;
+        "secure-attention"?: string;
+        "delete-this-file"?: number;
+        title?: string;
+    };
+}
+
+/**
  * Get the VNC websocket URL for connecting noVNC.
  */
 export function getVncWebsocketUrl(node: string, vmId: string, port: number, ticket: string, vmType: "qemu" | "lxc" = "qemu") {
