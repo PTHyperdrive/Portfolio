@@ -15,9 +15,9 @@ declare global {
     }
 }
 
-// noVNC served from our own server via /api/novnc/ (node_modules on server)
+// noVNC ESM source served from public/novnc/core/ (static files)
 // Browser never sees Proxmox host in network inspection
-const NOVNC_RFB_URL = "/api/novnc/lib/rfb.js";
+const NOVNC_RFB_URL = "/novnc/core/rfb.js";
 
 
 export default function VncConsole({ vmId, node }: VncConsoleProps) {
