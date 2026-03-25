@@ -48,9 +48,15 @@ export default function VncConsole({ vmId, node }: VncConsoleProps) {
 
             if (!canvasRef.current) throw new Error("Canvas container not ready");
 
-            // 3. Build the Proxmox VNC websocket URL
+            // 2b. Initialize WebSocket Proxy on Next.js server
+            // Since the proxy binds to the upgrade event transparently, we just send
+            // a dummy HTTP request to ensure the route handler runs and the WS Server starts.
+            await fetch("/api/proxmox/vnc-proxy").catch(() => { });
+
+            // 3. Build the Proxmox VNC websocket URL pointing to our internal Next.js Relay
             const encodedTicket = encodeURIComponent(ticket);
-            const wsUrl = `wss://${pveHost}:${pvePort}/api2/json/nodes/${node}/qemu/${vmId}/vncwebsocket?port=${port}&vncticket=${encodedTicket}`;
+            const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+            const wsUrl = `${protocol}//${window.location.host}/api/proxmox/vnc-proxy?node=${node}&vmId=${vmId}&port=${port}&vncticket=${encodedTicket}`;
 
             // 4. Create RFB connection — noVNC handles the canvas internally
             const rfb = new RFB(canvasRef.current, wsUrl, {
