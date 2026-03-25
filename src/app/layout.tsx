@@ -4,6 +4,7 @@ import "./globals.css";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import Providers from "@/components/Providers";
+import { auth } from "@/lib/auth";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -28,15 +29,19 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Fetch session server-side so SessionProvider can pre-hydrate it.
+  // This means useSession() in Navbar resolves instantly — no loading flash.
+  const session = await auth();
+
   return (
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`} style={{ scrollBehavior: "smooth" }}>
       <body>
-        <Providers>
+        <Providers session={session}>
           <div className="particles-bg" aria-hidden="true" />
           <Navbar />
           <main style={{ position: "relative", zIndex: 1, minHeight: "100vh" }}>
