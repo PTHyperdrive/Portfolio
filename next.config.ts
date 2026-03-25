@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  serverExternalPackages: ["@prisma/client", "mariadb", "undici"],
+  serverExternalPackages: ["@prisma/client", "mariadb", "undici", "ws"],
   allowedDevOrigins: ["lab.notrespond.com"],
   turbopack: {
     resolveAlias: {
