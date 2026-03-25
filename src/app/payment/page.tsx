@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
+import { WINDOWS_ISOS, getIsosByCategory } from "@/lib/windows-isos";
 
 // Plan pricing table
 const PLAN_PRICES: Record<string, number> = {
@@ -28,6 +29,9 @@ export default function PaymentPage() {
     const isAdmin = userMeta?.role === "ADMIN";
     const isTrialLocked = plan === "Trial Plan" && hasUsedTrial && !isAdmin;
 
+    const isoCategories = getIsosByCategory();
+    const defaultIso = WINDOWS_ISOS[0].id as string;
+    const [selectedIso, setSelectedIso] = useState<string>(defaultIso);
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState<"idle" | "processing" | "success" | "error">("idle");
     const [msg, setMsg] = useState("");
@@ -57,19 +61,18 @@ export default function PaymentPage() {
                 return;
             }
 
-            // 2. If it is a Trial Plan, automatically provision the VM
-            //    This will also lock the user's hasUsedTrial = true to prevent re-purchasing
-            if (plan === "Trial Plan") {
-                const provRes = await fetch("/api/proxmox/provision", {
-                    method: "POST",
-                });
-                const provData = await provRes.json();
-                if (!provRes.ok) {
-                    setStatus("error");
-                    setMsg(provData.error || "Payment succeeded but VM provisioning failed");
-                    setLoading(false);
-                    return;
-                }
+            // 2. Provision the VM on Proxmox for all plans
+            const provRes = await fetch("/api/proxmox/provision", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ plan, isoId: selectedIso }),
+            });
+            const provData = await provRes.json();
+            if (!provRes.ok) {
+                setStatus("error");
+                setMsg(provData.error || "Payment succeeded but VM provisioning failed");
+                setLoading(false);
+                return;
             }
 
             setStatus("success");
@@ -121,6 +124,32 @@ export default function PaymentPage() {
                         <span style={{ fontWeight: 800, fontSize: "1.1rem" }}>
                             {price === 0 ? "$0.00" : `$${price.toFixed(2)}`}
                         </span>
+                    </div>
+
+                    {/* OS Selector */}
+                    <div style={{ marginTop: "20px", paddingTop: "20px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                        <label style={{ display: "block", fontSize: "0.82rem", color: "var(--text-muted)", marginBottom: "8px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                            Operating System
+                        </label>
+                        <select
+                            value={selectedIso}
+                            onChange={(e) => setSelectedIso(e.target.value)}
+                            className="input-field"
+                            style={{ width: "100%", cursor: "pointer" }}
+                        >
+                            {Object.entries(isoCategories).map(([category, isos]) => (
+                                <optgroup key={category} label={category} style={{ color: "#000", background: "#fff" }}>
+                                    {isos.map((iso) => (
+                                        <option key={iso.id} value={iso.id} style={{ color: "#000", background: "#fff" }}>
+                                            {iso.name}
+                                        </option>
+                                    ))}
+                                </optgroup>
+                            ))}
+                        </select>
+                        <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "8px" }}>
+                            You can reinstall a different OS anytime from your VM settings.
+                        </p>
                     </div>
                 </div>
 

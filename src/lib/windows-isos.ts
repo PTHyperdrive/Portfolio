@@ -1,18 +1,23 @@
 /**
- * Windows ISO Configuration
- * 
- * Edit this file to add/remove Windows ISO options shown to users
- * when reinstalling their VPS. Each ISO must be uploaded to your
- * Proxmox storage first (e.g., local:iso/Win11_23H2.iso).
- * 
+ * ISO Catalogue
+ *
+ * Edit this file to add/remove OS ISO options shown to users
+ * when provisioning or reinstalling their VPS.
+ * Each ISO must be uploaded to your Proxmox storage first.
+ *
  * Format:
  *   id       — unique identifier (used in API calls)
  *   name     — display name shown to users
- *   iso      — Proxmox storage path (storage:content/filename)
+ *   iso      — Proxmox storage path (storage:iso/filename)
  *   category — grouping for the UI dropdown
  */
 
 export const WINDOWS_ISOS = [
+    // ─── Linux / Ubuntu ───────────────────────────────────────────
+    { id: "ubuntu-2404-server", name: "Ubuntu 24.04 LTS (Server)", iso: "local:iso/ubuntu-24.04.1-live-server-amd64.iso", category: "Ubuntu" },
+    { id: "ubuntu-2404-desktop", name: "Ubuntu 24.04 LTS (Desktop)", iso: "local:iso/ubuntu-24.04.4-desktop-amd64.iso", category: "Ubuntu" },
+    { id: "ubuntu-2204-server", name: "Ubuntu 22.04 LTS (Server)", iso: "local:iso/ubuntu-22.04.4-live-server-amd64.iso", category: "Ubuntu" },
+
     // ─── Windows 11 ───────────────────────────────────────────────
     { id: "win11-24h2", name: "Windows 11 24H2", iso: "local:iso/Win11_24H2.iso", category: "Windows 11" },
     { id: "win11-23h2", name: "Windows 11 23H2", iso: "local:iso/Win11_23H2.iso", category: "Windows 11" },

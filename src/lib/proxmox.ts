@@ -289,3 +289,140 @@ export async function destroyVM(node: string, vmId: string, vmType: "qemu" | "lx
         method: "DELETE",
     });
 }
+
+// ─── Phase 2: Orchestration Helpers ─────────────────────────────
+
+export interface StoragePool {
+    storage: string;
+    node: string;
+    content: string;
+    avail: number;
+    used: number;
+    total: number;
+    type: string;
+    active: number;
+    enabled: number;
+}
+
+/**
+ * Get all storage pools on a specific node.
+ * Filters to pools that can hold VM images (content includes "images").
+ */
+export async function getNodeStorage(node: string): Promise<StoragePool[]> {
+    const data = await pveFetch(`/nodes/${node}/storage?content=images`);
+    return (data as StoragePool[]).map((s) => ({ ...s, node }));
+}
+
+/**
+ * Fetch storage from all available nodes and collate into one flat list.
+ */
+export async function getAllNodesStorage(): Promise<StoragePool[]> {
+    try {
+        const nodesRaw = await pveFetch("/nodes");
+        const nodes: string[] = (nodesRaw as { node: string }[]).map((n) => n.node);
+        const results = await Promise.allSettled(nodes.map((n) => getNodeStorage(n)));
+        return results
+            .filter((r): r is PromiseFulfilledResult<StoragePool[]> => r.status === "fulfilled")
+            .flatMap((r) => r.value);
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * From a list of storage pools, pick the node+storage combination with
+ * the most available space, filtered by a keyword in the storage name.
+ * Falls back to any pool if no keyword match found.
+ */
+export function selectBestStorage(
+    pools: StoragePool[],
+    keyword: string
+): { node: string; storage: string } | null {
+    if (pools.length === 0) return null;
+
+    const kw = keyword.toLowerCase();
+    const filtered = pools.filter((p) =>
+        p.storage.toLowerCase().includes(kw) && p.active === 1 && p.enabled === 1 && p.avail > 0
+    );
+
+    const candidates = filtered.length > 0 ? filtered : pools.filter((p) => p.active === 1 && p.enabled === 1);
+    candidates.sort((a, b) => b.avail - a.avail);
+
+    if (candidates.length === 0) return null;
+    return { node: candidates[0].node, storage: candidates[0].storage };
+}
+
+/**
+ * Get the next available VM ID on a given node.
+ */
+export async function getNextVmId(node: string): Promise<number> {
+    const data = await pveFetch(`/nodes/${node}/qemu/nextid`);
+    return parseInt(data as string, 10);
+}
+
+/**
+ * Create a new QEMU VM on the given node.
+ */
+export async function createVM(node: string, config: Record<string, string | number | boolean>) {
+    return pveFetch(`/nodes/${node}/qemu`, {
+        method: "POST",
+        body: JSON.stringify(config),
+    });
+}
+
+/**
+ * Update VM config via PUT (for disk/ISO changes).
+ */
+export async function updateVMConfig(node: string, vmId: string, config: Record<string, string | number | boolean>) {
+    return pveFetch(`/nodes/${node}/qemu/${vmId}/config`, {
+        method: "PUT",
+        body: JSON.stringify(config),
+    });
+}
+
+/**
+ * Detach and permanently delete a disk from a VM.
+ * Step 1: Remove the disk from config (sets it to "unused:X").
+ * Step 2: Delete the unused disk to free the storage.
+ */
+export async function detachAndDeleteDisk(node: string, vmId: string, disk = "scsi0") {
+    // Step 1: detach by setting delete flag
+    await pveFetch(`/nodes/${node}/qemu/${vmId}/config`, {
+        method: "PUT",
+        body: JSON.stringify({ delete: disk }),
+    });
+    // Brief pause to let Proxmox process the detach before further ops
+    await new Promise((r) => setTimeout(r, 1500));
+}
+
+/**
+ * Allocate a fresh blank disk on scsi0 for a VM.
+ * Example: addDisk("Timox-1", "150", "local-zfs", 32)
+ */
+export async function addDisk(node: string, vmId: string, storage: string, diskGb: number) {
+    return pveFetch(`/nodes/${node}/qemu/${vmId}/config`, {
+        method: "PUT",
+        body: JSON.stringify({ scsi0: `${storage}:${diskGb}` }),
+    });
+}
+
+/**
+ * Set the VM boot order to prefer CD-ROM then disk.
+ * This ensures the VM boots into the ISO installer on first start.
+ */
+export async function setBootOrder(node: string, vmId: string) {
+    return pveFetch(`/nodes/${node}/qemu/${vmId}/config`, {
+        method: "PUT",
+        body: JSON.stringify({ boot: "order=ide2;scsi0" }),
+    });
+}
+
+/**
+ * Generate a random MAC address in Proxmox format (lowercase hex pairs).
+ */
+export function generateMac(): string {
+    const hex = () => Math.floor(Math.random() * 16).toString(16).padStart(2, "0");
+    // First byte: locally administered, unicast (02:xx:...)
+    return `02:${hex()}:${hex()}:${hex()}:${hex()}:${hex()}`;
+}
+

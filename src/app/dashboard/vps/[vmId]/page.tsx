@@ -71,6 +71,20 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
         setActionLoading(action);
         setError("");
         try {
+            if (action === "reinstall") {
+                // Use the dedicated reinstall route that wipes the disk
+                const res = await fetch(`/api/proxmox/vms/${vmId}/reinstall`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ node, isoId }),
+                });
+                if (!res.ok) {
+                    const data = await res.json();
+                    throw new Error(data.error || "Reinstall failed");
+                }
+                setTimeout(loadVm, 3000);
+                return;
+            }
             const res = await fetch(`/api/proxmox/vms/${vmId}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
