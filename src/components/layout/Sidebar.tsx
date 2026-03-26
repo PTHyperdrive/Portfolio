@@ -58,173 +58,279 @@ const SIDEBAR_STRUCTURE: NavGroup[] = [
     },
 ];
 
+const S = {
+    aside: {
+        width: "260px",
+        minWidth: "260px",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column" as const,
+        backgroundColor: "#0d1117",
+        borderRight: "1px solid rgba(255,255,255,0.07)",
+        flexShrink: 0,
+    },
+    brand: {
+        display: "flex",
+        alignItems: "center",
+        gap: "12px",
+        padding: "20px 20px 18px",
+        flexShrink: 0,
+        textDecoration: "none",
+    },
+    logoBox: {
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        background: "linear-gradient(135deg,#3b82f6,#6366f1)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+    },
+    brandText: {
+        fontWeight: 800,
+        fontSize: "1.05rem",
+        color: "#fff",
+        letterSpacing: "-0.02em",
+    },
+    nav: {
+        flex: 1,
+        overflowY: "auto" as const,
+        overflowX: "hidden" as const,
+        padding: "4px 12px 16px",
+        scrollbarWidth: "none" as const,
+    },
+    overviewLink: (active: boolean): React.CSSProperties => ({
+        display: "flex",
+        alignItems: "center",
+        gap: "12px",
+        padding: "11px 12px",
+        borderRadius: "10px",
+        fontSize: "0.92rem",
+        fontWeight: 600,
+        marginBottom: "20px",
+        textDecoration: "none",
+        transition: "all 0.15s",
+        color: active ? "#60a5fa" : "#94a3b8",
+        backgroundColor: active ? "rgba(59,130,246,0.15)" : "transparent",
+        cursor: "pointer",
+    }),
+    group: {
+        marginBottom: "28px",
+    },
+    groupLabel: {
+        fontSize: "0.68rem",
+        fontWeight: 700,
+        letterSpacing: "0.12em",
+        color: "#475569",
+        textTransform: "uppercase" as const,
+        paddingLeft: "12px",
+        marginBottom: "8px",
+        display: "block",
+    },
+    navRow: (active: boolean): React.CSSProperties => ({
+        display: "flex",
+        alignItems: "center",
+        gap: "12px",
+        padding: "10px 12px",
+        borderRadius: "10px",
+        fontSize: "0.9rem",
+        fontWeight: 600,
+        textDecoration: "none",
+        transition: "all 0.15s",
+        color: active ? "#60a5fa" : "#94a3b8",
+        backgroundColor: active ? "rgba(59,130,246,0.15)" : "transparent",
+        cursor: "pointer",
+        width: "100%",
+        boxSizing: "border-box" as const,
+        border: "none",
+        textAlign: "left" as const,
+        justifyContent: "space-between",
+        marginBottom: "2px",
+    }),
+    subList: {
+        marginLeft: "20px",
+        paddingLeft: "14px",
+        borderLeft: "1px solid rgba(100,116,139,0.2)",
+        marginTop: "2px",
+        marginBottom: "4px",
+    },
+    subRow: (active: boolean): React.CSSProperties => ({
+        display: "flex",
+        alignItems: "center",
+        gap: "10px",
+        padding: "9px 12px",
+        borderRadius: "8px",
+        fontSize: "0.875rem",
+        fontWeight: 500,
+        textDecoration: "none",
+        transition: "all 0.15s",
+        color: active ? "#e2e8f0" : "#64748b",
+        backgroundColor: active ? "rgba(255,255,255,0.05)" : "transparent",
+        marginBottom: "1px",
+    }),
+    dot: (active: boolean): React.CSSProperties => ({
+        width: 6,
+        height: 6,
+        borderRadius: "50%",
+        backgroundColor: active ? "#60a5fa" : "#475569",
+        flexShrink: 0,
+    }),
+    footer: {
+        flexShrink: 0,
+        padding: "16px",
+        borderTop: "1px solid rgba(255,255,255,0.07)",
+        display: "flex",
+        alignItems: "center",
+        gap: "12px",
+    },
+    avatar: {
+        width: 34,
+        height: 34,
+        borderRadius: "50%",
+        flexShrink: 0,
+        background: "linear-gradient(135deg,#8b5cf6,#3b82f6)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: "0.8rem",
+        fontWeight: 700,
+        color: "#fff",
+    },
+};
+
 export default function Sidebar() {
     const pathname = usePathname();
     const { data: session } = useSession();
-    const [expanded, setExpanded] = useState<Record<string, boolean>>({ "Compute": true });
+    const [expanded, setExpanded] = useState<Record<string, boolean>>({ Compute: true });
+    const [hoveredItem, setHoveredItem] = useState<string | null>(null);
 
     const toggle = (label: string) =>
         setExpanded(prev => ({ ...prev, [label]: !prev[label] }));
 
-    const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
+    const isActive = (href: string) =>
+        pathname === href || pathname.startsWith(href + "/");
+
+    const rowStyle = (href: string, label: string): React.CSSProperties => {
+        const active = isActive(href);
+        const hovered = hoveredItem === label && !active;
+        return {
+            ...S.navRow(active),
+            color: active ? "#60a5fa" : hovered ? "#e2e8f0" : "#94a3b8",
+            backgroundColor: active ? "rgba(59,130,246,0.15)" : hovered ? "rgba(255,255,255,0.05)" : "transparent",
+        };
+    };
 
     return (
-        <aside
-            className="flex flex-col h-full flex-shrink-0"
-            style={{ width: "260px", backgroundColor: "#131720", borderRight: "1px solid rgba(255,255,255,0.06)" }}
-        >
+        <aside style={S.aside}>
             {/* ── Brand ── */}
-            <div className="flex items-center gap-3 px-5 py-5 flex-shrink-0">
-                <Link href="/" className="flex items-center gap-3" style={{ textDecoration: "none" }}>
-                    <div style={{
-                        width: 36, height: 36, borderRadius: 10,
-                        background: "linear-gradient(135deg,#3b82f6,#6366f1)",
-                        display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0
-                    }}>
-                        <Image src="/logo.png" alt="Logo" width={20} height={20}
-                            style={{ objectFit: "contain", filter: "brightness(0) invert(1)" }} />
-                    </div>
-                    <span style={{ fontWeight: 800, fontSize: "1.05rem", color: "#fff", letterSpacing: "-0.02em" }}>
-                        Not<span style={{ color: "#60a5fa" }}>Respond</span>
-                    </span>
-                </Link>
-            </div>
+            <Link href="/" style={S.brand}>
+                <div style={S.logoBox}>
+                    <Image src="/logo.png" alt="Logo" width={20} height={20}
+                        style={{ objectFit: "contain", filter: "brightness(0) invert(1)" }} />
+                </div>
+                <span style={S.brandText}>
+                    Not<span style={{ color: "#60a5fa" }}>Respond</span>
+                </span>
+            </Link>
 
             {/* ── Scrollable Nav ── */}
-            <nav
-                className="flex-1 overflow-y-auto px-3 pb-4"
-                style={{ scrollbarWidth: "none" }}
-            >
+            <nav style={S.nav}>
                 {/* Overview */}
                 <Link
                     href="/dashboard/vps"
-                    style={{ textDecoration: "none" }}
-                    className={[
-                        "flex items-center gap-3 px-3 py-3 rounded-xl text-[0.92rem] font-semibold mb-5 transition-all",
-                        isActive("/dashboard/vps")
-                            ? "bg-blue-600/20 text-blue-400"
-                            : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
-                    ].join(" ")}
+                    style={S.overviewLink(isActive("/dashboard/vps"))}
                 >
-                    <LayoutGrid className="w-5 h-5 flex-shrink-0" />
+                    <LayoutGrid style={{ width: 18, height: 18, flexShrink: 0 }} />
                     Overview
                 </Link>
 
                 {/* Groups */}
-                <div className="flex flex-col gap-7">
-                    {SIDEBAR_STRUCTURE.map((group) => (
-                        <div key={group.title}>
-                            {/* Section label */}
-                            <p style={{
-                                fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.12em",
-                                color: "#475569", textTransform: "uppercase",
-                                paddingLeft: "0.75rem", marginBottom: "0.5rem"
-                            }}>
-                                {group.title}
-                            </p>
+                {SIDEBAR_STRUCTURE.map((group) => (
+                    <div key={group.title} style={S.group}>
+                        <span style={S.groupLabel}>{group.title}</span>
 
-                            <div className="flex flex-col gap-0.5">
-                                {group.items.map((item) => {
-                                    const active = isActive(item.href);
-                                    const open = !!expanded[item.label];
-                                    const hasSub = !!item.subItems;
+                        {group.items.map((item) => {
+                            const active = isActive(item.href);
+                            const open = !!expanded[item.label];
+                            const hasSub = !!item.subItems;
+                            const style = rowStyle(item.href, item.label);
 
-                                    const rowCls = [
-                                        "flex items-center gap-3 px-3 py-2.5 rounded-xl text-[0.9rem] font-semibold transition-all w-full",
-                                        active
-                                            ? "bg-blue-600/20 text-blue-400"
-                                            : "text-slate-400 hover:text-slate-100 hover:bg-white/5"
-                                    ].join(" ");
+                            return (
+                                <div key={item.label}>
+                                    {hasSub ? (
+                                        <button
+                                            onClick={() => toggle(item.label)}
+                                            style={style}
+                                            onMouseEnter={() => setHoveredItem(item.label)}
+                                            onMouseLeave={() => setHoveredItem(null)}
+                                        >
+                                            <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                                                <item.icon style={{ width: 18, height: 18, flexShrink: 0 }} />
+                                                {item.label}
+                                            </span>
+                                            {open
+                                                ? <ChevronDown style={{ width: 15, height: 15, opacity: 0.5 }} />
+                                                : <ChevronRight style={{ width: 15, height: 15, opacity: 0.5 }} />}
+                                        </button>
+                                    ) : (
+                                        <Link
+                                            href={item.href}
+                                            style={style}
+                                            onMouseEnter={() => setHoveredItem(item.label)}
+                                            onMouseLeave={() => setHoveredItem(null)}
+                                        >
+                                            <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                                                <item.icon style={{ width: 18, height: 18, flexShrink: 0 }} />
+                                                {item.label}
+                                            </span>
+                                            {item.hasArrow && <ChevronRight style={{ width: 15, height: 15, opacity: 0.5 }} />}
+                                        </Link>
+                                    )}
 
-                                    return (
-                                        <div key={item.label}>
-                                            {hasSub ? (
-                                                <button onClick={() => toggle(item.label)} className={rowCls} style={{ justifyContent: "space-between" }}>
-                                                    <span className="flex items-center gap-3">
-                                                        <item.icon className="w-5 h-5 flex-shrink-0" />
-                                                        {item.label}
-                                                    </span>
-                                                    {open
-                                                        ? <ChevronDown className="w-4 h-4 opacity-50" />
-                                                        : <ChevronRight className="w-4 h-4 opacity-50" />}
-                                                </button>
-                                            ) : (
-                                                <Link href={item.href} style={{ textDecoration: "none", justifyContent: "space-between", display: "flex" }}
-                                                    className={rowCls}>
-                                                    <span className="flex items-center gap-3">
-                                                        <item.icon className="w-5 h-5 flex-shrink-0" />
-                                                        {item.label}
-                                                    </span>
-                                                    {item.hasArrow && <ChevronRight className="w-4 h-4 opacity-50" />}
-                                                </Link>
-                                            )}
-
-                                            {/* Sub-items */}
-                                            {hasSub && open && (
-                                                <div style={{
-                                                    marginLeft: "1.25rem",
-                                                    marginTop: "0.25rem",
-                                                    marginBottom: "0.25rem",
-                                                    paddingLeft: "0.875rem",
-                                                    borderLeft: "1px solid rgba(100,116,139,0.25)"
-                                                }}>
-                                                    {item.subItems!.map((sub) => {
-                                                        const subActive = pathname === sub.href;
-                                                        return (
-                                                            <Link key={sub.label} href={sub.href}
-                                                                style={{ textDecoration: "none" }}
-                                                                className={[
-                                                                    "flex items-center gap-2 px-3 py-2.5 text-[0.875rem] font-medium rounded-lg transition-all",
-                                                                    subActive
-                                                                        ? "text-slate-100 bg-white/5"
-                                                                        : "text-slate-500 hover:text-slate-300"
-                                                                ].join(" ")}
-                                                            >
-                                                                <span style={{ width: 6, height: 6, borderRadius: "50%", background: subActive ? "#60a5fa" : "#475569", flexShrink: 0 }} />
-                                                                {sub.label}
-                                                            </Link>
-                                                        );
-                                                    })}
-                                                </div>
-                                            )}
+                                    {/* Sub-items */}
+                                    {hasSub && open && (
+                                        <div style={S.subList}>
+                                            {item.subItems!.map((sub) => {
+                                                const subActive = pathname === sub.href;
+                                                return (
+                                                    <Link key={sub.label} href={sub.href} style={S.subRow(subActive)}>
+                                                        <span style={S.dot(subActive)} />
+                                                        {sub.label}
+                                                    </Link>
+                                                );
+                                            })}
                                         </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    ))}
-                </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+                    </div>
+                ))}
             </nav>
 
-            {/* ── Anchored User Footer ── */}
-            <div className="flex-shrink-0 px-4 py-4" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
-                <div className="flex items-center gap-3">
-                    <div style={{
-                        width: 34, height: 34, borderRadius: "50%", flexShrink: 0,
-                        background: "linear-gradient(135deg,#8b5cf6,#3b82f6)",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: "0.8rem", fontWeight: 700, color: "#fff"
-                    }}>
-                        {(session?.user?.name || session?.user?.email || "U")[0].toUpperCase()}
-                    </div>
-                    <div className="flex-1 overflow-hidden">
-                        <p style={{ fontSize: "0.85rem", fontWeight: 700, color: "#e2e8f0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.3 }}>
-                            {session?.user?.name || session?.user?.email?.split("@")[0] || "Guest"}
-                        </p>
-                        <p style={{ fontSize: "0.7rem", color: "#64748b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.3 }}>
-                            {session?.user?.email || "Not signed in"}
-                        </p>
-                    </div>
-                    <button
-                        onClick={() => signOut({ callbackUrl: "/" })}
-                        title="Log out"
-                        style={{ padding: "6px", borderRadius: "8px", color: "#64748b", background: "transparent", border: "none", cursor: "pointer", flexShrink: 0 }}
-                        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#f87171"; }}
-                        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#64748b"; }}
-                    >
-                        <LogOut style={{ width: 16, height: 16 }} />
-                    </button>
+            {/* ── Anchored Footer ── */}
+            <div style={S.footer}>
+                <div style={S.avatar}>
+                    {(session?.user?.name || session?.user?.email || "U")[0].toUpperCase()}
                 </div>
+                <div style={{ flex: 1, overflow: "hidden" }}>
+                    <p style={{ fontSize: "0.85rem", fontWeight: 700, color: "#e2e8f0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.4 }}>
+                        {session?.user?.name?.toUpperCase() || session?.user?.email?.split("@")[0]?.toUpperCase() || "GUEST"}
+                    </p>
+                    <p style={{ fontSize: "0.72rem", color: "#64748b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.4 }}>
+                        {session?.user?.email || "Not signed in"}
+                    </p>
+                </div>
+                <button
+                    onClick={() => signOut({ callbackUrl: "/" })}
+                    title="Log out"
+                    style={{ padding: 6, borderRadius: 8, border: "none", background: "transparent", cursor: "pointer", color: "#64748b", flexShrink: 0 }}
+                    onMouseEnter={e => (e.currentTarget.style.color = "#f87171")}
+                    onMouseLeave={e => (e.currentTarget.style.color = "#64748b")}
+                >
+                    <LogOut style={{ width: 16, height: 16 }} />
+                </button>
             </div>
         </aside>
     );
