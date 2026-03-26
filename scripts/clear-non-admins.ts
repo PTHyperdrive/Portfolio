@@ -29,14 +29,25 @@ async function main() {
     console.log(`Found ${nonAdminUsers.length} non-admin user(s) to delete:`);
     nonAdminUsers.forEach(user => console.log(`- ${user.email} (${user.id})`));
 
-    // Delete the users. Note: Due to onDelete: Cascade on the Prisma schema,
-    // this will automatically delete their associated accounts, sessions, orders, 
-    // vpnConfigs, proxyAccounts, emailAccounts, vpsInstances, and transactions.
+    // Get the IDs of users to delete
+    const userIds = nonAdminUsers.map(u => u.id);
+
+    // Delete dependent records first to avoid Foreign Key constraint violations!
+    // VpsInstance, VpnConfig, ProxyAccount, EmailAccount all depend on Order
+    // without cascading deletes, so we must manually delete them first.
+    await prisma.vpsInstance.deleteMany({ where: { userId: { in: userIds } } });
+    await prisma.vpnConfig.deleteMany({ where: { userId: { in: userIds } } });
+    await prisma.proxyAccount.deleteMany({ where: { userId: { in: userIds } } });
+    await prisma.emailAccount.deleteMany({ where: { userId: { in: userIds } } });
+    
+    // Now safe to delete Orders and Transactions
+    await prisma.order.deleteMany({ where: { userId: { in: userIds } } });
+    await prisma.transaction.deleteMany({ where: { userId: { in: userIds } } });
+
+    // Finally, delete the users
     const result = await prisma.user.deleteMany({
       where: {
-        role: {
-          not: 'ADMIN',
-        },
+        id: { in: userIds }
       },
     });
 
