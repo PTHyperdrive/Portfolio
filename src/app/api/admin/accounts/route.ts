@@ -23,7 +23,7 @@ export async function GET() {
                 name: true,
                 email: true,
                 role: true,
-                credits: true,
+                balance: true,
                 createdAt: true,
                 _count: {
                     select: {

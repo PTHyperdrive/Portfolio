@@ -190,7 +190,7 @@ export default function BillingPage() {
                                 <p className="gradient-text" style={{ fontSize: "1.8rem", fontWeight: 800 }}>
                                     {(data?.credits ?? 0).toLocaleString()}
                                 </p>
-                                <span style={{ fontSize: "0.85rem", color: "var(--text-secondary)", fontWeight: 600 }}>Credits</span>
+                                <span style={{ fontSize: "0.85rem", color: "var(--text-secondary)", fontWeight: 600 }}>VND</span>
                             </div>
                         </div>
                         <button className="btn btn-primary" style={{ marginTop: "24px", width: "100%", padding: "10px", fontSize: "0.85rem" }}>

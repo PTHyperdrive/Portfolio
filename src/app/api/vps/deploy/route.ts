@@ -29,7 +29,7 @@ export async function POST(req: Request) {
         // 1. Verify user has an active plan
         const dbUser = await prisma.user.findUnique({
             where: { id: userId },
-            select: { activePlan: true, credits: true },
+            select: { activePlan: true, balance: true },
         });
 
         if (!dbUser || !dbUser.activePlan) {
@@ -63,8 +63,8 @@ export async function POST(req: Request) {
 
         // 3. Validate Wallet Credits (Skip if Free Trial)
         if (plan !== "Trial Plan" && planCfg.priceInCredits > 0) {
-            if (dbUser.credits < planCfg.priceInCredits) {
-                return NextResponse.json({ error: "Insufficient credits. Please top up your balance." }, { status: 402 });
+            if (Number(dbUser.balance) < planCfg.priceInCredits) {
+                return NextResponse.json({ error: "Insufficient balance. Please top up your account." }, { status: 402 });
             }
         }
 
@@ -133,7 +133,7 @@ export async function POST(req: Request) {
         if (plan !== "Trial Plan" && planCfg.priceInCredits > 0) {
             await prisma.user.update({
                 where: { id: userId },
-                data: { credits: { decrement: planCfg.priceInCredits } },
+                data: { balance: { decrement: planCfg.priceInCredits } },
             });
             
             await prisma.transaction.create({
@@ -155,7 +155,7 @@ export async function POST(req: Request) {
                 serviceId: service.id,
                 status: "ACTIVE",
                 totalPrice: planCfg.priceInCredits,
-                notes: `Deployed via active plan: ${plan}. Deducted ${planCfg.priceInCredits} credits.`,
+                notes: `Deployed via active plan: ${plan}. Deducted ${planCfg.priceInCredits} from balance.`,
             },
         });
 
