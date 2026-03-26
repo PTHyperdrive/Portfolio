@@ -19,6 +19,7 @@ model User {
   role          Role      @default(USER)
   credits       Int       @default(0)
   hasUsedTrial  Boolean   @default(false)
+  twoFactorEnabled Boolean @default(false)
   trialExpiresAt DateTime?
   activePlan    String?
   planActivatedAt DateTime?
@@ -34,6 +35,7 @@ model User {
   blogPosts     BlogPost[]
   vpsInstances  VpsInstance[]
   transactions  Transaction[]
+  activityLogs  ActivityLog[]
 }
 
 model Account {
@@ -247,4 +249,23 @@ model Transaction {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+// ─── Activity Log ─────────────────────────────────────────
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String
+  action    String   // e.g., "VM Created", "Login Success"
+  service   String   // e.g., "Compute", "Auth", "Billing"
+  status    String   // e.g., "Success", "Failed"
+  ipAddress String?
+  userAgent String?
+  details   Json?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
 }
