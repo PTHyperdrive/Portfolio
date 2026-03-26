@@ -111,8 +111,13 @@ export default function VPSPage() {
     const userMeta = session?.user as Record<string, unknown> | undefined;
     const hasUsedTrial = userMeta?.hasUsedTrial === true;
     const isAdmin = userMeta?.role === "ADMIN";
+    const activePlan = userMeta?.activePlan as string | undefined;
 
-    const visiblePlans = VPS_PLANS.filter((p) => !(p.isTrial && hasUsedTrial && !isAdmin));
+    const visiblePlans = VPS_PLANS.filter((p) => {
+        if (p.isTrial && hasUsedTrial && !isAdmin) return false;
+        if (p.name === activePlan) return false;
+        return true;
+    });
 
     return (
         <>
@@ -145,74 +150,89 @@ export default function VPSPage() {
             {/* Pricing Cards */}
             <section className="section" style={{ paddingTop: "20px" }}>
                 <div className="container">
-                    <div className="grid-3 stagger">
-                        {visiblePlans.map((plan) => (
-                            <div
-                                key={plan.name}
-                                className={`glass-card pricing-card ${plan.featured ? "featured" : ""}`}
-                                style={{ padding: "36px", display: "flex", flexDirection: "column" }}
-                            >
-                                <span className="badge" style={{
-                                    background: `${plan.color}15`,
-                                    color: plan.color,
-                                    marginBottom: "16px",
-                                    alignSelf: "flex-start",
-                                }}>
-                                    {plan.badge}
-                                </span>
-
-                                <h3 style={{ fontSize: "1.4rem", fontWeight: 700, marginBottom: "8px" }}>
-                                    {plan.name}
-                                </h3>
-
-                                <div style={{ marginBottom: "24px" }}>
-                                    <span style={{ fontSize: "2.5rem", fontWeight: 800 }}>
-                                        <span className="gradient-text">${plan.price}</span>
-                                    </span>
-                                    {"period" in plan && <span style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>{(plan as typeof plan & { period?: string }).period}</span>}
-                                </div>
-
-                                {/* Specs Table */}
-                                <div style={{ marginBottom: "24px" }}>
-                                    {Object.entries(plan.specs).map(([key, value]) => (
-                                        <div
-                                            key={key}
-                                            style={{
-                                                display: "flex",
-                                                justifyContent: "space-between",
-                                                padding: "10px 0",
-                                                borderBottom: "1px solid rgba(255,255,255,0.04)",
-                                                fontSize: "0.9rem",
-                                            }}
-                                        >
-                                            <span style={{ color: "var(--text-muted)" }}>{key}</span>
-                                            <span className="mono" style={{ color: "var(--text-primary)", fontWeight: 500, fontSize: "0.85rem" }}>
-                                                {value}
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                {/* Features */}
-                                <div style={{ marginBottom: "28px", flex: 1 }}>
-                                    {plan.features.filter(Boolean).map((f) => (
-                                        <div key={f} style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                                            <span style={{ color: plan.color, fontSize: "0.9rem" }}>✓</span>
-                                            <span style={{ color: "var(--text-secondary)", fontSize: "0.88rem" }}>{f}</span>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                <Link
-                                    href={`/payment?plan=${encodeURIComponent(plan.name)}`}
-                                    className={plan.featured ? "btn btn-primary" : "btn btn-secondary"}
-                                    style={{ width: "100%", textAlign: "center" }}
+                    {visiblePlans.length === 0 ? (
+                        <div className="glass-card stagger" style={{ padding: "48px 32px", textAlign: "center", maxWidth: "600px", margin: "0 auto" }}>
+                            <div style={{ fontSize: "3.5rem", marginBottom: "20px" }}>🎉</div>
+                            <h3 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "16px", color: "var(--text-primary)" }}>
+                                You own all available plans!
+                            </h3>
+                            <p style={{ color: "var(--text-secondary)", fontSize: "1.05rem", marginBottom: "32px", lineHeight: "1.6" }}>
+                                You currently have active subscriptions covering everything we offer. Head to your Billing dashboard to manage your instances.
+                            </p>
+                            <Link href="/dashboard/billing" className="btn btn-primary" style={{ padding: "12px 24px", fontSize: "1rem" }}>
+                                Go to Billing Dashboard
+                            </Link>
+                        </div>
+                    ) : (
+                        <div className="grid-3 stagger">
+                            {visiblePlans.map((plan) => (
+                                <div
+                                    key={plan.name}
+                                    className={`glass-card pricing-card ${plan.featured ? "featured" : ""}`}
+                                    style={{ padding: "36px", display: "flex", flexDirection: "column" }}
                                 >
-                                    Get Started
-                                </Link>
-                            </div>
-                        ))}
-                    </div>
+                                    <span className="badge" style={{
+                                        background: `${plan.color}15`,
+                                        color: plan.color,
+                                        marginBottom: "16px",
+                                        alignSelf: "flex-start",
+                                    }}>
+                                        {plan.badge}
+                                    </span>
+
+                                    <h3 style={{ fontSize: "1.4rem", fontWeight: 700, marginBottom: "8px" }}>
+                                        {plan.name}
+                                    </h3>
+
+                                    <div style={{ marginBottom: "24px" }}>
+                                        <span style={{ fontSize: "2.5rem", fontWeight: 800 }}>
+                                            <span className="gradient-text">${plan.price}</span>
+                                        </span>
+                                        {"period" in plan && <span style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>{(plan as typeof plan & { period?: string }).period}</span>}
+                                    </div>
+
+                                    {/* Specs Table */}
+                                    <div style={{ marginBottom: "24px" }}>
+                                        {Object.entries(plan.specs).map(([key, value]) => (
+                                            <div
+                                                key={key}
+                                                style={{
+                                                    display: "flex",
+                                                    justifyContent: "space-between",
+                                                    padding: "10px 0",
+                                                    borderBottom: "1px solid rgba(255,255,255,0.04)",
+                                                    fontSize: "0.9rem",
+                                                }}
+                                            >
+                                                <span style={{ color: "var(--text-muted)" }}>{key}</span>
+                                                <span className="mono" style={{ color: "var(--text-primary)", fontWeight: 500, fontSize: "0.85rem" }}>
+                                                    {value}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Features */}
+                                    <div style={{ marginBottom: "28px", flex: 1 }}>
+                                        {plan.features.filter(Boolean).map((f) => (
+                                            <div key={f} style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+                                                <span style={{ color: plan.color, fontSize: "0.9rem" }}>✓</span>
+                                                <span style={{ color: "var(--text-secondary)", fontSize: "0.88rem" }}>{f}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    <Link
+                                        href={`/payment?plan=${encodeURIComponent(plan.name)}`}
+                                        className={plan.featured ? "btn btn-primary" : "btn btn-secondary"}
+                                        style={{ width: "100%", textAlign: "center" }}
+                                    >
+                                        Get Started
+                                    </Link>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </section>
 

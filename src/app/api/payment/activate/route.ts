@@ -24,14 +24,20 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Plan name is required" }, { status: 400 });
         }
 
-        // Anti-bypass guard: If it's a Trial plan, check the DB directly to ensure they haven't used it
+        // Anti-bypass guards: fetch user state from DB
+        const user = await prisma.user.findUnique({
+            where: { id: session.user.id },
+            select: { hasUsedTrial: true, role: true, activePlan: true },
+        });
+
         if (plan === "Trial Plan") {
-            const user = await prisma.user.findUnique({
-                where: { id: session.user.id },
-                select: { hasUsedTrial: true, role: true },
-            });
             if (user?.hasUsedTrial && user.role !== "ADMIN") {
                 return NextResponse.json({ error: "You have already claimed your one-time free trial." }, { status: 403 });
+            }
+        } else {
+            // For standard plans, prevent purchasing a plan they already own
+            if (user?.activePlan === plan) {
+                return NextResponse.json({ error: "You already have an active subscription for this plan." }, { status: 400 });
             }
         }
 
