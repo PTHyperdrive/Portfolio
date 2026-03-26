@@ -12,7 +12,6 @@ import {
 } from "lucide-react";
 
 type SubItem = { label: string; href: string };
-
 type NavItem = {
     label: string;
     icon: React.ElementType;
@@ -20,18 +19,15 @@ type NavItem = {
     subItems?: SubItem[];
     hasArrow?: boolean;
 };
-
-type NavGroup = {
-    title: string;
-    items: NavItem[];
-};
+type NavGroup = { title: string; items: NavItem[] };
 
 const SIDEBAR_STRUCTURE: NavGroup[] = [
     {
         title: "PUBLIC CLOUD",
         items: [
             {
-                label: "Compute", icon: Server, href: "/dashboard/vps", subItems: [
+                label: "Compute", icon: Server, href: "/dashboard/vps",
+                subItems: [
                     { label: "Virtual Machine", href: "/dashboard/vps" },
                     { label: "Bare Metal", href: "/dashboard/metal" },
                 ]
@@ -67,143 +63,166 @@ export default function Sidebar() {
     const { data: session } = useSession();
     const [expanded, setExpanded] = useState<Record<string, boolean>>({ "Compute": true });
 
-    const toggleExpand = (label: string) => {
+    const toggle = (label: string) =>
         setExpanded(prev => ({ ...prev, [label]: !prev[label] }));
-    };
 
-    const linkBase = "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150";
-    const linkActive = "bg-blue-600/20 text-blue-400 font-semibold";
-    const linkInactive = "text-slate-400 hover:text-slate-100 hover:bg-slate-800";
+    const isActive = (href: string) => pathname === href || pathname.startsWith(href + "/");
 
     return (
         <aside
-            className="w-[260px] flex flex-col h-full flex-shrink-0 border-r border-slate-800"
-            style={{ backgroundColor: "#0f1117" }}
+            className="flex flex-col h-full flex-shrink-0"
+            style={{ width: "260px", backgroundColor: "#131720", borderRight: "1px solid rgba(255,255,255,0.06)" }}
         >
-            {/* ── Brand Logo ── */}
-            <div className="flex items-center gap-3 px-5 h-[64px] border-b border-slate-800 flex-shrink-0">
+            {/* ── Brand ── */}
+            <div className="flex items-center gap-3 px-5 py-5 flex-shrink-0">
                 <Link href="/" className="flex items-center gap-3" style={{ textDecoration: "none" }}>
-                    <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center flex-shrink-0">
-                        <Image
-                            src="/logo.png"
-                            alt="Logo"
-                            width={18}
-                            height={18}
-                            style={{ objectFit: "contain", filter: "brightness(0) invert(1)" }}
-                        />
+                    <div style={{
+                        width: 36, height: 36, borderRadius: 10,
+                        background: "linear-gradient(135deg,#3b82f6,#6366f1)",
+                        display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0
+                    }}>
+                        <Image src="/logo.png" alt="Logo" width={20} height={20}
+                            style={{ objectFit: "contain", filter: "brightness(0) invert(1)" }} />
                     </div>
-                    <span className="font-extrabold text-white text-base tracking-tight">
-                        Not<span className="text-blue-400">Respond</span>
+                    <span style={{ fontWeight: 800, fontSize: "1.05rem", color: "#fff", letterSpacing: "-0.02em" }}>
+                        Not<span style={{ color: "#60a5fa" }}>Respond</span>
                     </span>
                 </Link>
             </div>
 
             {/* ── Scrollable Nav ── */}
-            <div
-                className="flex-1 overflow-y-auto px-3 py-4 space-y-6"
-                style={{ scrollbarWidth: "thin", scrollbarColor: "rgba(255,255,255,0.08) transparent" }}
+            <nav
+                className="flex-1 overflow-y-auto px-3 pb-4"
+                style={{ scrollbarWidth: "none" }}
             >
-                {/* Overview top link */}
+                {/* Overview */}
                 <Link
                     href="/dashboard/vps"
-                    className={`${linkBase} ${pathname === "/dashboard/vps" && !pathname.startsWith("/dashboard/vps/") ? linkActive : linkInactive}`}
                     style={{ textDecoration: "none" }}
+                    className={[
+                        "flex items-center gap-3 px-3 py-3 rounded-xl text-[0.92rem] font-semibold mb-5 transition-all",
+                        isActive("/dashboard/vps")
+                            ? "bg-blue-600/20 text-blue-400"
+                            : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
+                    ].join(" ")}
                 >
-                    <LayoutGrid className="w-4 h-4 flex-shrink-0" />
+                    <LayoutGrid className="w-5 h-5 flex-shrink-0" />
                     Overview
                 </Link>
 
-                {/* Sections */}
-                {SIDEBAR_STRUCTURE.map((group) => (
-                    <div key={group.title}>
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 px-3">
-                            {group.title}
-                        </p>
-                        <div className="flex flex-col space-y-0.5">
-                            {group.items.map((item) => {
-                                const isActive = pathname.startsWith(item.href);
-                                const isExpanded = !!expanded[item.label];
-                                const hasSubItems = !!item.subItems;
+                {/* Groups */}
+                <div className="flex flex-col gap-7">
+                    {SIDEBAR_STRUCTURE.map((group) => (
+                        <div key={group.title}>
+                            {/* Section label */}
+                            <p style={{
+                                fontSize: "0.68rem", fontWeight: 700, letterSpacing: "0.12em",
+                                color: "#475569", textTransform: "uppercase",
+                                paddingLeft: "0.75rem", marginBottom: "0.5rem"
+                            }}>
+                                {group.title}
+                            </p>
 
-                                return (
-                                    <div key={item.label}>
-                                        {hasSubItems ? (
-                                            <button
-                                                onClick={() => toggleExpand(item.label)}
-                                                className={`w-full ${linkBase} justify-between ${isActive ? linkActive : linkInactive}`}
-                                            >
-                                                <span className="flex items-center gap-3">
-                                                    <item.icon className="w-4 h-4 flex-shrink-0" />
-                                                    {item.label}
-                                                </span>
-                                                {isExpanded
-                                                    ? <ChevronDown className="w-3.5 h-3.5 opacity-60" />
-                                                    : <ChevronRight className="w-3.5 h-3.5 opacity-60" />
-                                                }
-                                            </button>
-                                        ) : (
-                                            <Link
-                                                href={item.href}
-                                                className={`${linkBase} justify-between ${isActive ? linkActive : linkInactive}`}
-                                                style={{ textDecoration: "none" }}
-                                            >
-                                                <span className="flex items-center gap-3">
-                                                    <item.icon className="w-4 h-4 flex-shrink-0" />
-                                                    {item.label}
-                                                </span>
-                                                {item.hasArrow && <ChevronRight className="w-3.5 h-3.5 opacity-60" />}
-                                            </Link>
-                                        )}
+                            <div className="flex flex-col gap-0.5">
+                                {group.items.map((item) => {
+                                    const active = isActive(item.href);
+                                    const open = !!expanded[item.label];
+                                    const hasSub = !!item.subItems;
 
-                                        {/* Expanded sub-items */}
-                                        {hasSubItems && isExpanded && (
-                                            <div className="ml-4 mt-0.5 mb-1 border-l border-slate-700/60 pl-3 flex flex-col space-y-0.5">
-                                                {item.subItems!.map((sub) => {
-                                                    const subActive = pathname === sub.href;
-                                                    return (
-                                                        <Link
-                                                            key={sub.label}
-                                                            href={sub.href}
-                                                            className={`block px-3 py-1.5 text-[0.82rem] rounded-md transition-all duration-150 ${subActive ? "text-slate-100 font-semibold" : "text-slate-500 hover:text-slate-300"}`}
-                                                            style={{ textDecoration: "none" }}
-                                                        >
-                                                            {sub.label}
-                                                        </Link>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
+                                    const rowCls = [
+                                        "flex items-center gap-3 px-3 py-2.5 rounded-xl text-[0.9rem] font-semibold transition-all w-full",
+                                        active
+                                            ? "bg-blue-600/20 text-blue-400"
+                                            : "text-slate-400 hover:text-slate-100 hover:bg-white/5"
+                                    ].join(" ");
+
+                                    return (
+                                        <div key={item.label}>
+                                            {hasSub ? (
+                                                <button onClick={() => toggle(item.label)} className={rowCls} style={{ justifyContent: "space-between" }}>
+                                                    <span className="flex items-center gap-3">
+                                                        <item.icon className="w-5 h-5 flex-shrink-0" />
+                                                        {item.label}
+                                                    </span>
+                                                    {open
+                                                        ? <ChevronDown className="w-4 h-4 opacity-50" />
+                                                        : <ChevronRight className="w-4 h-4 opacity-50" />}
+                                                </button>
+                                            ) : (
+                                                <Link href={item.href} style={{ textDecoration: "none", justifyContent: "space-between", display: "flex" }}
+                                                    className={rowCls}>
+                                                    <span className="flex items-center gap-3">
+                                                        <item.icon className="w-5 h-5 flex-shrink-0" />
+                                                        {item.label}
+                                                    </span>
+                                                    {item.hasArrow && <ChevronRight className="w-4 h-4 opacity-50" />}
+                                                </Link>
+                                            )}
+
+                                            {/* Sub-items */}
+                                            {hasSub && open && (
+                                                <div style={{
+                                                    marginLeft: "1.25rem",
+                                                    marginTop: "0.25rem",
+                                                    marginBottom: "0.25rem",
+                                                    paddingLeft: "0.875rem",
+                                                    borderLeft: "1px solid rgba(100,116,139,0.25)"
+                                                }}>
+                                                    {item.subItems!.map((sub) => {
+                                                        const subActive = pathname === sub.href;
+                                                        return (
+                                                            <Link key={sub.label} href={sub.href}
+                                                                style={{ textDecoration: "none" }}
+                                                                className={[
+                                                                    "flex items-center gap-2 px-3 py-2.5 text-[0.875rem] font-medium rounded-lg transition-all",
+                                                                    subActive
+                                                                        ? "text-slate-100 bg-white/5"
+                                                                        : "text-slate-500 hover:text-slate-300"
+                                                                ].join(" ")}
+                                                            >
+                                                                <span style={{ width: 6, height: 6, borderRadius: "50%", background: subActive ? "#60a5fa" : "#475569", flexShrink: 0 }} />
+                                                                {sub.label}
+                                                            </Link>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
-                    </div>
-                ))}
-            </div>
+                    ))}
+                </div>
+            </nav>
 
-            {/* ── User Profile — always anchored to bottom ── */}
-            <div className="flex-shrink-0 border-t border-slate-800 p-4">
+            {/* ── Anchored User Footer ── */}
+            <div className="flex-shrink-0 px-4 py-4" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
                 <div className="flex items-center gap-3">
-                    {/* Avatar */}
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-blue-600 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                    <div style={{
+                        width: 34, height: 34, borderRadius: "50%", flexShrink: 0,
+                        background: "linear-gradient(135deg,#8b5cf6,#3b82f6)",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: "0.8rem", fontWeight: 700, color: "#fff"
+                    }}>
                         {(session?.user?.name || session?.user?.email || "U")[0].toUpperCase()}
                     </div>
-                    {/* Name + email */}
                     <div className="flex-1 overflow-hidden">
-                        <p className="text-sm font-semibold text-slate-200 truncate leading-tight">
+                        <p style={{ fontSize: "0.85rem", fontWeight: 700, color: "#e2e8f0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.3 }}>
                             {session?.user?.name || session?.user?.email?.split("@")[0] || "Guest"}
                         </p>
-                        <p className="text-[0.72rem] text-slate-500 truncate leading-tight">
+                        <p style={{ fontSize: "0.7rem", color: "#64748b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.3 }}>
                             {session?.user?.email || "Not signed in"}
                         </p>
                     </div>
-                    {/* Logout icon */}
                     <button
                         onClick={() => signOut({ callbackUrl: "/" })}
                         title="Log out"
-                        className="p-1.5 rounded-md text-slate-500 hover:text-red-400 hover:bg-slate-800 transition-colors flex-shrink-0"
+                        style={{ padding: "6px", borderRadius: "8px", color: "#64748b", background: "transparent", border: "none", cursor: "pointer", flexShrink: 0 }}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#f87171"; }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "#64748b"; }}
                     >
-                        <LogOut className="w-4 h-4" />
+                        <LogOut style={{ width: 16, height: 16 }} />
                     </button>
                 </div>
             </div>
