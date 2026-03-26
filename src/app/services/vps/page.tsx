@@ -7,103 +7,142 @@ const VPS_PLANS = [
     {
         name: "Trial Plan",
         badge: "VPS",
-        price: "Free 30 Days",
+        price: "Free",
+        currency: "30 Days",
         specs: {
-            CPU: "2 vCPU Cores",
-            RAM: "2 GB DDR4",
-            Storage: "32GB Sata SSD",
-            Bandwidth: "45Mbit/s",
-            GPU: "N/A",
+            "CPU": "1 vCPU Core",
+            "RAM": "1 GB",
+            "Storage": "40 GB",
+            "Tier": "SATA SSD",
+            "vGPU": "None",
+            "Node": "Timox-2",
         },
-        features: ["24/7 Operation", "Limited Network", "Dedicated Manager", "Customized Config"],
+        features: ["Testing SSH connectivity", "NAT port forwarding", "Network latency testing"],
         featured: false,
         color: "var(--accent-purple)",
         isTrial: true,
+        isHiddenFromPublic: false,
     },
     {
-        name: "Cloud Starter",
+        name: "Nano-NAT",
         badge: "VPS",
-        price: 4.99,
+        price: "40,000",
         period: "/month",
+        currency: "VND",
         specs: {
-            CPU: "2 vCPU Cores",
-            RAM: "4 GB DDR4",
-            Storage: "80 GB NVMe SSD",
-            Bandwidth: "100Mbit/s",
-            GPU: "N/A",
+            "CPU": "1 vCPU Core",
+            "RAM": "1 GB",
+            "Storage": "64 GB",
+            "Tier": "SATA SSD",
+            "vGPU": "None",
+            "Node": "Timox-2",
         },
-        features: ["Private Network", "DDoS Protection", "SIEM ready", "24/7 Monitoring", "Service ready"],
+        features: ["Basic VPNs", "Personal proxies", "Lightweight background scripts"],
         featured: false,
         color: "var(--accent-cyan)",
         isTrial: false,
+        isHiddenFromPublic: false,
     },
     {
-        name: "Cloud Gaming",
+        name: "Dev-Standard",
         badge: "VPS",
-        price: 5.99,
+        price: "120,000",
         period: "/month",
+        currency: "VND",
         specs: {
-            CPU: "8 vCPU Cores",
-            RAM: "16 GB DDR4",
-            Storage: "256GB SSD + 512GB HDD",
-            Bandwidth: "1Gbit/s",
-            GPU: "AMD or NVIDIA",
+            "CPU": "2 vCPU Cores",
+            "RAM": "4 GB",
+            "Storage": "80 GB",
+            "Tier": "SATA SSD",
+            "vGPU": "None",
+            "Node": "Timox-1 or 2",
         },
-        features: ["Tailscale Supported", "Account Protection", "Parsec & Sunshine ready", "Always up to date"],
+        features: ["Web dev environments", "Docker containers", "Standard websites"],
         featured: false,
         color: "var(--accent-cyan)",
         isTrial: false,
+        isHiddenFromPublic: false,
     },
     {
-        name: "Cloud Workstation",
-        badge: "DEDICATED GPU",
-        price: 49.99,
-        period: "/hour",
+        name: "Perform-NVMe",
+        badge: "VPS",
+        price: "280,000",
+        period: "/month",
+        currency: "VND",
         specs: {
-            CPU: "8 vCPU Cores",
-            RAM: "32 GB DDR4",
-            Storage: "500 GB NVMe SSD",
-            Bandwidth: "10 TB",
-            GPU: "AMD RX580 2048P",
+            "CPU": "4 vCPU Cores",
+            "RAM": "8 GB",
+            "Storage": "80 GB",
+            "Tier": "NVMe",
+            "vGPU": "None",
+            "Node": "Timox-1",
         },
-        features: ["DirectML Support", "PCIe Passthrough", "Priority Support", "Auto-Scaling", "File 3-2-1 Backup system", "Hourly Snapshots", "Full workstation applications supports"],
-        featured: true,
+        features: ["Game servers (Minecraft, etc.)", "High-traffic databases", "CI/CD tasks"],
+        featured: false,
         color: "var(--accent-magenta)",
         isTrial: false,
+        isHiddenFromPublic: false,
     },
     {
-        name: "Enterprise",
+        name: "GPU-Media",
         badge: "V-GPU",
-        price: 149.99,
+        price: "350,000",
         period: "/month",
+        currency: "VND",
         specs: {
-            CPU: "32 vCPU Cores",
-            RAM: "128 GB DDR4 ECC",
-            Storage: "2 TB NVMe SSD",
-            Bandwidth: "Unmetered",
-            GPU: "NVIDIA RTX 6000",
+            "CPU": "4 vCPU Cores",
+            "RAM": "8 GB",
+            "Storage": "50 GB",
+            "Tier": "NVMe",
+            "vGPU": "2 GB VRAM (RTX 6000)",
+            "Node": "Timox-1",
         },
-        features: ["Multi-GPU Cluster", "Dedicated Static IP", "Dedicated SDN", "CUDA & Tensor Supported", "Customized Config", "A.I Optimized"],
+        features: ["Hardware-accelerated video transcoding", "Remote desktop environments"],
+        featured: true,
+        color: "var(--accent-purple)",
+        isTrial: false,
+        isHiddenFromPublic: false,
+    },
+    {
+        name: "GPU-Compute",
+        badge: "V-GPU",
+        price: "850,000",
+        period: "/month",
+        currency: "VND",
+        specs: {
+            "CPU": "8 vCPU Cores",
+            "RAM": "16 GB",
+            "Storage": "150 GB",
+            "Tier": "NVMe",
+            "vGPU": "6 GB VRAM (RTX 6000)",
+            "Node": "Timox-1",
+        },
+        features: ["AI model inference", "3D rendering", "Heavy parallel processing"],
         featured: false,
         color: "var(--accent-purple)",
         isTrial: false,
+        isHiddenFromPublic: false,
     },
     {
-        name: "Anti-Detect VPS",
-        badge: "Specialized",
-        price: "Negotiable",
+        name: "Operator-Exclusive",
+        badge: "DEDICATED",
+        price: "Internal",
+        period: "",
+        currency: "",
         specs: {
-            CPU: "32 vCPU Cores",
-            RAM: "64 GB DDR4 ECC",
-            Storage: "256 U.2 SSD",
-            Bandwidth: "Unmetered",
-            GPU: "Optional",
+            "CPU": "16 vCPU Cores",
+            "RAM": "32 GB",
+            "Storage": "250 GB + 8TB",
+            "Tier": "NVMe/HDD",
+            "vGPU": "4 GB VRAM (RTX 6000)",
+            "Node": "Timox-1",
         },
-        features: ["VM full control", "Allow VM present obfuscation", "Dedicated custom network", "Customized CPU instructions", "Heavily customized VM", "Wireshark capturing supported"],
+        features: ["Isolated sandbox", "System architecture testing", "Anomalous executables analysis"],
         featured: false,
-        color: "var(--accent-cyan)",
+        color: "var(--accent-magenta)",
         isTrial: false,
-    },
+        isHiddenFromPublic: true,
+    }
 ];
 
 export default function VPSPage() {
@@ -116,6 +155,7 @@ export default function VPSPage() {
     const visiblePlans = VPS_PLANS.filter((p) => {
         if (p.isTrial && hasUsedTrial && !isAdmin) return false;
         if (p.name === activePlan) return false;
+        if ("isHiddenFromPublic" in p && p.isHiddenFromPublic && !isAdmin) return false;
         return true;
     });
 
@@ -184,11 +224,15 @@ export default function VPSPage() {
                                         {plan.name}
                                     </h3>
 
-                                    <div style={{ marginBottom: "24px" }}>
+                                    <div style={{ marginBottom: "24px", display: "flex", alignItems: "center" }}>
                                         <span style={{ fontSize: "2.5rem", fontWeight: 800 }}>
-                                            <span className="gradient-text">${plan.price}</span>
+                                            <span className="gradient-text">{plan.price}</span>
                                         </span>
-                                        {"period" in plan && <span style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>{(plan as typeof plan & { period?: string }).period}</span>}
+                                        {/* "currency" and "period" blocks */}
+                                        <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", marginLeft: "8px" }}>
+                                            {"currency" in plan && <span style={{ color: "var(--text-primary)", fontWeight: 700, fontSize: "1rem", lineHeight: "1" }}>{(plan as any).currency}</span>}
+                                            {"period" in plan && <span style={{ color: "var(--text-muted)", fontSize: "0.85rem", lineHeight: "1" }}>{(plan as any).period}</span>}
+                                        </div>
                                     </div>
 
                                     {/* Specs Table */}

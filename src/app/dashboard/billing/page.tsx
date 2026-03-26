@@ -17,6 +17,7 @@ interface Transaction {
 interface BillingData {
     activePlan: string | null;
     planActivatedAt: string | null;
+    trialExpiresAt: string | null;
     totalSpent: number;
     vpsCount: number;
     transactions: Transaction[];
@@ -49,6 +50,19 @@ export default function BillingPage() {
 
     const fmtTime = (s: string) =>
         new Date(s).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" });
+
+    const expirationText = (() => {
+        if (!data?.activePlan) return null;
+        if (data.activePlan === "Trial Plan" && data.trialExpiresAt) {
+            return `Expires on ${fmtDate(data.trialExpiresAt)}`;
+        }
+        if (data.planActivatedAt) {
+            const d = new Date(data.planActivatedAt);
+            d.setMonth(d.getMonth() + 1);
+            return `Renews on ${fmtDate(d.toISOString())}`;
+        }
+        return null;
+    })();
 
     const statusColor = (status: string) =>
         status === "paid" ? "var(--accent-green)" : status === "pending" ? "#FBBF24" : "var(--accent-magenta)";
@@ -110,9 +124,16 @@ export default function BillingPage() {
                             {data?.activePlan ?? "None"}
                         </p>
                         {data?.planActivatedAt && (
-                            <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "4px" }}>
-                                Since {fmtDate(data.planActivatedAt)}
-                            </p>
+                            <>
+                                <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "4px" }}>
+                                    Since {fmtDate(data.planActivatedAt)}
+                                </p>
+                                {expirationText && (
+                                    <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "2px", fontWeight: 700 }}>
+                                        {expirationText}
+                                    </p>
+                                )}
+                            </>
                         )}
 
                         {data?.activePlan && data.vpsCount === 0 && (
