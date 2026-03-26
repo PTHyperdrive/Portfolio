@@ -131,17 +131,27 @@ export default function ComputeNewPage() {
     const os           = OS_OPTIONS.find(o => o.id === selectedOs)!;
     const cycle        = BILLING_CYCLES.find(c => c.id === selectedCycle)!;
 
-    // Check if user has an active ticket for the selected plan
-    const activeTicket = tickets.find(t => t.planId === selectedPlan) ?? null;
+    // ── Ticket math (mirrors backend logic exactly) ─────────────────
+    const planTickets           = tickets.filter(t => t.planId === selectedPlan);
+    const availableTicketsCount = planTickets.length;
+    // Use the soonest-expiring ticket (same order as backend)
+    const activeTicket          = planTickets[0] ?? null;
 
-    const basePrice = (() => {
-        if (activeTicket) return 0; // free re-deploy
+    const instancesCoveredByTickets = Math.min(instanceCount, availableTicketsCount);
+    const instancesToPayFor         = instanceCount - instancesCoveredByTickets;
+
+    const unitPrice = (() => {
         if (cycle.id === "hourly") return Math.round(plan.price / 720);
         return Math.round(plan.price * cycle.mult);
     })();
-
     const backupPrice = backupEnabled ? 500 * plan.disk : 0;
-    const total       = Math.max(0, (basePrice + backupPrice) * instanceCount - (activeTicket ? 0 : promoBonus));
+
+    // Ticketed instances = 0 Credits; charged instances = full unit price
+    const basePrice = instancesToPayFor * unitPrice;
+    const total     = Math.max(0, basePrice + backupPrice * instanceCount - (activeTicket ? 0 : promoBonus));
+
+    // Split scenario: at least one is free AND at least one is charged
+    const isSplitOrder = instancesCoveredByTickets > 0 && instancesToPayFor > 0;
 
     const card: React.CSSProperties = {
         background: "#161b22", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14,
@@ -179,7 +189,13 @@ export default function ComputeNewPage() {
             const res = await fetch("/api/vps/deploy", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ plan: selectedPlan, isoId: selectedOs, node: location.node }),
+                // Always send instanceCount so backend can do authoritative ticket math
+                body: JSON.stringify({
+                    plan:          selectedPlan,
+                    isoId:         selectedOs,
+                    node:          location.node,
+                    instanceCount: instanceCount,
+                }),
             });
             const d = await res.json();
             if (!res.ok) { setDeployErr(d.error ?? "Deployment failed"); return; }
@@ -496,24 +512,37 @@ export default function ComputeNewPage() {
 
                     {/* Line items */}
                     <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 18 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between" }}>
-                            <span style={{ fontSize: "0.8rem", color: "#64748b" }}>
-                                Base price {activeTicket ? "(ticket)" : `(${cycle.label})`}
-                            </span>
-                            <span style={{ fontSize: "0.8rem", color: activeTicket ? "#10b981" : "#94a3b8", fontWeight: 600 }}>
-                                {activeTicket ? "FREE" : `${basePrice.toLocaleString()} Cr`}
-                            </span>
-                        </div>
-                        {backupEnabled && (
+                        {/* Ticket-covered instances */}
+                        {instancesCoveredByTickets > 0 && (
                             <div style={{ display: "flex", justifyContent: "space-between" }}>
-                                <span style={{ fontSize: "0.8rem", color: "#64748b" }}>Automatic Backup</span>
-                                <span style={{ fontSize: "0.8rem", color: "#10b981", fontWeight: 600 }}>+{backupPrice.toLocaleString()} Cr</span>
+                                <span style={{ fontSize: "0.8rem", color: "#64748b" }}>
+                                    🎟 {instancesCoveredByTickets}× {plan.label} (ticket)
+                                </span>
+                                <span style={{ fontSize: "0.8rem", color: "#10b981", fontWeight: 700 }}>FREE</span>
                             </div>
                         )}
-                        {instanceCount > 1 && (
+                        {/* Charged instances */}
+                        {instancesToPayFor > 0 && (
                             <div style={{ display: "flex", justifyContent: "space-between" }}>
-                                <span style={{ fontSize: "0.8rem", color: "#64748b" }}>× {instanceCount} instances</span>
-                                <span style={{ fontSize: "0.8rem", color: "#94a3b8" }}> </span>
+                                <span style={{ fontSize: "0.8rem", color: "#64748b" }}>
+                                    {instancesToPayFor}× {plan.label} ({cycle.label})
+                                </span>
+                                <span style={{ fontSize: "0.8rem", color: "#94a3b8", fontWeight: 600 }}>
+                                    {(instancesToPayFor * unitPrice).toLocaleString()} Cr
+                                </span>
+                            </div>
+                        )}
+                        {/* No tickets at all, single line */}
+                        {instancesCoveredByTickets === 0 && instancesToPayFor === 0 && (
+                            <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                <span style={{ fontSize: "0.8rem", color: "#64748b" }}>Base price ({cycle.label})</span>
+                                <span style={{ fontSize: "0.8rem", color: "#94a3b8", fontWeight: 600 }}>{unitPrice.toLocaleString()} Cr</span>
+                            </div>
+                        )}
+                        {backupEnabled && (
+                            <div style={{ display: "flex", justifyContent: "space-between" }}>
+                                <span style={{ fontSize: "0.8rem", color: "#64748b" }}>Backup (×{instanceCount})</span>
+                                <span style={{ fontSize: "0.8rem", color: "#10b981", fontWeight: 600 }}>+{(backupPrice * instanceCount).toLocaleString()} Cr</span>
                             </div>
                         )}
                         {promoApplied && !activeTicket && (
@@ -528,15 +557,23 @@ export default function ComputeNewPage() {
                     <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 16, marginBottom: 18 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
                             <span style={{ fontSize: "0.72rem", color: "#475569", textTransform: "uppercase", letterSpacing: "0.08em" }}>Total</span>
-                            <span style={{ fontWeight: 900, fontSize: "1.45rem", color: activeTicket ? "#10b981" : "#f1f5f9" }}>
+                            <span style={{ fontWeight: 900, fontSize: "1.45rem", color: total === 0 ? "#10b981" : "#f1f5f9" }}>
                                 {total.toLocaleString()}
                             </span>
                         </div>
-                        {activeTicket ? (
+                        {/* Helper text variants */}
+                        {total === 0 && instancesCoveredByTickets > 0 && (
                             <p style={{ fontSize: "0.72rem", color: "#10b981", textAlign: "right" }}>
-                                Using existing ticket · valid until {new Date(activeTicket.validUntil).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                                🎟 {instancesCoveredByTickets} ticket(s) applied · valid until{" "}
+                                {new Date(activeTicket!.validUntil).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
                             </p>
-                        ) : (
+                        )}
+                        {isSplitOrder && (
+                            <p style={{ fontSize: "0.72rem", color: "#f59e0b", textAlign: "right", marginTop: 4 }}>
+                                🎟 {instancesCoveredByTickets} ticket applied · {instancesToPayFor} billed at standard rate
+                            </p>
+                        )}
+                        {!activeTicket && !isSplitOrder && (
                             <p style={{ fontSize: "0.72rem", color: "#475569", textAlign: "right" }}>
                                 Credits / {cycle.id === "hourly" ? "hour" : cycle.id === "monthly" ? "month" : cycle.label.toLowerCase()}
                             </p>
@@ -610,7 +647,11 @@ export default function ComputeNewPage() {
                         )}
                     </button>
                     <p style={{ fontSize: "0.68rem", color: "#334155", textAlign: "center", marginTop: 10, lineHeight: 1.5 }}>
-                        {activeTicket ? "No credits will be deducted — using your deployment ticket." : "Credits deducted immediately upon deployment."}
+                        {total === 0 && instancesCoveredByTickets > 0
+                            ? "No credits deducted — deployment ticket(s) applied."
+                            : isSplitOrder
+                                ? `${instancesCoveredByTickets} ticket(s) free · ${instancesToPayFor} instance(s) billed at ${plan.price.toLocaleString()} Cr each.`
+                                : "Credits deducted immediately upon deployment."}
                     </p>
                 </div>
             </div>
