@@ -18,6 +18,8 @@ export interface PlanConfig {
     storageKeyword: string;
     /** Human-readable OS family default for display */
     defaultOs: string;
+    /** Plan price in prepaid credits (1 Credit = 1 VND value) */
+    priceInCredits: number;
 }
 
 export const PLAN_CONFIGS: Record<string, PlanConfig> = {
@@ -28,6 +30,7 @@ export const PLAN_CONFIGS: Record<string, PlanConfig> = {
         bandwidthMbits: 45,
         storageKeyword: "zfs",
         defaultOs: "Ubuntu 24.04 LTS",
+        priceInCredits: 0,
     },
     "Nano-NAT": {
         vcpu: 1,
@@ -36,6 +39,7 @@ export const PLAN_CONFIGS: Record<string, PlanConfig> = {
         bandwidthMbits: 100,
         storageKeyword: "zfs",
         defaultOs: "Ubuntu 24.04 LTS",
+        priceInCredits: 40000,
     },
     "Dev-Standard": {
         vcpu: 2,
@@ -44,6 +48,7 @@ export const PLAN_CONFIGS: Record<string, PlanConfig> = {
         bandwidthMbits: 250,
         storageKeyword: "zfs",
         defaultOs: "Ubuntu 24.04 LTS",
+        priceInCredits: 120000,
     },
     "Perform-NVMe": {
         vcpu: 4,
@@ -52,6 +57,7 @@ export const PLAN_CONFIGS: Record<string, PlanConfig> = {
         bandwidthMbits: 500,
         storageKeyword: "nvme",
         defaultOs: "Ubuntu 24.04 LTS",
+        priceInCredits: 280000,
     },
     "GPU-Media": {
         vcpu: 4,
@@ -60,6 +66,7 @@ export const PLAN_CONFIGS: Record<string, PlanConfig> = {
         bandwidthMbits: 1000,
         storageKeyword: "nvme",
         defaultOs: "Windows 11 23H2",
+        priceInCredits: 350000,
     },
     "GPU-Compute": {
         vcpu: 8,
@@ -68,6 +75,7 @@ export const PLAN_CONFIGS: Record<string, PlanConfig> = {
         bandwidthMbits: 1000,
         storageKeyword: "nvme",
         defaultOs: "Ubuntu 24.04 LTS",
+        priceInCredits: 850000,
     },
     "Operator-Exclusive": {
         vcpu: 16,
@@ -76,6 +84,7 @@ export const PLAN_CONFIGS: Record<string, PlanConfig> = {
         bandwidthMbits: 0,
         storageKeyword: "nvme",
         defaultOs: "Windows 11 24H2",
+        priceInCredits: 0,
     },
 };
 

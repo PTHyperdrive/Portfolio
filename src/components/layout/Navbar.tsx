@@ -60,6 +60,7 @@ export default function Navbar() {
 
     // ── While session is loading, render a skeleton to prevent flash ──
     if (status === "loading") {
+        if (pathname.startsWith("/dashboard")) return null;
         return (
             <nav
                 style={{
@@ -85,6 +86,8 @@ export default function Navbar() {
     }
 
     const loggedIn = !!session;
+
+    if (pathname.startsWith("/dashboard")) return null;
 
     return (
         <nav

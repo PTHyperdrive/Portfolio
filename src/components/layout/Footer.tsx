@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 
 const FOOTER_LINKS = {
     Services: [
@@ -24,6 +27,9 @@ const FOOTER_LINKS = {
 };
 
 export default function Footer() {
+    const pathname = usePathname();
+    if (pathname.startsWith("/dashboard")) return null;
+
     return (
         <footer
             style={{

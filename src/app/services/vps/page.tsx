@@ -28,7 +28,7 @@ const VPS_PLANS = [
         badge: "VPS",
         price: "40,000",
         period: "/month",
-        currency: "VND",
+        currency: "Credits",
         specs: {
             "CPU": "1 vCPU Core",
             "RAM": "1 GB",
@@ -48,7 +48,7 @@ const VPS_PLANS = [
         badge: "VPS",
         price: "120,000",
         period: "/month",
-        currency: "VND",
+        currency: "Credits",
         specs: {
             "CPU": "2 vCPU Cores",
             "RAM": "4 GB",
@@ -68,7 +68,7 @@ const VPS_PLANS = [
         badge: "VPS",
         price: "280,000",
         period: "/month",
-        currency: "VND",
+        currency: "Credits",
         specs: {
             "CPU": "4 vCPU Cores",
             "RAM": "8 GB",
@@ -88,7 +88,7 @@ const VPS_PLANS = [
         badge: "V-GPU",
         price: "350,000",
         period: "/month",
-        currency: "VND",
+        currency: "Credits",
         specs: {
             "CPU": "4 vCPU Cores",
             "RAM": "8 GB",
@@ -108,7 +108,7 @@ const VPS_PLANS = [
         badge: "V-GPU",
         price: "850,000",
         period: "/month",
-        currency: "VND",
+        currency: "Credits",
         specs: {
             "CPU": "8 vCPU Cores",
             "RAM": "16 GB",

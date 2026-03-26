@@ -29,7 +29,7 @@ export async function POST(req: Request) {
         // 1. Verify user has an active plan
         const dbUser = await prisma.user.findUnique({
             where: { id: userId },
-            select: { activePlan: true },
+            select: { activePlan: true, credits: true },
         });
 
         if (!dbUser || !dbUser.activePlan) {
@@ -59,6 +59,13 @@ export async function POST(req: Request) {
         const planCfg = getPlanConfig(plan);
         if (!planCfg) {
             return NextResponse.json({ error: `Unknown plan configuration for: ${plan}` }, { status: 400 });
+        }
+
+        // 3. Validate Wallet Credits (Skip if Free Trial)
+        if (plan !== "Trial Plan" && planCfg.priceInCredits > 0) {
+            if (dbUser.credits < planCfg.priceInCredits) {
+                return NextResponse.json({ error: "Insufficient credits. Please top up your balance." }, { status: 402 });
+            }
         }
 
         // ── Resolve ISO ──────────────────────────────────────────────
@@ -122,14 +129,33 @@ export async function POST(req: Request) {
             });
         }
 
+        // Deduct credits and log transaction 
+        if (plan !== "Trial Plan" && planCfg.priceInCredits > 0) {
+            await prisma.user.update({
+                where: { id: userId },
+                data: { credits: { decrement: planCfg.priceInCredits } },
+            });
+            
+            await prisma.transaction.create({
+                data: {
+                    userId,
+                    plan: plan,
+                    amount: planCfg.priceInCredits,
+                    currency: "Credits",
+                    method: "credit_wallet",
+                    status: "paid",
+                }
+            });
+        }
+
         // Generate an internal order record for history tracking
         const order = await prisma.order.create({
             data: {
                 userId,
                 serviceId: service.id,
                 status: "ACTIVE",
-                totalPrice: 0,
-                notes: `Deployed via active plan: ${plan}`,
+                totalPrice: planCfg.priceInCredits,
+                notes: `Deployed via active plan: ${plan}. Deducted ${planCfg.priceInCredits} credits.`,
             },
         });
 

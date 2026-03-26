@@ -20,6 +20,7 @@ interface BillingData {
     trialExpiresAt: string | null;
     totalSpent: number;
     vpsCount: number;
+    credits: number;
     transactions: Transaction[];
 }
 
@@ -180,16 +181,21 @@ export default function BillingPage() {
                         )}
                     </div>
 
-                    {/* Total Spent */}
-                    <div className="glass-card" style={{ padding: "24px" }}>
-                        <div style={{ fontSize: "1.4rem", marginBottom: "8px" }}>💰</div>
-                        <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "6px" }}>Total Spent</p>
-                        <p className="gradient-text" style={{ fontSize: "1.4rem", fontWeight: 800 }}>
-                            ${(data?.totalSpent ?? 0).toFixed(2)}
-                        </p>
-                        <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "4px" }}>
-                            {data?.transactions.length ?? 0} invoice{(data?.transactions.length ?? 0) !== 1 ? "s" : ""}
-                        </p>
+                    {/* Current Balance */}
+                    <div className="glass-card" style={{ padding: "24px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                        <div>
+                            <div style={{ fontSize: "1.4rem", marginBottom: "8px" }}>💳</div>
+                            <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "6px" }}>Current Balance</p>
+                            <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
+                                <p className="gradient-text" style={{ fontSize: "1.8rem", fontWeight: 800 }}>
+                                    {(data?.credits ?? 0).toLocaleString()}
+                                </p>
+                                <span style={{ fontSize: "0.85rem", color: "var(--text-secondary)", fontWeight: 600 }}>Credits</span>
+                            </div>
+                        </div>
+                        <button className="btn btn-primary" style={{ marginTop: "24px", width: "100%", padding: "10px", fontSize: "0.85rem" }}>
+                            Top Up Balance
+                        </button>
                     </div>
 
                     {/* Upgrade CTA */}

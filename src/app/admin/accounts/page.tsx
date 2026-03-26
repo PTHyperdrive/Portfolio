@@ -7,7 +7,7 @@ interface UserAccount {
     name: string | null;
     email: string;
     role: string;
-    balance: number;
+    credits: number;
     createdAt: string;
     _count: {
         orders: number;
@@ -150,7 +150,7 @@ export default function AdminAccountsPage() {
                                         </td>
                                         <td style={{ padding: "14px 16px" }} className="mono">
                                             <span style={{ color: "var(--accent-green)", fontSize: "0.88rem", fontWeight: 600 }}>
-                                                ${Number(user.balance).toFixed(2)}
+                                                {user.credits}
                                             </span>
                                         </td>
                                         <td style={{ padding: "14px 16px", fontSize: "0.9rem", fontWeight: 600 }} className="mono">{user._count.vpsInstances}</td>
