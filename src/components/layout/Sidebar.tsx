@@ -4,21 +4,22 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
+import { Server, HardDrive, Network, Settings, CreditCard } from "lucide-react";
 
 const SIDEBAR_GROUPS = [
     {
         title: "PUBLIC CLOUD",
         links: [
-            { href: "/dashboard/vps", label: "Compute", icon: "💻" },
-            { href: "/dashboard/storage", label: "Storage", icon: "💾" },
-            { href: "/dashboard/networks", label: "Networks", icon: "🌐" },
+            { href: "/dashboard/vps", label: "Compute", icon: Server },
+            { href: "/dashboard/storage", label: "Storage", icon: HardDrive },
+            { href: "/dashboard/networks", label: "Networks", icon: Network },
         ],
     },
     {
         title: "ACCOUNT",
         links: [
-            { href: "/settings", label: "Settings", icon: "⚙️" },
-            { href: "/dashboard/billing", label: "Billing", icon: "💳" },
+            { href: "/settings", label: "Settings", icon: Settings },
+            { href: "/dashboard/billing", label: "Billing", icon: CreditCard },
         ],
     },
 ];
@@ -34,7 +35,7 @@ export default function Sidebar() {
                 <Link href="/" className="flex items-center gap-2 decoration-transparent">
                     <Image src="/logo.png" alt="Logo" width={32} height={32} style={{ objectFit: "contain" }} />
                     <span className="font-bold text-white text-lg tracking-tight">
-                        Hyper<span className="text-cyan-400">Core</span>
+                        NotRespond<span className="text-cyan-400">.com</span>
                     </span>
                 </Link>
             </div>
@@ -60,7 +61,7 @@ export default function Sidebar() {
                                             }`}
                                             style={{ textDecoration: "none" }}
                                         >
-                                            <span style={{ fontSize: "1.1rem" }}>{link.icon}</span>
+                                            <link.icon className={`w-5 h-5 ${isActive ? "text-cyan-400" : "text-slate-400"}`} />
                                             {link.label}
                                         </Link>
                                     </li>
