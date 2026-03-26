@@ -15,7 +15,8 @@ interface LogEntry {
 }
 
 const statusColor = (s: string) =>
-    s === "Success" ? { bg: "rgba(16,185,129,0.15)", color: "#10b981", dot: "#10b981" }
+    s === "Success"
+        ? { bg: "rgba(16,185,129,0.15)", color: "#10b981", dot: "#10b981" }
         : { bg: "rgba(239,68,68,0.15)", color: "#ef4444", dot: "#ef4444" };
 
 const serviceColor = (s: string): string => {
@@ -31,6 +32,28 @@ function fmtDate(s: string) {
         day: "2-digit", month: "2-digit", year: "numeric",
         hour: "2-digit", minute: "2-digit",
     });
+}
+
+/** IP shown blurred by default, revealed on hover */
+function BlurredIP({ ip }: { ip: string | null }) {
+    if (!ip) return <span style={{ color: "#475569" }}>—</span>;
+    return (
+        <span
+            className="blurred-ip"
+            title="Hover to reveal IP"
+            style={{
+                fontFamily: "monospace",
+                fontSize: "0.875rem",
+                color: "#e2e8f0",
+                filter: "blur(4px)",
+                transition: "filter 0.2s ease",
+                cursor: "pointer",
+                userSelect: "none",
+            }}
+        >
+            {ip}
+        </span>
+    );
 }
 
 export default function ActivityLogPage() {
@@ -79,6 +102,11 @@ export default function ActivityLogPage() {
 
     return (
         <div style={{ padding: "32px 36px", minHeight: "100vh", backgroundColor: "#0d1117" }}>
+            {/* Global style for IP blur hover */}
+            <style>{`
+                .blurred-ip:hover { filter: blur(0px) !important; user-select: text !important; }
+            `}</style>
+
             {/* Header */}
             <div style={{ marginBottom: 28 }}>
                 <p style={{ fontSize: "0.78rem", color: "#475569", marginBottom: 6 }}>
@@ -100,7 +128,7 @@ export default function ActivityLogPage() {
                     </div>
                 </div>
 
-                {/* Filters */}
+                {/* Search */}
                 <div style={{ padding: "16px 24px", display: "flex", gap: 12, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
                     <div style={{ position: "relative" as const, flex: 1 }}>
                         <svg style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" as const }} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
@@ -172,6 +200,8 @@ export default function ActivityLogPage() {
                                             {/* User */}
                                             <td style={{ padding: "14px 20px" }}>
                                                 <p style={{ color: "#e2e8f0", fontSize: "0.875rem" }}>{log.user.email}</p>
+                                                {/* IP shown blurred under email */}
+                                                <BlurredIP ip={log.ipAddress} />
                                             </td>
                                             {/* Date */}
                                             <td style={{ padding: "14px 20px", color: "#94a3b8", fontSize: "0.875rem" }}>
@@ -195,20 +225,20 @@ export default function ActivityLogPage() {
                                             <tr key={`${log.id}-detail`}>
                                                 <td colSpan={6} style={{ padding: "0 20px 16px", background: "rgba(59,130,246,0.03)" }}>
                                                     <div style={{ padding: 20, background: "rgba(255,255,255,0.03)", borderRadius: 12, border: "1px solid rgba(255,255,255,0.06)" }}>
-                                                        <p style={{ fontSize: "0.8rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>Activity Details</p>
-                                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                                                        <p style={{ fontSize: "0.8rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Activity Details</p>
+                                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                                                             <div>
-                                                                <p style={{ fontSize: "0.75rem", color: "#475569", marginBottom: 4 }}>IP Address</p>
-                                                                <p style={{ fontFamily: "monospace", fontSize: "0.875rem", color: "#e2e8f0" }}>{log.ipAddress ?? "—"}</p>
+                                                                <p style={{ fontSize: "0.72rem", color: "#475569", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.08em" }}>IP Address</p>
+                                                                <BlurredIP ip={log.ipAddress} />
                                                             </div>
                                                             <div>
-                                                                <p style={{ fontSize: "0.75rem", color: "#475569", marginBottom: 4 }}>User Agent</p>
+                                                                <p style={{ fontSize: "0.72rem", color: "#475569", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.08em" }}>User Agent</p>
                                                                 <p style={{ fontSize: "0.8rem", color: "#94a3b8", wordBreak: "break-all" }}>{log.userAgent ?? "—"}</p>
                                                             </div>
                                                         </div>
                                                         {log.details && (
                                                             <div style={{ marginTop: 16 }}>
-                                                                <p style={{ fontSize: "0.75rem", color: "#475569", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.08em" }}>Details</p>
+                                                                <p style={{ fontSize: "0.72rem", color: "#475569", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.08em" }}>Details</p>
                                                                 <pre style={{ padding: 14, background: "rgba(0,0,0,0.3)", borderRadius: 8, fontSize: "0.78rem", color: "#94a3b8", overflowX: "auto", fontFamily: "monospace" }}>
                                                                     {JSON.stringify(log.details, null, 2)}
                                                                 </pre>

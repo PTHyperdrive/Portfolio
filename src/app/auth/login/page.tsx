@@ -27,6 +27,8 @@ export default function LoginPage() {
             if (result?.error) {
                 setError("Invalid email or password.");
             } else {
+                // Fire-and-forget: log the login event
+                fetch("/api/auth/log-login", { method: "POST" }).catch(() => {});
                 router.push("/dashboard");
             }
         } catch {

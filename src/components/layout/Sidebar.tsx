@@ -238,8 +238,8 @@ export default function Sidebar() {
             <nav style={S.nav}>
                 {/* Overview */}
                 <Link
-                    href="/dashboard/vps"
-                    style={S.overviewLink(isActive("/dashboard/vps"))}
+                    href="/dashboard"
+                    style={S.overviewLink(pathname === "/dashboard")}
                 >
                     <LayoutGrid style={{ width: 18, height: 18, flexShrink: 0 }} />
                     Overview

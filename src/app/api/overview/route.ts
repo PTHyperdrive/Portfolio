@@ -15,7 +15,8 @@ export async function GET() {
                 id: true,
                 name: true,
                 email: true,
-                balance: true,
+                credits: true,
+                twoFactorEnabled: true,
                 activePlan: true,
                 planActivatedAt: true,
             },
@@ -27,15 +28,7 @@ export async function GET() {
             take: 5,
         });
 
-        // Normalize to the shape the UI expects
-        return NextResponse.json({
-            user: user ? {
-                ...user,
-                credits: Number(user.balance ?? 0),
-                twoFactorEnabled: false, // Will be real once prisma db push runs
-            } : null,
-            vpsInstances,
-        });
+        return NextResponse.json({ user, vpsInstances });
     } catch (err) {
         console.error("[overview] GET error:", err);
         return NextResponse.json({ error: "Failed to load overview" }, { status: 500 });

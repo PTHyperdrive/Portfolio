@@ -94,7 +94,7 @@ export default function OverviewPage() {
             )}
 
             {/* ── Main Two-Column Grid ── */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 300px", gap: 24, alignItems: "start" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 24, alignItems: "start", width: "100%" }}>
 
                 {/* ── LEFT COLUMN ── */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
