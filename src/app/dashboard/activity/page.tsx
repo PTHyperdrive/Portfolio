@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Fragment } from "react";
 
 interface LogEntry {
     id: string;
@@ -173,7 +173,7 @@ export default function ActivityLogPage() {
                                 const svc = serviceColor(log.service);
                                 const isOpen = expanded === log.id;
                                 return (
-                                    <>
+                                    <Fragment key={log.id}>
                                         <tr
                                             key={log.id}
                                             onClick={() => setExpanded(isOpen ? null : log.id)}
@@ -248,7 +248,7 @@ export default function ActivityLogPage() {
                                                 </td>
                                             </tr>
                                         )}
-                                    </>
+                                    </Fragment>
                                 );
                             })}
                         </tbody>

@@ -36,6 +36,8 @@ model User {
   vpsInstances  VpsInstance[]
   transactions  Transaction[]
   activityLogs  ActivityLog[]
+  creditTxns    CreditTransaction[]
+  appliedPromos AppliedPromoCode[]
 }
 
 model Account {
@@ -268,4 +270,44 @@ model ActivityLog {
 
   @@index([userId])
   @@index([createdAt])
+}
+
+// ─── Credit Wallet ────────────────────────────────────────────────
+
+model CreditTransaction {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // "Top-up", "VM_Deduction", "Promo_Redeem"
+  amount    Int      // positive = credit, negative = deduction
+  details   String?  // e.g. "VM#101 Deduction", "Promo: LAUNCH25"
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model PromoCode {
+  id           String    @id @default(cuid())
+  code         String    @unique
+  creditValue  Int
+  maxUses      Int       @default(1)
+  currentUses  Int       @default(0)
+  expiresAt    DateTime?
+  createdAt    DateTime  @default(now())
+
+  appliedToUsers AppliedPromoCode[]
+}
+
+model AppliedPromoCode {
+  id          String   @id @default(cuid())
+  userId      String
+  promoCodeId String
+  appliedAt   DateTime @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  promoCode PromoCode @relation(fields: [promoCodeId], references: [id])
+
+  @@unique([userId, promoCodeId])
+  @@index([userId])
 }

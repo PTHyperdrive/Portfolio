@@ -196,11 +196,12 @@ export default function OverviewPage() {
                         </p>
                         <p style={{ fontSize: "0.75rem", color: "#475569", marginBottom: 20 }}>Cloud Credit</p>
                         <p style={{ fontSize: "2rem", fontWeight: 900, color: "#f1f5f9", marginBottom: 20 }}>
-                            {(user?.credits ?? 0).toLocaleString()} <span style={{ fontSize: "1rem", color: "#475569" }}>₫</span>
+                            {(user?.credits ?? 0).toLocaleString()} <span style={{ fontSize: "1rem", color: "#475569" }}>Credits</span>
                         </p>
-                        <Link href="/dashboard/billing" style={{
+                        <Link href="/dashboard/billing/topup" style={{
                             display: "block", padding: "10px 0", borderRadius: 8, textDecoration: "none",
                             background: "#3b82f6", color: "#fff", fontWeight: 700, fontSize: "0.875rem",
+                            textAlign: "center",
                         }}>
                             Add Credit
                         </Link>

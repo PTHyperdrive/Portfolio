@@ -193,9 +193,9 @@ export default function BillingPage() {
                                 <span style={{ fontSize: "0.85rem", color: "var(--text-secondary)", fontWeight: 600 }}>VND</span>
                             </div>
                         </div>
-                        <button className="btn btn-primary" style={{ marginTop: "24px", width: "100%", padding: "10px", fontSize: "0.85rem" }}>
+                        <Link href="/dashboard/billing/topup" className="btn btn-primary" style={{ marginTop: "24px", width: "100%", display: "block", textAlign: "center", padding: "10px", fontSize: "0.85rem", textDecoration: "none" }}>
                             Top Up Balance
-                        </button>
+                        </Link>
                     </div>
 
                     {/* Upgrade CTA */}
