@@ -2,10 +2,10 @@ import * as dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 dotenv.config(); // fallback to .env if needed
 
-import { prisma } from '../src/lib/db';
-
 async function main() {
   console.log('Starting cleanup of non-admin accounts...');
+  // Dynamically import the DB so dotenv has time to populate process.env first
+  const { prisma } = await import('../src/lib/db');
 
   try {
     // Find all users who are not admins
