@@ -38,6 +38,7 @@ model User {
   activityLogs  ActivityLog[]
   creditTxns    CreditTransaction[]
   appliedPromos AppliedPromoCode[]
+  deploymentTickets DeploymentTicket[]
 }
 
 model Account {
@@ -206,11 +207,13 @@ model VpsInstance {
   specs          Json?     // {vcpu, ram_gb, disk_gb, gpu}
   ipAddress      String?
   expiresAt      DateTime?
+  ticketId       String?   @unique  // Links to DeploymentTicket
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  order Order @relation(fields: [orderId], references: [id])
+  user   User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order  Order             @relation(fields: [orderId], references: [id])
+  ticket DeploymentTicket? @relation(fields: [ticketId], references: [id])
 
   @@unique([vmId, node])
   @@index([userId])
@@ -311,3 +314,21 @@ model AppliedPromoCode {
   @@unique([userId, promoCodeId])
   @@index([userId])
 }
+
+// ─── Deployment Ticket System ─────────────────────────────────────
+
+model DeploymentTicket {
+  id         String    @id @default(cuid())
+  userId     String
+  planId     String    // e.g., "Dev-Standard", "Perform-NVMe"
+  status     String    @default("AVAILABLE") // "AVAILABLE" | "IN_USE"
+  validUntil DateTime
+  createdAt  DateTime  @default(now())
+
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vpsInstance VpsInstance? // populated when status = "IN_USE"
+
+  @@index([userId])
+  @@index([status])
+}
+
