@@ -7,7 +7,7 @@ async function main() {
   // Dynamically import the DB so dotenv has time to populate process.env first
   const { prisma } = await import('../src/lib/db');
 
-  try {
+  try {   
     // Find all users who are not admins
     const nonAdminUsers = await prisma.user.findMany({
       where: {
