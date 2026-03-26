@@ -1,6 +1,4 @@
-import { PrismaClient } from '../src/generated/prisma';
-
-const prisma = new PrismaClient();
+import { prisma } from '../src/lib/db';
 
 async function main() {
   console.log('Starting cleanup of non-admin accounts...');
