@@ -8,7 +8,7 @@ import { useSession, signOut } from "next-auth/react";
 import {
     LayoutGrid, Server, Gamepad2, Cloud, Key, Globe, Settings as SettingsIcon,
     Users, History, BarChart2, Wallet, User, Sliders, MessageSquare,
-    ChevronDown, ChevronRight, LogOut
+    ChevronDown, ChevronRight, LogOut, Shield
 } from "lucide-react";
 
 type SubItem = { label: string; href: string };
@@ -251,7 +251,6 @@ export default function Sidebar() {
                         <span style={S.groupLabel}>{group.title}</span>
 
                         {group.items.map((item) => {
-                            const active = isActive(item.href);
                             const open = !!expanded[item.label];
                             const hasSub = !!item.subItems;
                             const style = rowStyle(item.href, item.label);
@@ -307,6 +306,33 @@ export default function Sidebar() {
                         })}
                     </div>
                 ))}
+
+                {/* Admin Panel link — only rendered for ADMIN role */}
+                {(session?.user as { role?: string })?.role === "ADMIN" && (
+                    <div style={{ marginTop: 8, paddingTop: 16, borderTop: "1px solid rgba(245,158,11,0.15)" }}>
+                        <span style={{ ...S.groupLabel, color: "#92400e" }}>ADMINISTRATION</span>
+                        <Link
+                            href="/dashboard/admin"
+                            style={{
+                                ...S.navRow(isActive("/dashboard/admin")),
+                                color: isActive("/dashboard/admin") ? "#fbbf24" : "#d97706",
+                                backgroundColor: isActive("/dashboard/admin")
+                                    ? "rgba(245,158,11,0.15)"
+                                    : "rgba(245,158,11,0.04)",
+                                border: "1px solid rgba(245,158,11,0.15)",
+                                marginBottom: 0,
+                            }}
+                            onMouseEnter={() => setHoveredItem("Admin Panel")}
+                            onMouseLeave={() => setHoveredItem(null)}
+                        >
+                            <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                                <Shield style={{ width: 18, height: 18, flexShrink: 0 }} />
+                                Admin Panel
+                            </span>
+                            <span style={{ fontSize: "0.6rem", fontWeight: 800, padding: "1px 6px", borderRadius: 20, background: "rgba(245,158,11,0.2)", color: "#f59e0b", letterSpacing: "0.06em" }}>ADMIN</span>
+                        </Link>
+                    </div>
+                )}
             </nav>
 
             {/* ── Anchored Footer ── */}

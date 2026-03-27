@@ -16,7 +16,7 @@ export async function GET() {
         const [user, transactions, vpsCount] = await Promise.all([
             prisma.user.findUnique({
                 where: { id: session.user.id },
-                select: { activePlan: true, planActivatedAt: true, credits: true, trialExpiresAt: true },
+                select: { activePlan: true, planActivatedAt: true, credits: true, trialExpiresAt: true, hasUsedTrial: true },
             }),
             prisma.transaction.findMany({
                 where: { userId: session.user.id },
@@ -37,6 +37,7 @@ export async function GET() {
             planActivatedAt: user?.planActivatedAt ?? null,
             trialExpiresAt: user?.trialExpiresAt ?? null,
             credits: user?.credits ?? 0,
+            hasUsedTrial: user?.hasUsedTrial ?? false,
             vpsCount,
             totalSpent,
             transactions,

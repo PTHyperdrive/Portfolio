@@ -22,6 +22,11 @@ import { getIsoById, WINDOWS_ISOS } from "@/lib/windows-isos";
  *   toCharge       = requestedCount − ticketsToUse.length
  *   totalCost      = toCharge × plan.priceInCredits
  *
+ * Special planId "free-trial":
+ *   – Validates user.hasUsedTrial === false (403 if already used)
+ *   – Maps to "Trial Plan" config (1 vCPU, 1 GB RAM, 40 GB, free)
+ *   – Sets hasUsedTrial = true in the atomic DB transaction
+ *
  * The backend NEVER trusts the client's cost estimate.
  */
 export async function POST(req: Request) {
@@ -37,24 +42,53 @@ export async function POST(req: Request) {
         let body: Record<string, unknown> = {};
         try { body = await req.json(); } catch { /* optional */ }
 
-        const isoId         = (body.isoId         as string) || WINDOWS_ISOS[0].id;
-        const requestedPlan = (body.plan           as string) || "";
+        const isoId          = (body.isoId         as string) || WINDOWS_ISOS[0].id;
+        const requestedPlanRaw = (body.plan         as string) || "";
         const requestedCount = Math.min(
             Math.max(1, parseInt(String(body.instanceCount ?? "1"), 10) || 1),
             10  // hard cap — never trust client
         );
 
+        // ── 0. Free-trial fast-path ───────────────────────────────────
+        const isFreeTrial = requestedPlanRaw === "free-trial";
+
+        if (isFreeTrial) {
+            // Validate eligibility first — only needs hasUsedTrial
+            const trialUser = await prisma.user.findUnique({
+                where:  { id: userId },
+                select: { hasUsedTrial: true },
+            });
+
+            if (!trialUser) {
+                return NextResponse.json({ error: "User not found" }, { status: 404 });
+            }
+
+            if (trialUser.hasUsedTrial) {
+                return NextResponse.json(
+                    { error: "You have already used your free trial. Please choose a paid plan to continue." },
+                    { status: 403 }
+                );
+            }
+        }
+
         // ── 1. Resolve plan ───────────────────────────────────────────
         const dbUser = await prisma.user.findUnique({
             where:  { id: userId },
-            select: { activePlan: true, credits: true },
+            select: { activePlan: true, credits: true, role: true },
         });
+
+        // Admin accounts bypass payment gates: no credit deduction, no sufficiency check
+        const isAdmin = dbUser?.role === "ADMIN";
 
         if (!dbUser) {
             return NextResponse.json({ error: "User not found" }, { status: 404 });
         }
 
-        const plan = requestedPlan || dbUser.activePlan || "";
+        // Map "free-trial" frontend id → "Trial Plan" config key
+        const plan = isFreeTrial
+            ? "Trial Plan"
+            : (requestedPlanRaw || dbUser.activePlan || "");
+
         if (!plan) {
             return NextResponse.json({ error: "No plan selected." }, { status: 403 });
         }
@@ -73,7 +107,7 @@ export async function POST(req: Request) {
         }
 
         // ── 3. Ticket math (server-side, authoritative) ───────────────
-        const isFree = plan === "Trial Plan" || planCfg.priceInCredits === 0;
+        const isFree = isFreeTrial || plan === "Trial Plan" || planCfg.priceInCredits === 0;
 
         let ticketsToUse:   { id: string; validUntil: Date }[] = [];
         let toCharge        = requestedCount;
@@ -97,8 +131,8 @@ export async function POST(req: Request) {
             toCharge     = requestedCount - ticketsToUse.length;
             totalCost    = toCharge * planCfg.priceInCredits;
 
-            // ── 4. Credit validation ──────────────────────────────────
-            if (totalCost > 0 && Number(dbUser.credits) < totalCost) {
+            // ── 4. Credit validation (skipped for admins) ────────────
+            if (!isAdmin && totalCost > 0 && Number(dbUser.credits) < totalCost) {
                 return NextResponse.json({
                     error: `Insufficient credits. Need ${totalCost.toLocaleString()}, ` +
                            `have ${Number(dbUser.credits).toLocaleString()}. ` +
@@ -204,8 +238,8 @@ export async function POST(req: Request) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const txOps: any[] = [];
 
-        // a) Deduct credits if needed
-        if (totalCost > 0) {
+        // a) Deduct credits if needed (admins are exempt)
+        if (!isAdmin && totalCost > 0) {
             txOps.push(
                 prisma.user.update({
                     where: { id: userId },
@@ -222,7 +256,17 @@ export async function POST(req: Request) {
             );
         }
 
-        // b) Consume existing tickets → set IN_USE
+        // b) Mark hasUsedTrial = true for free trial deployments
+        if (isFreeTrial) {
+            txOps.push(
+                prisma.user.update({
+                    where: { id: userId },
+                    data:  { hasUsedTrial: true },
+                })
+            );
+        }
+
+        // c) Consume existing tickets → set IN_USE
         for (const t of ticketsToUse) {
             txOps.push(
                 prisma.deploymentTicket.update({
@@ -232,7 +276,7 @@ export async function POST(req: Request) {
             );
         }
 
-        // c) Create VpsInstance records, each linked to its ticket
+        // d) Create VpsInstance records, each linked to its ticket
         for (let i = 0; i < deployedVms.length; i++) {
             const vm     = deployedVms[i];
             const ticket = allTicketIds[i];
@@ -262,16 +306,19 @@ export async function POST(req: Request) {
         await prisma.$transaction(txOps);
 
         return NextResponse.json({
-            success:        true,
-            deployed:       deployedVms.length,
-            vmids:          deployedVms.map(v => v.vmid),
+            success:          true,
+            deployed:         deployedVms.length,
+            vmids:            deployedVms.map(v => v.vmid),
             node,
-            ticketsUsed:    ticketsToUse.length,
-            instancesCharged: toCharge,
-            totalCost,
+            ticketsUsed:      ticketsToUse.length,
+            instancesCharged: isAdmin ? 0 : toCharge,
+            totalCost:        isAdmin ? 0 : totalCost,
+            isFreeTrial,
+            isAdminDeploy:    isAdmin,
             message: `${deployedVms.length} VM(s) deployed on ${node}. ` +
-                     `${ticketsToUse.length} ticket(s) consumed, ` +
-                     `${toCharge} instance(s) charged (${totalCost.toLocaleString()} Credits).`,
+                     (isAdmin
+                         ? "Admin deploy — no credits deducted."
+                         : `${ticketsToUse.length} ticket(s) consumed, ${toCharge} instance(s) charged (${totalCost.toLocaleString()} Credits).`),
         });
 
     } catch (error: unknown) {
