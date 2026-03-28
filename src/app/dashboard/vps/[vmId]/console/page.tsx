@@ -71,7 +71,7 @@ export default function ConsolePage({ params }: { params: Promise<{ vmId: string
 
             // ── 3. Initialise RFB ─────────────────────────────────────────
             if (!viewerRef.current) return; // guard: unmounted during async ops
-            
+
             const rfb = new RFB(viewerRef.current, data.wsUrl, {
                 credentials: { username: "", password: data.ticket, target: "" },
             });
@@ -109,15 +109,15 @@ export default function ConsolePage({ params }: { params: Promise<{ vmId: string
     // ── Status dot colour ─────────────────────────────────────────────
     const dotColor: Record<ConnectionStatus, string> = {
         connecting: "#f59e0b",   // amber
-        connected:  "#00ff88",   // green
+        connected: "#00ff88",   // green
         disconnected: "#ef4444", // red
-        error:      "#ef4444",   // red
+        error: "#ef4444",   // red
     };
     const dotGlow: Record<ConnectionStatus, string> = {
-        connecting:  "0 0 8px #f59e0b66",
-        connected:   "0 0 12px #00ff88aa",
+        connecting: "0 0 8px #f59e0b66",
+        connected: "0 0 12px #00ff88aa",
         disconnected: "none",
-        error:       "none",
+        error: "none",
     };
 
     return (
