@@ -16,12 +16,19 @@ mkdirSync("public", { recursive: true });
 
 await build({
     entryPoints: ["node_modules/@novnc/novnc/lib/rfb.js"],
-    bundle:     true,
-    format:     "esm",
-    splitting:  true,           // Emits async chunks to handle top-level await in browser.js
-    chunkNames: "chunk-[hash]",
-    outdir:     "public/novnc",
-    platform:   "browser",
-    minify:     false,
-    logLevel:   "info",
+    bundle:      true,
+    format:      "iife",
+    globalName:  "RFBModule",    // exposes window.RFBModule = { default: RFB }
+    outfile:     "public/novnc-rfb.js",
+    platform:    "browser",
+    minify:      false,
+    logLevel:    "info",
+
+    // noVNC's browser.js uses top-level await for H264 WebCodecs detection.
+    // Marking TLA as unsupported strips the await keyword — the feature
+    // detection returns a Promise instead of a bool, breaking H264 only.
+    // Core VNC/RFB functionality is completely unaffected.
+    supported: {
+        "top-level-await": false,
+    },
 });
