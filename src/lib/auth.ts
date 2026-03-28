@@ -46,6 +46,32 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }),
     ],
     callbacks: {
+        async signIn({ user, account, profile, email, credentials }) {
+            // Suppress unused-variable warnings — we only use `user` here
+            void account; void profile; void email; void credentials;
+
+            if (!user?.id) return true; // Let NextAuth handle the rejection
+
+            // ── Create a DeviceSession row on every successful sign-in ───
+            // Note: headers() is NOT available here (no Request context in this callback).
+            // IP/UA must be captured via the client-side log-login route instead.
+            try {
+                console.log("[AUTH] signIn callback fired for user:", user.id);
+                const dbSession = await prisma.deviceSession.create({
+                    data: {
+                        userId: user.id,
+                        // IP & UA are captured separately via POST /api/auth/log-login
+                        // called client-side right after signIn() succeeds
+                    },
+                });
+                console.log("[AUTH] DeviceSession created:", dbSession.id);
+            } catch (error) {
+                console.error("[AUTH ERROR] Failed to create DeviceSession:", error);
+                // Non-fatal — don't block the sign-in
+            }
+
+            return true;
+        },
         async jwt({ token, user }) {
             if (user) {
                 token.role = (user as Record<string, unknown>).role as string;
