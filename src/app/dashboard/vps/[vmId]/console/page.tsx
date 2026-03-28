@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback, use } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import type RFBType from "@novnc/novnc/lib/rfb";
 
 type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error";
 
@@ -14,21 +15,13 @@ interface NoVncTicket {
     vmId: string;
 }
 
-// RFB is a browser-only DOM library — dynamically import it inside useEffect
-// to prevent Next.js SSR from trying to require it on the server.
-type RFBInstance = {
-    sendCtrlAltDel: () => void;
-    disconnect: () => void;
-    addEventListener: (event: string, cb: () => void) => void;
-};
-
 export default function ConsolePage({ params }: { params: Promise<{ vmId: string }> }) {
     const { vmId } = use(params);
     const searchParams = useSearchParams();
     const node = searchParams.get("node") ?? "";
 
     const viewerRef = useRef<HTMLDivElement>(null);
-    const rfbRef = useRef<RFBInstance | null>(null);
+    const rfbRef = useRef<InstanceType<typeof RFBType> | null>(null);
 
     const [status, setStatus] = useState<ConnectionStatus>("connecting");
     const [statusMsg, setStatusMsg] = useState("Fetching console ticket…");
@@ -70,11 +63,7 @@ export default function ConsolePage({ params }: { params: Promise<{ vmId: string
             const { default: RFB } = await import(
                 /* webpackChunkName: "novnc" */
                 "@novnc/novnc/lib/rfb"
-            ) as { default: new (
-                target: HTMLElement,
-                url: string,
-                options?: { credentials?: { password?: string } }
-            ) => RFBInstance };
+            );
 
             // Disconnect any lingering connection before creating a new one
             rfbRef.current?.disconnect();
@@ -84,7 +73,7 @@ export default function ConsolePage({ params }: { params: Promise<{ vmId: string
             if (!viewerRef.current) return; // guard: unmounted during async ops
             
             const rfb = new RFB(viewerRef.current, data.wsUrl, {
-                credentials: { password: data.ticket },
+                credentials: { username: "", password: data.ticket, target: "" },
             });
 
             rfb.addEventListener("connect", () => {

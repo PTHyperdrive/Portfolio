@@ -41,6 +41,7 @@
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",
+    "@types/novnc__novnc": "^1.6.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/ua-parser-js": "^0.7.39",
