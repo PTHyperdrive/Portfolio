@@ -21,7 +21,7 @@ export default function SessionGuard() {
         const user = session?.user as Record<string, unknown> | undefined;
         if (user?.error === "SessionRevoked") {
             console.warn("[SessionGuard] Session was revoked — signing out.");
-            void signOut({ callbackUrl: "/auth/login?reason=session_revoked" });
+            void signOut({ callbackUrl: "/login?error=SessionRevoked" });
         }
     }, [session]);
 
