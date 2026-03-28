@@ -8,6 +8,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "postinstall": "node scripts/build-novnc.mjs",
+    "prebuild": "node scripts/build-novnc.mjs",
     "start": "next start",
     "lint": "eslint",
     "seed": "npx ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed.ts"
@@ -47,7 +49,6 @@
     "@types/ua-parser-js": "^0.7.39",
     "@types/uuid": "^10.0.0",
     "@types/ws": "^8.5.10",
-    "esbuild": "^0.27.4",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",

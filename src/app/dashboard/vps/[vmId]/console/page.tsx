@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useCallback, use } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import type RFBType from "@novnc/novnc/lib/rfb";
+import Script from "next/script";
 
 type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error";
 
@@ -15,20 +15,41 @@ interface NoVncTicket {
     vmId: string;
 }
 
+// RFB is loaded via <Script> from public/novnc-rfb.js (pre-bundled IIFE).
+// The bundle sets window.RFBModule = { default: RFB }.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type RFBConstructor = new (target: HTMLElement, url: string, options?: Record<string, unknown>) => any;
+
+declare global {
+    interface Window {
+        RFBModule?: { default: RFBConstructor };
+    }
+}
+
 export default function ConsolePage({ params }: { params: Promise<{ vmId: string }> }) {
     const { vmId } = use(params);
     const searchParams = useSearchParams();
     const node = searchParams.get("node") ?? "";
 
     const viewerRef = useRef<HTMLDivElement>(null);
-    const rfbRef = useRef<InstanceType<typeof RFBType> | null>(null);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rfbRef = useRef<any>(null);
 
     const [status, setStatus] = useState<ConnectionStatus>("connecting");
-    const [statusMsg, setStatusMsg] = useState("Fetching console ticket…");
+    const [statusMsg, setStatusMsg] = useState("Loading noVNC…");
     const [vmName, setVmName] = useState(`VM ${vmId}`);
+    const [scriptReady, setScriptReady] = useState(false);
 
     const connect = useCallback(async () => {
         if (!viewerRef.current) return;
+
+        // Wait for the IIFE script to load
+        const RFB = window.RFBModule?.default;
+        if (!RFB) {
+            setStatus("error");
+            setStatusMsg("noVNC library failed to load");
+            return;
+        }
 
         setStatus("connecting");
         setStatusMsg("Fetching console ticket…");
@@ -59,17 +80,11 @@ export default function ConsolePage({ params }: { params: Promise<{ vmId: string
 
             setStatusMsg("Opening WebSocket connection…");
 
-            // ── 2. Dynamic import — RFB touches the DOM, must run client-side ─
-            const { default: RFB } = await import(
-                /* webpackChunkName: "novnc" */
-                "@novnc/novnc/lib/rfb"
-            );
-
-            // Disconnect any lingering connection before creating a new one
+            // ── 2. Disconnect any lingering connection ────────────────────
             rfbRef.current?.disconnect();
             rfbRef.current = null;
 
-            // ── 3. Initialise RFB ─────────────────────────────────────────
+            // ── 3. Initialise RFB ────────────────────────────────────────
             if (!viewerRef.current) return; // guard: unmounted during async ops
 
             const rfb = new RFB(viewerRef.current, data.wsUrl, {
@@ -94,13 +109,16 @@ export default function ConsolePage({ params }: { params: Promise<{ vmId: string
         }
     }, [vmId, node]);
 
+    // Auto-connect once the script has loaded
     useEffect(() => {
-        void connect();
+        if (scriptReady) {
+            void connect();
+        }
         return () => {
             rfbRef.current?.disconnect();
             rfbRef.current = null;
         };
-    }, [connect]);
+    }, [connect, scriptReady]);
 
     const handleCtrlAltDel = () => {
         rfbRef.current?.sendCtrlAltDel();
@@ -108,10 +126,10 @@ export default function ConsolePage({ params }: { params: Promise<{ vmId: string
 
     // ── Status dot colour ─────────────────────────────────────────────
     const dotColor: Record<ConnectionStatus, string> = {
-        connecting: "#f59e0b",   // amber
-        connected: "#00ff88",   // green
-        disconnected: "#ef4444", // red
-        error: "#ef4444",   // red
+        connecting: "#f59e0b",
+        connected: "#00ff88",
+        disconnected: "#ef4444",
+        error: "#ef4444",
     };
     const dotGlow: Record<ConnectionStatus, string> = {
         connecting: "0 0 8px #f59e0b66",
@@ -122,6 +140,17 @@ export default function ConsolePage({ params }: { params: Promise<{ vmId: string
 
     return (
         <div style={{ minHeight: "100vh", background: "#0d1117", padding: "24px", fontFamily: "var(--font-inter), sans-serif" }}>
+
+            {/* Load pre-bundled noVNC (IIFE → window.RFBModule) */}
+            <Script
+                src="/novnc-rfb.js"
+                strategy="afterInteractive"
+                onLoad={() => setScriptReady(true)}
+                onError={() => {
+                    setStatus("error");
+                    setStatusMsg("Failed to load noVNC library");
+                }}
+            />
 
             {/* ── Header ──────────────────────────────────────────────── */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px", flexWrap: "wrap", gap: "12px" }}>
