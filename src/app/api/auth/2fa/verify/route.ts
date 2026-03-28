@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { authenticator } from "otplib";
+import speakeasy from "speakeasy";
 
 /**
  * POST /api/auth/2fa/verify
  *
- * Verifies a 6-digit TOTP token against the user's stored secret.
- * If valid, permanently enables 2FA on the account by setting
- * twoFactorEnabled = true.
+ * Verifies a 6-digit TOTP token against the user's stored base32 secret.
+ * If valid, permanently enables 2FA on the account.
  *
  * Body: { token: string }
  */
@@ -23,7 +22,7 @@ export async function POST(req: Request) {
 
         // ── Parse body ───────────────────────────────────────────────────
         let body: Record<string, unknown> = {};
-        try { body = await req.json(); } catch { /* invalid body */ }
+        try { body = await req.json(); } catch { /* invalid JSON body */ }
 
         const token = (body.token as string | undefined)?.trim();
         if (!token || !/^\d{6}$/.test(token)) {
@@ -58,14 +57,15 @@ export async function POST(req: Request) {
         }
 
         // ── Verify the TOTP token ────────────────────────────────────────
-        const isValid = authenticator.verify({
-            token,
+        const isValid = speakeasy.totp.verify({
             secret: user.twoFactorSecret,
+            encoding: "base32",
+            token,
         });
 
         if (!isValid) {
             return NextResponse.json(
-                { error: "Invalid authenticator code. Please try again." },
+                { error: "Invalid authenticator code." },
                 { status: 400 }
             );
         }

@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { authenticator } from "otplib";
-import { toDataURL } from "qrcode";
+import speakeasy from "speakeasy";
+import QRCode from "qrcode";
 
 /**
  * GET /api/auth/2fa/generate
  *
  * Generates a new TOTP secret and QR code for the authenticated user.
- * Saves the secret to the database (twoFactorSecret) but does NOT
- * enable 2FA yet — that happens in the /verify endpoint once the user
- * proves they have the correct authenticator app configured.
+ * Saves the base32 secret to the database but does NOT enable 2FA yet —
+ * that only happens in /verify once the user proves they can generate
+ * a valid token with their authenticator app.
  */
 export async function GET() {
     try {
@@ -38,25 +38,23 @@ export async function GET() {
         }
 
         // ── 1. Generate a new TOTP secret ────────────────────────────────
-        const secret = authenticator.generateSecret();
-
-        // ── 2. Build the otpauth:// URI ──────────────────────────────────
-        const otpauth = authenticator.keyuri(user.email, "NRSP Cloud", secret);
-
-        // ── 3. Generate a QR code Data URL ───────────────────────────────
-        const qrCodeUrl = await toDataURL(otpauth, {
-            width: 256,
-            margin: 2,
-            color: { dark: "#ffffffee", light: "#00000000" },
+        const secret = speakeasy.generateSecret({
+            name: `NRSP Cloud (${user.email})`,
         });
 
-        // ── 4. Persist the secret (keep 2FA disabled until verified) ─────
+        // ── 2. Extract the base32 key (persisted in DB) ──────────────────
+        const manualKey = secret.base32;
+
+        // ── 3. Generate QR Code data URI ─────────────────────────────────
+        const qrCodeUrl = await QRCode.toDataURL(secret.otpauth_url as string);
+
+        // ── 4. Persist secret (keep 2FA disabled until verified) ─────────
         await prisma.user.update({
             where: { id: userId },
-            data: { twoFactorSecret: secret },
+            data: { twoFactorSecret: manualKey },
         });
 
-        return NextResponse.json({ secret, qrCodeUrl });
+        return NextResponse.json({ secret: manualKey, qrCodeUrl });
     } catch (error) {
         console.error("2FA generate error:", error);
         return NextResponse.json(

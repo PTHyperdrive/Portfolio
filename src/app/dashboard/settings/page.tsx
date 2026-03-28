@@ -22,10 +22,74 @@ export default function SettingsPage() {
     const [language, setLanguage] = useState("en");
     const [network, setNetwork] = useState("auto");
 
-    // Security state
+    // Security state — 2FA
     const [twoFAEnabled, setTwoFAEnabled] = useState(false);
+    const [twoFAVerified, setTwoFAVerified] = useState(false);
+    const [twoFALoading, setTwoFALoading] = useState(false);
+    const [twoFAError, setTwoFAError] = useState("");
+    const [qrCodeUrl, setQrCodeUrl] = useState("");
+    const [manualSecret, setManualSecret] = useState("");
+    const [totpToken, setTotpToken] = useState("");
 
     const user = session?.user as Record<string, unknown> | undefined;
+
+    // Initialize twoFAVerified from session if already enabled
+    useEffect(() => {
+        if (user?.twoFactorEnabled) {
+            setTwoFAEnabled(true);
+            setTwoFAVerified(true);
+        }
+    }, [user?.twoFactorEnabled]);
+
+    // Handle 2FA toggle — fetch QR code from backend when toggling on
+    const handle2FAToggle = async () => {
+        if (twoFAEnabled) {
+            // Toggling off — just reset UI state (doesn't disable backend 2FA)
+            setTwoFAEnabled(false);
+            setQrCodeUrl("");
+            setManualSecret("");
+            setTotpToken("");
+            setTwoFAError("");
+            return;
+        }
+
+        setTwoFAEnabled(true);
+        setTwoFALoading(true);
+        setTwoFAError("");
+        try {
+            const res = await fetch("/api/auth/2fa/generate");
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error ?? "Failed to generate 2FA credentials");
+            setQrCodeUrl(data.qrCodeUrl);
+            setManualSecret(data.secret);
+        } catch (err) {
+            setTwoFAError(err instanceof Error ? err.message : "Failed to generate 2FA");
+            setTwoFAEnabled(false);
+        } finally {
+            setTwoFALoading(false);
+        }
+    };
+
+    // Handle 2FA verification — POST the 6-digit code
+    const handle2FAVerify = async () => {
+        if (totpToken.length !== 6) return;
+        setTwoFALoading(true);
+        setTwoFAError("");
+        try {
+            const res = await fetch("/api/auth/2fa/verify", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ token: totpToken }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error ?? "Verification failed");
+            setTwoFAVerified(true);
+        } catch (err) {
+            setTwoFAError(err instanceof Error ? err.message : "Verification failed");
+        } finally {
+            setTwoFALoading(false);
+        }
+    };
 
     useEffect(() => {
         if (session?.user) {
@@ -264,7 +328,7 @@ export default function SettingsPage() {
                 {/* ── Security Tab ─────────────────────────────────────────── */}
                 {activeTab === "security" && (
                     <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
-                        {/* 2FA toggle */}
+                        {/* 2FA */}
                         <div className="glass-card" style={{ padding: "28px" }}>
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
                                 <div>
@@ -273,53 +337,91 @@ export default function SettingsPage() {
                                         Use Google Authenticator to add an extra layer of security.
                                     </p>
                                 </div>
-                                {/* Toggle */}
+                                {/* Toggle — disabled when already verified or while loading */}
                                 <button
-                                    onClick={() => setTwoFAEnabled(!twoFAEnabled)}
+                                    onClick={handle2FAToggle}
+                                    disabled={twoFAVerified || twoFALoading}
                                     style={{
-                                        width: 52,
-                                        height: 28,
-                                        borderRadius: 14,
-                                        border: "none",
-                                        cursor: "pointer",
-                                        background: twoFAEnabled ? "var(--accent-cyan)" : "rgba(255,255,255,0.1)",
-                                        position: "relative",
-                                        transition: "background 0.25s",
-                                        flexShrink: 0,
+                                        width: 52, height: 28, borderRadius: 14, border: "none",
+                                        cursor: twoFAVerified || twoFALoading ? "not-allowed" : "pointer",
+                                        background: twoFAEnabled || twoFAVerified ? "var(--accent-cyan)" : "rgba(255,255,255,0.1)",
+                                        position: "relative", transition: "background 0.25s", flexShrink: 0,
+                                        opacity: twoFALoading ? 0.6 : 1,
                                     }}
                                 >
                                     <span style={{
-                                        position: "absolute",
-                                        top: 4,
-                                        left: twoFAEnabled ? 26 : 4,
-                                        width: 20,
-                                        height: 20,
-                                        borderRadius: "50%",
-                                        background: "#fff",
-                                        transition: "left 0.25s",
+                                        position: "absolute", top: 4,
+                                        left: twoFAEnabled || twoFAVerified ? 26 : 4,
+                                        width: 20, height: 20, borderRadius: "50%",
+                                        background: "#fff", transition: "left 0.25s",
                                     }} />
                                 </button>
                             </div>
 
-                            {twoFAEnabled && (
-                                <div style={{ marginTop: "24px", padding: "24px", borderRadius: "var(--radius-sm)", background: "rgba(0,240,255,0.04)", border: "1px solid rgba(0,240,255,0.12)", textAlign: "center" }}>
-                                    {/* QR Code placeholder */}
-                                    <div style={{ width: 160, height: 160, margin: "0 auto 16px", borderRadius: 12, background: "rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "3rem", border: "1px dashed rgba(255,255,255,0.15)" }}>
-                                        📷
-                                    </div>
-                                    <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", marginBottom: "8px" }}>
-                                        Scan this QR code with <strong>Google Authenticator</strong>
-                                    </p>
-                                    <p style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
-                                        QR code generation requires <code className="mono">speakeasy</code> — coming soon.
-                                    </p>
-                                    <div style={{ marginTop: "20px" }}>
-                                        <input style={{ ...inputStyle, textAlign: "center", maxWidth: 200, margin: "0 auto" }} placeholder="Enter 6-digit code" maxLength={6} />
-                                        <button disabled className="btn btn-primary" style={{ marginTop: "12px", opacity: 0.5, cursor: "not-allowed" }}>Verify & Enable</button>
-                                    </div>
+                            {/* Success state — 2FA is permanently enabled */}
+                            {twoFAVerified && (
+                                <div style={{ marginTop: "20px", padding: "20px", borderRadius: "var(--radius-sm)", background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.25)", textAlign: "center" }}>
+                                    <p style={{ fontSize: "1.5rem", marginBottom: "8px" }}>✅</p>
+                                    <p style={{ fontSize: "0.95rem", fontWeight: 700, color: "#10b981", marginBottom: "4px" }}>Two-Factor Authentication Enabled</p>
+                                    <p style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>Your account is protected with an authenticator app.</p>
+                                </div>
+                            )}
+
+                            {/* Setup flow — only shown while toggled on & not yet verified */}
+                            {twoFAEnabled && !twoFAVerified && (
+                                <div style={{ marginTop: "24px", padding: "24px", borderRadius: "var(--radius-sm)", background: "rgba(0,240,255,0.04)", border: "1px solid rgba(0,240,255,0.12)" }}>
+
+                                    {twoFALoading && !qrCodeUrl && (
+                                        <p style={{ textAlign: "center", fontSize: "0.9rem", color: "var(--text-muted)", padding: "20px 0" }}>Generating QR code…</p>
+                                    )}
+
+                                    {qrCodeUrl && (
+                                        <>
+                                            {/* Step 1: QR Code */}
+                                            <div style={{ textAlign: "center", marginBottom: "20px" }}>
+                                                <p style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "12px" }}>Step 1 — Scan with your authenticator app</p>
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                <img src={qrCodeUrl} alt="2FA QR Code" width={192} height={192} style={{ margin: "0 auto", borderRadius: 12, background: "#111" }} />
+                                            </div>
+
+                                            {/* Manual key */}
+                                            {manualSecret && (
+                                                <div style={{ textAlign: "center", marginBottom: "24px" }}>
+                                                    <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "6px" }}>Or enter this key manually:</p>
+                                                    <code className="mono" style={{ display: "inline-block", padding: "8px 16px", borderRadius: 8, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--accent-cyan)", fontSize: "0.85rem", fontWeight: 700, letterSpacing: "0.1em", userSelect: "all" }}>
+                                                        {manualSecret}
+                                                    </code>
+                                                </div>
+                                            )}
+
+                                            {/* Step 2: Verification input */}
+                                            <div style={{ textAlign: "center" }}>
+                                                <p style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "12px" }}>Step 2 — Enter the 6-digit code</p>
+                                                <input
+                                                    value={totpToken}
+                                                    onChange={e => { setTotpToken(e.target.value.replace(/\D/g, "").slice(0, 6)); setTwoFAError(""); }}
+                                                    style={{ ...inputStyle, textAlign: "center", maxWidth: 200, margin: "0 auto", fontSize: "1.2rem", letterSpacing: "0.3em", fontWeight: 700 }}
+                                                    placeholder="000000"
+                                                    maxLength={6}
+                                                    inputMode="numeric"
+                                                    autoComplete="one-time-code"
+                                                />
+                                                {twoFAError && <p style={{ fontSize: "0.82rem", color: "var(--accent-magenta)", marginTop: "8px" }}>❌ {twoFAError}</p>}
+                                                <button
+                                                    onClick={handle2FAVerify}
+                                                    disabled={twoFALoading || totpToken.length !== 6}
+                                                    className="btn btn-primary"
+                                                    style={{ marginTop: "14px", padding: "10px 28px", opacity: totpToken.length !== 6 ? 0.5 : 1, cursor: totpToken.length !== 6 || twoFALoading ? "not-allowed" : "pointer" }}
+                                                >
+                                                    {twoFALoading ? "Verifying…" : "Verify & Enable"}
+                                                </button>
+                                            </div>
+                                        </>
+                                    )}
                                 </div>
                             )}
                         </div>
+
 
                         {/* Sessions info */}
                         <div className="glass-card" style={{ padding: "28px" }}>
