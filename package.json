@@ -8,8 +8,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "postinstall": "node scripts/build-novnc.mjs",
     "prebuild": "node scripts/build-novnc.mjs",
+    "build:novnc": "node scripts/build-novnc.mjs",
     "start": "next start",
     "lint": "eslint",
     "seed": "npx ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed.ts"
