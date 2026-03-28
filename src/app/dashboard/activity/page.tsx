@@ -226,19 +226,32 @@ export default function ActivityLogPage() {
                                                 <td colSpan={6} style={{ padding: "0 20px 16px", background: "rgba(59,130,246,0.03)" }}>
                                                     <div style={{ padding: 20, background: "rgba(255,255,255,0.03)", borderRadius: 12, border: "1px solid rgba(255,255,255,0.06)" }}>
                                                         <p style={{ fontSize: "0.8rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Activity Details</p>
-                                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+
+                                                        {/* ── Network info grid ── */}
+                                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
                                                             <div>
-                                                                <p style={{ fontSize: "0.72rem", color: "#475569", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.08em" }}>IP Address</p>
-                                                                <BlurredIP ip={log.ipAddress} />
+                                                                <span style={{ display: "block", fontSize: "0.7rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
+                                                                    IP Address
+                                                                </span>
+                                                                {log.ipAddress
+                                                                    ? <BlurredIP ip={log.ipAddress} />
+                                                                    : <span style={{ fontFamily: "monospace", fontSize: "0.85rem", color: "#475569" }}>N/A</span>
+                                                                }
                                                             </div>
                                                             <div>
-                                                                <p style={{ fontSize: "0.72rem", color: "#475569", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.08em" }}>User Agent</p>
-                                                                <p style={{ fontSize: "0.8rem", color: "#94a3b8", wordBreak: "break-all" }}>{log.userAgent ?? "—"}</p>
+                                                                <span style={{ display: "block", fontSize: "0.7rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
+                                                                    User Agent
+                                                                </span>
+                                                                <span style={{ fontSize: "0.8rem", color: "#94a3b8", wordBreak: "break-all", lineHeight: 1.5 }}>
+                                                                    {log.userAgent || "N/A"}
+                                                                </span>
                                                             </div>
                                                         </div>
+
+                                                        {/* ── Details JSON ── */}
                                                         {log.details && (
-                                                            <div style={{ marginTop: 16 }}>
-                                                                <p style={{ fontSize: "0.72rem", color: "#475569", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.08em" }}>Details</p>
+                                                            <div>
+                                                                <p style={{ fontSize: "0.72rem", color: "#475569", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700 }}>Details</p>
                                                                 <pre style={{ padding: 14, background: "rgba(0,0,0,0.3)", borderRadius: 8, fontSize: "0.78rem", color: "#94a3b8", overflowX: "auto", fontFamily: "monospace" }}>
                                                                     {JSON.stringify(log.details, null, 2)}
                                                                 </pre>
@@ -248,6 +261,7 @@ export default function ActivityLogPage() {
                                                 </td>
                                             </tr>
                                         )}
+
                                     </Fragment>
                                 );
                             })}

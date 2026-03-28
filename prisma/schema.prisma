@@ -20,6 +20,7 @@ model User {
   credits       Int       @default(0)
   hasUsedTrial  Boolean   @default(false)
   twoFactorEnabled Boolean @default(false)
+  twoFactorSecret  String?
   trialExpiresAt DateTime?
   activePlan    String?
   planActivatedAt DateTime?

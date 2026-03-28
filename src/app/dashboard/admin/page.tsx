@@ -49,6 +49,7 @@ interface LogEntry {
     service: string;
     status: string;
     ipAddress: string | null;
+    userAgent: string | null;
     details: Record<string, unknown> | null;
     createdAt: string;
     user: { id: string; email: string; name: string | null };
@@ -699,19 +700,52 @@ function SystemLogsTab() {
                                         {isOpen && (
                                             <tr key={`${log.id}-d`}>
                                                 <td colSpan={6} style={{ padding: "0 18px 14px", background: "rgba(59,130,246,0.02)" }}>
-                                                    <div style={{ padding: 14, background: "rgba(255,255,255,0.02)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.05)" }}>
-                                                        <p style={{ fontSize: "0.7rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Details</p>
+                                                    <div style={{ padding: 16, background: "rgba(255,255,255,0.02)", borderRadius: 10, border: "1px solid rgba(255,255,255,0.05)" }}>
+                                                        <p style={{ fontSize: "0.7rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>Activity Details</p>
+
+                                                        {/* ── Network info grid ── */}
+                                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 14 }}>
+                                                            <div>
+                                                                <span style={{ display: "block", fontSize: "0.68rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
+                                                                    IP Address
+                                                                </span>
+                                                                {log.ipAddress
+                                                                    ? <span
+                                                                        title="Hover to reveal"
+                                                                        style={{ fontFamily: "monospace", fontSize: "0.85rem", color: "#94a3b8", filter: "blur(4px)", transition: "filter 0.2s", cursor: "pointer", userSelect: "none" }}
+                                                                        onMouseEnter={e => (e.currentTarget.style.filter = "blur(0px)")}
+                                                                        onMouseLeave={e => (e.currentTarget.style.filter = "blur(4px)")}>
+                                                                        {log.ipAddress}
+                                                                      </span>
+                                                                    : <span style={{ fontFamily: "monospace", fontSize: "0.82rem", color: "#475569" }}>N/A</span>
+                                                                }
+                                                            </div>
+                                                            <div>
+                                                                <span style={{ display: "block", fontSize: "0.68rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
+                                                                    User Agent
+                                                                </span>
+                                                                <span style={{ fontSize: "0.78rem", color: "#94a3b8", wordBreak: "break-all", lineHeight: 1.5 }}>
+                                                                    {log.userAgent || "N/A"}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* ── Details JSON ── */}
                                                         {log.details ? (
-                                                            <pre style={{ padding: 12, background: "rgba(0,0,0,0.3)", borderRadius: 8, fontSize: "0.78rem", color: "#94a3b8", overflowX: "auto", fontFamily: "monospace", margin: 0 }}>
-                                                                {JSON.stringify(log.details, null, 2)}
-                                                            </pre>
+                                                            <div>
+                                                                <p style={{ fontSize: "0.68rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>Details</p>
+                                                                <pre style={{ padding: 12, background: "rgba(0,0,0,0.3)", borderRadius: 8, fontSize: "0.78rem", color: "#94a3b8", overflowX: "auto", fontFamily: "monospace", margin: 0 }}>
+                                                                    {JSON.stringify(log.details, null, 2)}
+                                                                </pre>
+                                                            </div>
                                                         ) : (
-                                                            <p style={{ fontSize: "0.82rem", color: "#475569" }}>No additional details.</p>
+                                                            <p style={{ fontSize: "0.8rem", color: "#475569" }}>No additional details.</p>
                                                         )}
                                                     </div>
                                                 </td>
                                             </tr>
                                         )}
+
                                     </Fragment>
                                 );
                             })}
