@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { Prisma } from "@/generated/prisma";
 import { destroyVM } from "@/lib/proxmox";
 import { verifyPassword } from "@/lib/security";
+
 
 /**
  * POST /api/proxmox/vms/[vmId]/destroy
@@ -66,7 +68,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ vmId: s
         }
 
         // 4. DB cleanup — delete VM record and release ticket back to AVAILABLE
-        const ops: Parameters<typeof prisma.$transaction>[0] = [
+        const ops: Prisma.PrismaPromise<unknown>[] = [
             prisma.vpsInstance.delete({ where: { id: instance.id } }),
         ];
 
@@ -82,7 +84,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ vmId: s
                     prisma.deploymentTicket.update({
                         where: { id: ticket.id },
                         data:  { status: "AVAILABLE" },
-                    }) as never
+                    })
                 );
             }
             // If ticket is expired, leave it — user cannot re-deploy for free
