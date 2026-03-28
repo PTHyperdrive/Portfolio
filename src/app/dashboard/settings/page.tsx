@@ -2,8 +2,17 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
+import { UAParser } from "ua-parser-js";
 
 type Tab = "profile" | "preferences" | "security";
+
+interface DeviceSession {
+    id: string;
+    ipAddress: string | null;
+    userAgent: string | null;
+    lastActive: string;
+    createdAt: string;
+}
 
 export default function SettingsPage() {
     const { data: session } = useSession();
@@ -125,6 +134,48 @@ export default function SettingsPage() {
             setDisableError(err instanceof Error ? err.message : "Failed to disable 2FA");
         } finally {
             setDisableLoading(false);
+        }
+    };
+
+    // ── Active Sessions state ─────────────────────────────────────────
+    const [deviceSessions, setDeviceSessions] = useState<DeviceSession[]>([]);
+    const [sessionsLoading, setSessionsLoading] = useState(false);
+    const [revokingId, setRevokingId] = useState<string | null>(null);
+
+    const formatUserAgent = (uaString: string): string => {
+        if (!uaString) return "Unknown Device";
+        const parser = new UAParser(uaString);
+        const browser = parser.getBrowser().name ?? "Unknown Browser";
+        const os = parser.getOS().name ?? "Unknown OS";
+        return `${browser} on ${os}`;
+    };
+
+    const loadSessions = () => {
+        setSessionsLoading(true);
+        fetch("/api/user/sessions")
+            .then(r => r.json())
+            .then((d: { sessions?: DeviceSession[] }) => {
+                setDeviceSessions(d.sessions ?? []);
+            })
+            .catch(() => { /* non-critical */ })
+            .finally(() => setSessionsLoading(false));
+    };
+
+    // Load sessions when the Security tab is opened
+    useEffect(() => {
+        if (activeTab === "security") loadSessions();
+    }, [activeTab]);
+
+
+    const handleRevokeSession = async (id: string) => {
+        setRevokingId(id);
+        try {
+            const res = await fetch(`/api/user/sessions/${id}`, { method: "DELETE" });
+            if (res.ok) {
+                setDeviceSessions(prev => prev.filter(s => s.id !== id));
+            }
+        } catch { /* non-critical */ } finally {
+            setRevokingId(null);
         }
     };
 
@@ -518,20 +569,74 @@ export default function SettingsPage() {
                         </div>
 
 
-                        {/* Sessions info */}
+                        {/* Active Sessions */}
                         <div className="glass-card" style={{ padding: "28px" }}>
-                            <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "8px" }}>Active Sessions</h3>
-                            <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "16px" }}>
-                                Session management and device list coming soon.
-                            </p>
-                            <div style={{ padding: "16px", borderRadius: "var(--radius-sm)", background: "rgba(255,255,255,0.03)", border: "1px solid var(--glass-border)", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
                                 <div>
-                                    <p style={{ fontSize: "0.88rem", fontWeight: 600 }}>Current Session</p>
-                                    <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "2px" }}>Web Browser · Active now</p>
+                                    <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "4px" }}>Active Sessions</h3>
+                                    <p style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>
+                                        Devices that have recently signed in to your account.
+                                    </p>
                                 </div>
-                                <span className="badge badge-cyan" style={{ fontSize: "0.72rem" }}>Current</span>
+                                <button
+                                    onClick={loadSessions}
+                                    disabled={sessionsLoading}
+                                    className="btn btn-secondary"
+                                    style={{ fontSize: "0.78rem", padding: "6px 14px", opacity: sessionsLoading ? 0.5 : 1 }}
+                                >
+                                    {sessionsLoading ? "Loading…" : "↺ Refresh"}
+                                </button>
                             </div>
+
+                            {sessionsLoading && (
+                                <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", textAlign: "center", padding: "20px 0" }}>
+                                    Loading sessions…
+                                </p>
+                            )}
+
+                            {!sessionsLoading && deviceSessions.length === 0 && (
+                                <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", textAlign: "center", padding: "20px 0" }}>
+                                    No active sessions found. Sign in to see them here.
+                                </p>
+                            )}
+
+                            {!sessionsLoading && deviceSessions.length > 0 && (
+                                <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                                    {deviceSessions.map((ds, idx) => (
+                                        <div key={ds.id} style={{ padding: "14px 16px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid var(--glass-border)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                                            <div style={{ minWidth: 0 }}>
+                                                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                                                    <p style={{ fontSize: "0.88rem", fontWeight: 600, color: "var(--text-primary)" }}>
+                                                        {formatUserAgent(ds.userAgent ?? "")}
+                                                    </p>
+                                                    {idx === 0 && (
+                                                        <span style={{ fontSize: "0.65rem", fontWeight: 700, padding: "2px 7px", borderRadius: 20, background: "rgba(0,240,255,0.12)", color: "var(--accent-cyan)", border: "1px solid rgba(0,240,255,0.2)", flexShrink: 0 }}>
+                                                            LATEST
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                    {ds.ipAddress ?? "Unknown IP"} · {new Date(ds.lastActive).toLocaleString()}
+                                                </p>
+                                            </div>
+                                            <button
+                                                onClick={() => handleRevokeSession(ds.id)}
+                                                disabled={revokingId === ds.id}
+                                                style={{
+                                                    flexShrink: 0, padding: "6px 14px", borderRadius: 6, border: "1px solid rgba(239,68,68,0.3)",
+                                                    background: "rgba(239,68,68,0.06)", color: "#f87171", fontSize: "0.78rem", fontWeight: 600,
+                                                    cursor: revokingId === ds.id ? "not-allowed" : "pointer",
+                                                    opacity: revokingId === ds.id ? 0.5 : 1, transition: "all 0.15s",
+                                                }}
+                                            >
+                                                {revokingId === ds.id ? "Revoking…" : "Revoke"}
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </div>
+
                     </div>
                 )}
             </div>

@@ -40,6 +40,7 @@ model User {
   creditTxns    CreditTransaction[]
   appliedPromos AppliedPromoCode[]
   deploymentTickets DeploymentTicket[]
+  deviceSessions DeviceSession[]
 }
 
 model Account {
@@ -75,6 +76,17 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model DeviceSession {
+  id         String   @id @default(cuid())
+  userId     String
+  ipAddress  String?
+  userAgent  String?
+  lastActive DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // ─── Business Models ────────────────────────────────────────────
