@@ -13,6 +13,7 @@ interface VmDetail {
     name: string;
     os: string;
     status: string;
+    displayType: string;
     specs: { vcpu?: number; ram_gb?: number; disk_gb?: number; gpu?: string } | null;
     ipAddress: string | null;
     expiresAt: string | null;
@@ -48,12 +49,21 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
     const [destroyLoading, setDestroyLoading] = useState(false);
     const [destroyErr, setDestroyErr] = useState("");
 
+    // Display type state — mirrors DB; optimistic update on success
+    const [displayType, setDisplayType] = useState<"novnc" | "spice">("novnc");
+    const [displayLoading, setDisplayLoading] = useState(false);
+    const [displayMsg, setDisplayMsg] = useState("");
+
     const loadVm = useCallback(async () => {
         try {
             const res = await fetch(`/api/proxmox/vms/${vmId}?node=${node}`);
             if (!res.ok) throw new Error("Failed to load VM");
-            const data = await res.json();
+            const data = await res.json() as VmDetail;
             setVm(data);
+            // Sync display type from DB on every load
+            if (data.displayType === "spice" || data.displayType === "novnc") {
+                setDisplayType(data.displayType);
+            }
         } catch (err) {
             setError(err instanceof Error ? err.message : "Failed to load");
         } finally {
@@ -120,6 +130,28 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
         } catch (err) {
             setDestroyErr(err instanceof Error ? err.message : "Failed to destroy the instance");
             setDestroyLoading(false);
+        }
+    };
+
+    const handleDisplayChange = async (next: "novnc" | "spice") => {
+        if (!vm || next === displayType) return;
+        setDisplayLoading(true);
+        setDisplayMsg("");
+        try {
+            const res = await fetch(`/api/proxmox/vms/${vm.vmId}/display`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ displayType: next, node: vm.node }),
+            });
+            const data = await res.json() as { error?: string };
+            if (!res.ok) throw new Error(data.error ?? "Failed to update display type");
+            setDisplayType(next);
+            setDisplayMsg(`✅ Display switched to ${next === "novnc" ? "noVNC" : "SPICE"} successfully.`);
+        } catch (err) {
+            setDisplayMsg(`❌ ${err instanceof Error ? err.message : "Failed to change display type"}`);
+        } finally {
+            setDisplayLoading(false);
+            setTimeout(() => setDisplayMsg(""), 5000);
         }
     };
 
@@ -330,22 +362,42 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
                     <div>
                         {isRunning ? (
                             <div className="glass-card" style={{ padding: "40px", textAlign: "center" }}>
-                                <div style={{ fontSize: "3rem", marginBottom: "16px" }}>🖥️</div>
+                                <div style={{ fontSize: "3rem", marginBottom: "16px" }}>
+                                    {displayType === "novnc" ? "🌐" : "🖥️"}
+                                </div>
                                 <h3 style={{ marginBottom: "8px", fontSize: "1.2rem" }}>Remote Console</h3>
-                                <p style={{ color: "var(--text-muted)", fontSize: "0.88rem", marginBottom: "24px", maxWidth: "480px", margin: "0 auto 24px" }}>
-                                    Download the SPICE connection file and open it with <strong style={{ color: "var(--text-secondary)" }}>virt-viewer</strong> to connect to your VM&apos;s console.
-                                </p>
-                                <a
-                                    href={`/api/proxmox/spice/download?vmId=${vm.vmId}&node=${vm.node}`}
-                                    download
-                                    className="btn btn-primary"
-                                    style={{ padding: "12px 28px", fontSize: "0.95rem", textDecoration: "none", display: "inline-block" }}
-                                >
-                                    📁 Download SPICE Console (.vv)
-                                </a>
-                                <p style={{ color: "var(--text-muted)", fontSize: "0.78rem", marginTop: "16px" }}>
-                                    Requires <a href="https://virt-manager.org/download/" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent-cyan)" }}>virt-viewer</a> installed on your system.
-                                </p>
+
+                                {displayType === "novnc" ? (
+                                    <>
+                                        <p style={{ color: "var(--text-muted)", fontSize: "0.88rem", marginBottom: "24px", maxWidth: "480px", margin: "0 auto 24px" }}>
+                                            Connect to your VM directly in the browser using <strong style={{ color: "var(--text-secondary)" }}>noVNC</strong>.
+                                        </p>
+                                        <Link
+                                            href={`/dashboard/vps/${vm.vmId}/console?node=${vm.node}`}
+                                            className="btn btn-primary"
+                                            style={{ padding: "12px 28px", fontSize: "0.95rem", textDecoration: "none", display: "inline-block" }}
+                                        >
+                                            🌐 Open noVNC Console
+                                        </Link>
+                                    </>
+                                ) : (
+                                    <>
+                                        <p style={{ color: "var(--text-muted)", fontSize: "0.88rem", marginBottom: "24px", maxWidth: "480px", margin: "0 auto 24px" }}>
+                                            Download the SPICE connection file and open it with <strong style={{ color: "var(--text-secondary)" }}>virt-viewer</strong> to connect to your VM&apos;s console.
+                                        </p>
+                                        <a
+                                            href={`/api/proxmox/spice/download?vmId=${vm.vmId}&node=${vm.node}`}
+                                            download
+                                            className="btn btn-primary"
+                                            style={{ padding: "12px 28px", fontSize: "0.95rem", textDecoration: "none", display: "inline-block" }}
+                                        >
+                                            📁 Download SPICE Console (.vv)
+                                        </a>
+                                        <p style={{ color: "var(--text-muted)", fontSize: "0.78rem", marginTop: "16px" }}>
+                                            Requires <a href="https://virt-manager.org/download/" target="_blank" rel="noopener noreferrer" style={{ color: "var(--accent-cyan)" }}>virt-viewer</a> installed on your system.
+                                        </p>
+                                    </>
+                                )}
                             </div>
                         ) : (
                             <div className="glass-card" style={{ padding: "60px", textAlign: "center" }}>
@@ -362,6 +414,63 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
 
                 {tab === "settings" && (
                     <div>
+                        {/* Console Display Type */}
+                        <div className="glass-card" style={{ padding: "28px", marginBottom: "20px" }}>
+                            <h3 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "4px" }}>🖥️ Console Display Type</h3>
+                            <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", marginBottom: "16px" }}>
+                                <strong>noVNC</strong> allows instant browser-based access. <strong>SPICE</strong> provides a smoother desktop experience via an external client app (virt-viewer).
+                            </p>
+
+                            {isRunning && (
+                                <div style={{ padding: "12px 16px", borderRadius: 8, background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.3)", color: "#fbbf24", fontSize: "0.85rem", fontWeight: 600, marginBottom: "16px" }}>
+                                    ⚠️ Your virtual machine is currently running. You must power it off completely before changing the display adapter.
+                                </div>
+                            )}
+
+                            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+                                {(["novnc", "spice"] as const).map((opt) => (
+                                    <label
+                                        key={opt}
+                                        style={{
+                                            flex: 1, minWidth: 160,
+                                            padding: "14px 18px",
+                                            borderRadius: 8,
+                                            border: `1px solid ${displayType === opt ? "var(--accent-cyan)" : "var(--glass-border)"}`,
+                                            background: displayType === opt ? "rgba(0,240,255,0.06)" : "rgba(255,255,255,0.02)",
+                                            cursor: isRunning || displayLoading ? "not-allowed" : "pointer",
+                                            opacity: isRunning || displayLoading ? 0.55 : 1,
+                                            display: "flex", alignItems: "center", gap: 10,
+                                            transition: "all 0.15s",
+                                        }}
+                                    >
+                                        <input
+                                            type="radio"
+                                            name="displayType"
+                                            value={opt}
+                                            checked={displayType === opt}
+                                            disabled={isRunning || displayLoading}
+                                            onChange={() => void handleDisplayChange(opt)}
+                                            style={{ accentColor: "var(--accent-cyan)" }}
+                                        />
+                                        <div>
+                                            <p style={{ fontWeight: 700, fontSize: "0.9rem", marginBottom: 2 }}>
+                                                {opt === "novnc" ? "🌐 noVNC" : "🖥️ SPICE"}
+                                            </p>
+                                            <p style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>
+                                                {opt === "novnc" ? "Browser-based, no install needed" : "External client, best performance"}
+                                            </p>
+                                        </div>
+                                    </label>
+                                ))}
+                            </div>
+
+                            {displayMsg && (
+                                <p style={{ marginTop: "12px", fontSize: "0.85rem", color: displayMsg.startsWith("✅") ? "var(--accent-green)" : "var(--accent-magenta)" }}>
+                                    {displayMsg}
+                                </p>
+                            )}
+                        </div>
+
                         {/* OS Reinstall */}
                         <div className="glass-card" style={{ padding: "28px", marginBottom: "20px" }}>
                             <h3 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "8px" }}>

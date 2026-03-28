@@ -217,6 +217,7 @@ model VpsInstance {
   name           String    // Display name (e.g., "My Windows VPS")
   os             String    // OS label (e.g., "Windows 11 23H2")
   status         String    @default("stopped") // running, stopped, provisioning
+  displayType    String    @default("novnc")   // novnc | spice
   specs          Json?     // {vcpu, ram_gb, disk_gb, gpu}
   ipAddress      String?
   expiresAt      DateTime?

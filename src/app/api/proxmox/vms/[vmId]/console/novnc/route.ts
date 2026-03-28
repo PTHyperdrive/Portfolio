@@ -1,0 +1,69 @@
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
+import { getVncTicket, getVncWebsocketUrl } from "@/lib/proxmox";
+
+/**
+ * POST /api/proxmox/vms/[vmId]/console/novnc
+ *
+ * Generates a short-lived noVNC authentication ticket from Proxmox.
+ * Returns the WebSocket URL and all credentials needed for the browser noVNC client.
+ *
+ * The ticket expires in ~60s — the frontend must connect immediately.
+ */
+export async function POST(
+    _req: NextRequest,
+    { params }: { params: Promise<{ vmId: string }> }
+) {
+    try {
+        const session = await auth();
+        if (!session?.user?.id) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        const { vmId } = await params;
+
+        // ── 1. Verify ownership ──────────────────────────────────────────
+        const instance = await prisma.vpsInstance.findFirst({
+            where: { vmId, userId: session.user.id },
+            select: { node: true, displayType: true },
+        });
+
+        if (!instance) {
+            return NextResponse.json({ error: "VM not found or not yours" }, { status: 403 });
+        }
+
+        if (instance.displayType !== "novnc") {
+            return NextResponse.json(
+                { error: "This VM is configured to use SPICE. Switch display type to noVNC first." },
+                { status: 400 }
+            );
+        }
+
+        // ── 2. Request VNC proxy ticket from Proxmox VE ─────────────────
+        const { ticket, port } = await getVncTicket(instance.node, vmId, "qemu");
+
+        // ── 3. Build the WebSocket URL ───────────────────────────────────
+        // The ticket doubles as the VNC password — passed as a URL param
+        const wsUrl = getVncWebsocketUrl(instance.node, vmId, port, ticket, "qemu");
+
+        // ── 4. The PVEAuthCookie is the ticket itself for token-based auth ─
+        // Proxmox VE uses the VNC ticket as both the websocket password and
+        // the value of the PVEAuthCookie header for websocket handshake
+        return NextResponse.json({
+            ticket,
+            port,
+            wsUrl,
+            // pveAuthCookie is the ticket — needed by noVNC for the initial handshake
+            pveAuthCookie: ticket,
+            node: instance.node,
+            vmId,
+        });
+    } catch (error) {
+        console.error("[console/novnc] POST error:", error);
+        return NextResponse.json(
+            { error: error instanceof Error ? error.message : "Failed to generate console ticket" },
+            { status: 500 }
+        );
+    }
+}
