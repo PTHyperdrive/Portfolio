@@ -108,7 +108,7 @@ export const securityHeaders = {
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "font-src 'self' https://fonts.gstatic.com",
         "img-src 'self' data: blob: https:",
-        "connect-src 'self'",
+        "connect-src 'self' wss://Timox-1.notrespond.com:8000",
         "frame-ancestors 'none'",
     ].join('; '),
 };
