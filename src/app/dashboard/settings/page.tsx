@@ -39,12 +39,17 @@ export default function SettingsPage() {
 
     const user = session?.user as Record<string, unknown> | undefined;
 
-    // Sync toggle from session — runs once when session loads
+    // Sync toggle from DB on mount — session JWT does not carry twoFactorEnabled
     useEffect(() => {
-        if (user?.twoFactorEnabled) {
-            setIs2FAEnabled(true);
-        }
-    }, [user?.twoFactorEnabled]);
+        fetch("/api/overview")
+            .then(r => r.json())
+            .then((d: { user?: { twoFactorEnabled?: boolean } }) => {
+                if (d?.user?.twoFactorEnabled) {
+                    setIs2FAEnabled(true);
+                }
+            })
+            .catch(() => { /* non-critical — toggle stays off */ });
+    }, []);
 
     // Toggle click — open setup if OFF, open disable modal if ON
     const handle2FAToggle = async () => {

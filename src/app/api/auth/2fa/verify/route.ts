@@ -42,13 +42,6 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "User not found" }, { status: 404 });
         }
 
-        if (user.twoFactorEnabled) {
-            return NextResponse.json(
-                { error: "Two-factor authentication is already enabled" },
-                { status: 400 }
-            );
-        }
-
         if (!user.twoFactorSecret) {
             return NextResponse.json(
                 { error: "No 2FA setup found. Please generate a QR code first." },

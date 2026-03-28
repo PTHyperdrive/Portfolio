@@ -30,14 +30,9 @@ export async function GET() {
             return NextResponse.json({ error: "User not found" }, { status: 404 });
         }
 
-        if (user.twoFactorEnabled) {
-            return NextResponse.json(
-                { error: "Two-factor authentication is already enabled" },
-                { status: 400 }
-            );
-        }
-
         // ── 1. Generate a new TOTP secret ────────────────────────────────
+        // Generating always resets twoFactorEnabled so the user must re-verify
+        // with the new code. This also serves as a re-setup path (lost device, etc.)
         const secret = speakeasy.generateSecret({
             name: `NRSP Cloud (${user.email})`,
         });
@@ -48,10 +43,11 @@ export async function GET() {
         // ── 3. Generate QR Code data URI ─────────────────────────────────
         const qrCodeUrl = await QRCode.toDataURL(secret.otpauth_url as string);
 
-        // ── 4. Persist secret (keep 2FA disabled until verified) ─────────
+        // ── 4. Save the new secret and reset the enabled flag ─────────────
+        // twoFactorEnabled stays/becomes false until the user verifies below
         await prisma.user.update({
             where: { id: userId },
-            data: { twoFactorSecret: manualKey },
+            data: { twoFactorSecret: manualKey, twoFactorEnabled: false },
         });
 
         return NextResponse.json({ secret: manualKey, qrCodeUrl });
