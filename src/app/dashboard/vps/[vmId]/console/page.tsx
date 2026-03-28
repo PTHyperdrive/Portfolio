@@ -9,6 +9,7 @@ type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error";
 
 interface NoVncTicket {
     ticket: string;
+    password: string;
     port: number;
     wsUrl: string;
     node: string;
@@ -81,14 +82,14 @@ export default function ConsolePage({ params }: { params: Promise<{ vmId: string
             setStatusMsg("Opening WebSocket connection…");
 
             // ── 2. Disconnect any lingering connection ────────────────────
-            rfbRef.current?.disconnect();
+            try { rfbRef.current?.disconnect(); } catch { /* already disconnected */ }
             rfbRef.current = null;
 
             // ── 3. Initialise RFB ────────────────────────────────────────
             if (!viewerRef.current) return; // guard: unmounted during async ops
 
             const rfb = new RFB(viewerRef.current, data.wsUrl, {
-                credentials: { username: "", password: data.ticket, target: "" },
+                credentials: { username: "", password: data.password, target: "" },
             });
 
             rfb.addEventListener("connect", () => {
