@@ -121,6 +121,12 @@ export default function ConsolePage({ params }: { params: Promise<{ vmId: string
 
     // Auto-connect once the script has loaded
     useEffect(() => {
+        // If the script was already loaded from a previous mount, onLoad won't fire again.
+        // Detect this and set scriptReady immediately.
+        if (!scriptReady && window.RFBModule) {
+            setScriptReady(true);
+            return;
+        }
         if (scriptReady) {
             void connect();
         }

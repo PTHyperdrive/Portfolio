@@ -113,6 +113,10 @@ export default function ConsoleWindowPage({ params }: { params: Promise<{ vmId: 
     }, [vmId, node]);
 
     useEffect(() => {
+        if (!scriptReady && window.RFBModule) {
+            setScriptReady(true);
+            return;
+        }
         if (scriptReady) {
             void connect();
         }

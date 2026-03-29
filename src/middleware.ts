@@ -10,9 +10,14 @@ export function middleware(request: NextRequest) {
         response.headers.set(key, value);
     });
 
-    // ── Protect Dashboard Routes ──
+    // Pass pathname so the root layout can conditionally hide Navbar/Footer
     const { pathname } = request.nextUrl;
-    const isAuthRoute = pathname.startsWith('/dashboard') || pathname.startsWith('/admin');
+    response.headers.set('x-pathname', pathname);
+
+    // ── Protect Dashboard & Console-Window Routes ──
+    const isAuthRoute = pathname.startsWith('/dashboard')
+        || pathname.startsWith('/admin')
+        || pathname.startsWith('/console-window');
 
     if (isAuthRoute) {
         const token = request.cookies.get('authjs.session-token')?.value

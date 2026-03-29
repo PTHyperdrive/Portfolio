@@ -38,16 +38,22 @@ export default async function RootLayout({
   // This means useSession() in Navbar resolves instantly — no loading flash.
   const session = await auth();
 
+  // Detect if this is a bare-chrome route (e.g. pop-out console window)
+  const { headers } = await import("next/headers");
+  const hdrs = await headers();
+  const pathname = hdrs.get("x-pathname") ?? "";
+  const isBare = pathname.startsWith("/console-window");
+
   return (
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`} style={{ scrollBehavior: "smooth" }}>
       <body>
         <Providers session={session}>
-          <div className="particles-bg" aria-hidden="true" />
-          <Navbar />
-          <main style={{ position: "relative", zIndex: 1, minHeight: "100vh" }}>
+          {!isBare && <div className="particles-bg" aria-hidden="true" />}
+          {!isBare && <Navbar />}
+          <main style={{ position: "relative", zIndex: 1, minHeight: isBare ? undefined : "100vh" }}>
             {children}
           </main>
-          <Footer />
+          {!isBare && <Footer />}
         </Providers>
       </body>
     </html>
