@@ -40,6 +40,7 @@ export default function ConsolePage({ params }: { params: Promise<{ vmId: string
     const [statusMsg, setStatusMsg] = useState("Loading noVNC…");
     const [vmName, setVmName] = useState(`VM ${vmId}`);
     const [scriptReady, setScriptReady] = useState(false);
+    const [isPoppedOut, setIsPoppedOut] = useState(false);
 
     const connect = useCallback(async () => {
         if (!viewerRef.current) return;
@@ -96,6 +97,10 @@ export default function ConsolePage({ params }: { params: Promise<{ vmId: string
                 credentials: { username: "", password: data.password, target: "" },
             });
 
+            // ── 4. Enable viewport scaling ───────────────────────────────
+            rfb.scaleViewport = true;   // Scales canvas to fit the container
+            rfb.resizeSession = true;   // Adjusts if the VM changes resolution
+
             rfb.addEventListener("connect", () => {
                 setStatus("connected");
                 setStatusMsg("Connected");
@@ -120,13 +125,36 @@ export default function ConsolePage({ params }: { params: Promise<{ vmId: string
             void connect();
         }
         return () => {
-            rfbRef.current?.disconnect();
+            try { rfbRef.current?.disconnect(); } catch { /* already disconnected */ }
             rfbRef.current = null;
         };
     }, [connect, scriptReady]);
 
     const handleCtrlAltDel = () => {
         rfbRef.current?.sendCtrlAltDel();
+    };
+
+    const handlePopOut = () => {
+        const popout = window.open(
+            `/console-window/${vmId}?node=${node}`,
+            "vnc_popout",
+            "width=1280,height=800,menubar=no,toolbar=no,location=no,status=no"
+        );
+        if (popout) {
+            setIsPoppedOut(true);
+            // Disconnect the embedded console — the pop-out will create its own
+            try { rfbRef.current?.disconnect(); } catch { /* ok */ }
+            rfbRef.current = null;
+
+            // Watch for the pop-out window closing
+            const check = setInterval(() => {
+                if (popout.closed) {
+                    clearInterval(check);
+                    setIsPoppedOut(false);
+                    void connect();
+                }
+            }, 1000);
+        }
     };
 
     // ── Status dot colour ─────────────────────────────────────────────
@@ -171,40 +199,55 @@ export default function ConsolePage({ params }: { params: Promise<{ vmId: string
                         {/* Animated pulsing dot for connecting state */}
                         <div style={{
                             width: 10, height: 10, borderRadius: "50%",
-                            background: dotColor[status],
-                            boxShadow: dotGlow[status],
-                            animation: status === "connecting" ? "pulse 1.5s ease-in-out infinite" : "none",
+                            background: isPoppedOut ? "#a78bfa" : dotColor[status],
+                            boxShadow: isPoppedOut ? "0 0 8px #a78bfa66" : dotGlow[status],
+                            animation: status === "connecting" && !isPoppedOut ? "pulse 1.5s ease-in-out infinite" : "none",
                         }} />
                         <span style={{ fontSize: "0.88rem", fontWeight: 600, color: "var(--text-secondary)" }}>
                             {vmName}
                         </span>
-                        <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>· {statusMsg}</span>
+                        <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
+                            · {isPoppedOut ? "Console in pop-out window" : statusMsg}
+                        </span>
                     </div>
                 </div>
 
                 <div style={{ display: "flex", gap: "10px" }}>
                     <button
                         onClick={handleCtrlAltDel}
-                        disabled={status !== "connected"}
+                        disabled={status !== "connected" || isPoppedOut}
                         style={{
                             padding: "8px 16px", borderRadius: 6, fontSize: "0.82rem", fontWeight: 600,
                             border: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.05)",
-                            color: status === "connected" ? "var(--text-secondary)" : "var(--text-muted)",
-                            cursor: status === "connected" ? "pointer" : "not-allowed",
-                            opacity: status === "connected" ? 1 : 0.45,
+                            color: status === "connected" && !isPoppedOut ? "var(--text-secondary)" : "var(--text-muted)",
+                            cursor: status === "connected" && !isPoppedOut ? "pointer" : "not-allowed",
+                            opacity: status === "connected" && !isPoppedOut ? 1 : 0.45,
                             transition: "all 0.15s",
                         }}
                     >
                         ⌨️ Ctrl+Alt+Del
                     </button>
                     <button
+                        onClick={handlePopOut}
+                        disabled={isPoppedOut}
+                        style={{
+                            padding: "8px 16px", borderRadius: 6, fontSize: "0.82rem", fontWeight: 600,
+                            border: "1px solid rgba(167,139,250,0.3)", background: "rgba(167,139,250,0.08)",
+                            color: isPoppedOut ? "var(--text-muted)" : "#a78bfa",
+                            cursor: isPoppedOut ? "not-allowed" : "pointer",
+                            opacity: isPoppedOut ? 0.5 : 1, transition: "all 0.15s",
+                        }}
+                    >
+                        ⧉ {isPoppedOut ? "Popped Out" : "Pop Out"}
+                    </button>
+                    <button
                         onClick={() => void connect()}
-                        disabled={status === "connecting"}
+                        disabled={status === "connecting" || isPoppedOut}
                         style={{
                             padding: "8px 16px", borderRadius: 6, fontSize: "0.82rem", fontWeight: 600,
                             border: "1px solid rgba(0,240,255,0.25)", background: "rgba(0,240,255,0.07)",
-                            color: "var(--accent-cyan)", cursor: status === "connecting" ? "not-allowed" : "pointer",
-                            opacity: status === "connecting" ? 0.5 : 1, transition: "all 0.15s",
+                            color: "var(--accent-cyan)", cursor: status === "connecting" || isPoppedOut ? "not-allowed" : "pointer",
+                            opacity: status === "connecting" || isPoppedOut ? 0.5 : 1, transition: "all 0.15s",
                         }}
                     >
                         ↺ Reconnect
@@ -228,8 +271,25 @@ export default function ConsolePage({ params }: { params: Promise<{ vmId: string
                     style={{ width: "100%", height: "100%" }}
                 />
 
+                {/* Overlay: popped-out state */}
+                {isPoppedOut && (
+                    <div style={{
+                        position: "absolute", inset: 0,
+                        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                        background: "rgba(0,0,0,0.9)", backdropFilter: "blur(6px)", gap: 16,
+                    }}>
+                        <div style={{ fontSize: "3rem" }}>⧉</div>
+                        <p style={{ fontWeight: 700, color: "#a78bfa", fontSize: "1.1rem" }}>
+                            Console is in pop-out window
+                        </p>
+                        <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", maxWidth: 400, textAlign: "center" }}>
+                            Close the pop-out window to return the console here
+                        </p>
+                    </div>
+                )}
+
                 {/* Overlay shown while not yet connected */}
-                {status !== "connected" && (
+                {!isPoppedOut && status !== "connected" && (
                     <div style={{
                         position: "absolute", inset: 0,
                         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
