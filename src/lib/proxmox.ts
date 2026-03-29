@@ -234,10 +234,9 @@ export async function getSpiceTicket(node: string, vmId: string, vmType: "qemu" 
  */
 export function getVncWebsocketUrl(node: string, vmId: string, port: number, ticket: string, vmType: "qemu" | "lxc" = "qemu") {
     const encodedTicket = encodeURIComponent(ticket);
-    // Route through the Nginx reverse proxy at /novnc/ on the app's own domain.
-    // Direct wss:// to Proxmox fails because its self-signed TLS cert is rejected
-    // by browsers. Nginx proxies the WebSocket with proxy_ssl_verify off.
-    return `wss://lab.notrespond.com/novnc/api2/json/nodes/${node}/${vmType}/${vmId}/vncwebsocket?port=${port}&vncticket=${encodedTicket}`;
+    // Return only the path — the frontend prepends wss:// + window.location.host
+    // so the URL is domain-agnostic (works with any domain/proxy).
+    return `/novnc/api2/json/nodes/${node}/${vmType}/${vmId}/vncwebsocket?port=${port}&vncticket=${encodedTicket}`;
 }
 
 /**

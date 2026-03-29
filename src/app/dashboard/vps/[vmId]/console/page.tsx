@@ -88,7 +88,11 @@ export default function ConsolePage({ params }: { params: Promise<{ vmId: string
             // ── 3. Initialise RFB ────────────────────────────────────────
             if (!viewerRef.current) return; // guard: unmounted during async ops
 
-            const rfb = new RFB(viewerRef.current, data.wsUrl, {
+            // data.wsUrl is a path like /novnc/... — prepend the current origin
+            const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+            const fullWsUrl = `${wsProtocol}//${window.location.host}${data.wsUrl}`;
+
+            const rfb = new RFB(viewerRef.current, fullWsUrl, {
                 credentials: { username: "", password: data.password, target: "" },
             });
 
