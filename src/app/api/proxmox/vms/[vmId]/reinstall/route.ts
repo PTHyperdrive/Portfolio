@@ -9,6 +9,7 @@ import {
     changeVMIso,
 } from "@/lib/proxmox";
 import { getIsoById } from "@/lib/windows-isos";
+import { audit } from "@/lib/audit";
 
 /**
  * POST /api/proxmox/vms/[vmId]/reinstall
@@ -86,6 +87,16 @@ export async function POST(
         await prisma.vpsInstance.update({
             where: { id: instance.id },
             data: { status: "running" },
+        });
+
+        // ISO 27001: Audit VM reinstall
+        void audit({
+            userId: session.user.id,
+            action: "VM_REINSTALL",
+            resourceType: "VirtualMachine",
+            resourceId: vmId,
+            metadata: { node, isoId, isoName: iso.name, diskGb, storage },
+            req,
         });
 
         return NextResponse.json({

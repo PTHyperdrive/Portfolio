@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getVncTicket, getVncWebsocketUrl } from "@/lib/proxmox";
+import { audit } from "@/lib/audit";
 
 /**
  * POST /api/proxmox/vms/[vmId]/console/novnc
@@ -47,6 +48,15 @@ export async function POST(
         // ticket → URL vncticket param (authenticates the WebSocket)
         // password → RFB credential (authenticates the VNC session)
         const wsUrl = getVncWebsocketUrl(instance.node, vmId, port, ticket, "qemu");
+
+        // ISO 27001: Audit console access
+        void audit({
+            userId: session.user.id,
+            action: "CONSOLE_VNC_ACCESS",
+            resourceType: "VirtualMachine",
+            resourceId: vmId,
+            metadata: { node: instance.node },
+        });
 
         return NextResponse.json({
             ticket,

@@ -5,24 +5,26 @@ import { useState, useEffect, useCallback, Fragment } from "react";
 interface LogEntry {
     id: string;
     action: string;
-    service: string;
-    status: string;
+    resourceType: string;
+    outcome: string;
     ipAddress: string | null;
     userAgent: string | null;
-    details: Record<string, unknown> | null;
+    metadata: Record<string, unknown> | null;
     createdAt: string;
     user: { email: string; name: string | null };
 }
 
 const statusColor = (s: string) =>
-    s === "Success"
+    s === "SUCCESS"
         ? { bg: "rgba(16,185,129,0.15)", color: "#10b981", dot: "#10b981" }
-        : { bg: "rgba(239,68,68,0.15)", color: "#ef4444", dot: "#ef4444" };
+        : s === "DENIED"
+            ? { bg: "rgba(251,191,36,0.15)", color: "#fbbf24", dot: "#fbbf24" }
+            : { bg: "rgba(239,68,68,0.15)", color: "#ef4444", dot: "#ef4444" };
 
-const serviceColor = (s: string): string => {
+const resourceColor = (s: string): string => {
     const map: Record<string, string> = {
-        Compute: "#3b82f6", Auth: "#8b5cf6", Billing: "#f59e0b",
-        VPN: "#06b6d4", Network: "#10b981",
+        VirtualMachine: "#3b82f6", UserAccount: "#8b5cf6", Billing: "#f59e0b",
+        Network: "#06b6d4",
     };
     return map[s] ?? "#64748b";
 };
@@ -56,7 +58,7 @@ function BlurredIP({ ip }: { ip: string | null }) {
     );
 }
 
-export default function ActivityLogPage() {
+export default function AuditLogPage() {
     const [logs, setLogs] = useState<LogEntry[]>([]);
     const [total, setTotal] = useState(0);
     const [page, setPage] = useState(1);
@@ -87,8 +89,8 @@ export default function ActivityLogPage() {
 
     const filtered = logs.filter(l =>
         l.action.toLowerCase().includes(search.toLowerCase()) ||
-        l.service.toLowerCase().includes(search.toLowerCase()) ||
-        l.status.toLowerCase().includes(search.toLowerCase())
+        l.resourceType.toLowerCase().includes(search.toLowerCase()) ||
+        l.outcome.toLowerCase().includes(search.toLowerCase())
     );
 
     const totalPages = Math.ceil(total / PAGE_SIZE);
@@ -110,9 +112,9 @@ export default function ActivityLogPage() {
             {/* Header */}
             <div style={{ marginBottom: 28 }}>
                 <p style={{ fontSize: "0.78rem", color: "#475569", marginBottom: 6 }}>
-                    Dashboard &nbsp;•&nbsp; Activity Log
+                    Dashboard &nbsp;•&nbsp; Audit Log
                 </p>
-                <h1 style={{ fontSize: "1.6rem", fontWeight: 800, color: "#f1f5f9" }}>Activity Log</h1>
+                <h1 style={{ fontSize: "1.6rem", fontWeight: 800, color: "#f1f5f9" }}>Audit Log</h1>
             </div>
 
             {/* Card */}
@@ -123,8 +125,8 @@ export default function ActivityLogPage() {
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" /></svg>
                     </div>
                     <div>
-                        <p style={{ fontWeight: 700, color: "#f1f5f9", fontSize: "0.95rem" }}>Activity Log</p>
-                        <p style={{ color: "#64748b", fontSize: "0.8rem" }}>View and track all activities performed on your account</p>
+                        <p style={{ fontWeight: 700, color: "#f1f5f9", fontSize: "0.95rem" }}>Audit Log</p>
+                        <p style={{ color: "#64748b", fontSize: "0.8rem" }}>Immutable record of all actions performed on your account (ISO 27001)</p>
                     </div>
                 </div>
 
@@ -149,12 +151,12 @@ export default function ActivityLogPage() {
 
                 {/* Table */}
                 {loading ? (
-                    <div style={{ padding: 60, textAlign: "center" as const, color: "#475569" }}>Loading activity…</div>
+                    <div style={{ padding: 60, textAlign: "center" as const, color: "#475569" }}>Loading audit log…</div>
                 ) : (
                     <table style={{ width: "100%", borderCollapse: "collapse" as const }}>
                         <thead>
                             <tr style={{ background: "rgba(255,255,255,0.02)" }}>
-                                {["Activity", "Service", "User", "Created At", "Status", ""].map(h => (
+                                {["Action", "Resource", "User", "Created At", "Outcome", ""].map(h => (
                                     <th key={h} style={{ padding: "12px 20px", textAlign: "left" as const, fontSize: "0.75rem", fontWeight: 700, color: "#475569", textTransform: "uppercase" as const, letterSpacing: "0.06em", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
                                         {h}
                                     </th>
@@ -169,8 +171,8 @@ export default function ActivityLogPage() {
                                     </td>
                                 </tr>
                             ) : filtered.map(log => {
-                                const sc = statusColor(log.status);
-                                const svc = serviceColor(log.service);
+                                const sc = statusColor(log.outcome);
+                                const svc = resourceColor(log.resourceType);
                                 const isOpen = expanded === log.id;
                                 return (
                                     <Fragment key={log.id}>
@@ -188,14 +190,13 @@ export default function ActivityLogPage() {
                                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={svc} strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" /></svg>
                                                     </div>
                                                     <div>
-                                                        <p style={{ fontWeight: 700, color: "#e2e8f0", fontSize: "0.9rem" }}>{log.action}</p>
+                                                        <p style={{ fontWeight: 700, color: "#e2e8f0", fontSize: "0.9rem" }}>{log.action.replace(/_/g, " ")}</p>
                                                         <p style={{ color: "#475569", fontSize: "0.75rem", fontFamily: "monospace" }}>{log.id.substring(0, 26)}…</p>
                                                     </div>
                                                 </div>
                                             </td>
-                                            {/* Service */}
                                             <td style={{ padding: "14px 20px" }}>
-                                                <p style={{ fontWeight: 700, color: svc, fontSize: "0.875rem" }}>{log.service}</p>
+                                                <p style={{ fontWeight: 700, color: svc, fontSize: "0.875rem" }}>{log.resourceType}</p>
                                             </td>
                                             {/* User */}
                                             <td style={{ padding: "14px 20px" }}>
@@ -211,7 +212,7 @@ export default function ActivityLogPage() {
                                             <td style={{ padding: "14px 20px" }}>
                                                 <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 20, background: sc.bg, color: sc.color, fontSize: "0.78rem", fontWeight: 700 }}>
                                                     <span style={{ width: 6, height: 6, borderRadius: "50%", background: sc.dot }} />
-                                                    {log.status}
+                                                    {log.outcome}
                                                 </span>
                                             </td>
                                             {/* Expand */}
@@ -249,11 +250,11 @@ export default function ActivityLogPage() {
                                                         </div>
 
                                                         {/* ── Details JSON ── */}
-                                                        {log.details && (
+                                                        {log.metadata && (
                                                             <div>
-                                                                <p style={{ fontSize: "0.72rem", color: "#475569", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700 }}>Details</p>
+                                                                <p style={{ fontSize: "0.72rem", color: "#475569", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700 }}>Metadata</p>
                                                                 <pre style={{ padding: 14, background: "rgba(0,0,0,0.3)", borderRadius: 8, fontSize: "0.78rem", color: "#94a3b8", overflowX: "auto", fontFamily: "monospace" }}>
-                                                                    {JSON.stringify(log.details, null, 2)}
+                                                                    {JSON.stringify(log.metadata, null, 2)}
                                                                 </pre>
                                                             </div>
                                                         )}

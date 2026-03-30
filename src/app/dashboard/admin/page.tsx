@@ -299,7 +299,7 @@ function EditLogModal({ log, onClose, onSuccess }: { log: LogEntry; onClose: () 
     };
 
     return (
-        <Modal title="Edit Activity Log" onClose={onClose}>
+        <Modal title="Audit Log Detail" onClose={onClose}>
             <div style={{ display: "flex", gap: 10, padding: "12px 14px", borderRadius: 10, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", marginBottom: 18 }}>
                 <AlertTriangle size={16} style={{ color: "#ef4444", flexShrink: 0, marginTop: 2 }} />
                 <p style={{ fontSize: "0.78rem", color: "#ef4444", lineHeight: 1.5 }}>

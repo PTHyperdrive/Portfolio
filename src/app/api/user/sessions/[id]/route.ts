@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { audit } from "@/lib/audit";
 
 /**
  * DELETE /api/user/sessions/[id]
@@ -35,6 +36,14 @@ export async function DELETE(
         }
 
         await prisma.deviceSession.delete({ where: { id } });
+
+        // ISO 27001: Audit session revocation
+        void audit({
+            userId: session.user.id,
+            action: "SESSION_REVOKED",
+            resourceType: "UserAccount",
+            resourceId: id,
+        });
 
         return NextResponse.json({ success: true });
     } catch (error) {

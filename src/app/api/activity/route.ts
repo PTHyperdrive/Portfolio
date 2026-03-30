@@ -16,19 +16,19 @@ export async function GET(req: Request) {
         const skip = (page - 1) * PAGE_SIZE;
 
         const [logs, total] = await Promise.all([
-            prisma.activityLog.findMany({
+            prisma.auditLog.findMany({
                 where: { userId: session.user.id },
                 orderBy: { createdAt: "desc" },
                 skip,
                 take: PAGE_SIZE,
                 include: { user: { select: { email: true, name: true } } },
             }),
-            prisma.activityLog.count({ where: { userId: session.user.id } }),
+            prisma.auditLog.count({ where: { userId: session.user.id } }),
         ]);
 
         return NextResponse.json({ logs, total, page, pageSize: PAGE_SIZE });
     } catch (err) {
-        console.error("[activity-log] GET error:", err);
-        return NextResponse.json({ error: "Failed to load activity log" }, { status: 500 });
+        console.error("[audit-log] GET error:", err);
+        return NextResponse.json({ error: "Failed to load audit log" }, { status: 500 });
     }
 }

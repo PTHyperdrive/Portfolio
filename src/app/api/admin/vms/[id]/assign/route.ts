@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/admin-guard";
+import { audit } from "@/lib/audit";
 
 /**
  * PATCH /api/admin/vms/[id]/assign
@@ -25,6 +26,10 @@ export async function PATCH(
     try {
         const { error } = await requireAdmin();
         if (error) return error;
+
+        // Get the admin's userId for audit
+        const adminSession = await (await import("@/lib/auth")).auth();
+        const adminUserId = adminSession?.user?.id;
 
         const { id } = await params;
         if (!id) {
@@ -83,6 +88,23 @@ export async function PATCH(
         }
 
         await prisma.$transaction(txOps);
+
+        // ISO 27001: Audit admin VM reassignment
+        if (adminUserId) {
+            void audit({
+                userId: adminUserId,
+                action: "ADMIN_VM_ASSIGN",
+                resourceType: "VirtualMachine",
+                resourceId: vm.vmId,
+                metadata: {
+                    previousOwner: vm.userId,
+                    newOwner: newUserId,
+                    vmName: vm.name,
+                    ticketReassigned: !!vm.ticketId,
+                },
+                req,
+            });
+        }
 
         return NextResponse.json({
             success:    true,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getVMStatus, updateVMConfig } from "@/lib/proxmox";
+import { audit } from "@/lib/audit";
 
 /**
  * PATCH /api/proxmox/vms/[vmId]/display
@@ -68,6 +69,16 @@ export async function PATCH(
         await prisma.vpsInstance.update({
             where: { id: instance.id },
             data: { displayType },
+        });
+
+        // ISO 27001: Audit display change
+        void audit({
+            userId: session.user.id,
+            action: "VM_DISPLAY_CHANGE",
+            resourceType: "VirtualMachine",
+            resourceId: vmId,
+            metadata: { displayType, vga: vgaType, node: pveNode },
+            req,
         });
 
         return NextResponse.json({

@@ -43,7 +43,7 @@ const SIDEBAR_STRUCTURE: NavGroup[] = [
         title: "TEAM",
         items: [
             { label: "Team Management", icon: Users, href: "/dashboard/team" },
-            { label: "Activity Log", icon: History, href: "/dashboard/activity" },
+            { label: "Audit Log", icon: History, href: "/dashboard/activity" },
             { label: "Bandwidth Usage", icon: BarChart2, href: "/dashboard/bandwidth", hasArrow: true },
             { label: "Billing", icon: Wallet, href: "/dashboard/billing" },
         ],

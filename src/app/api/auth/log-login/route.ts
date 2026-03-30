@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { logUserActivity } from "@/lib/logger";
+import { audit } from "@/lib/audit";
 
 /**
  * POST /api/auth/log-login
@@ -29,14 +29,14 @@ export async function POST(req: Request) {
             },
         });
 
-        // ── Record the activity log ──────────────────────────────────────
-        await logUserActivity({
+        // ── Record the audit log ──────────────────────────────────────
+        void audit({
             userId: session.user.id,
-            action: "Login Success",
-            service: "Auth",
-            status: "Success",
+            action: "LOGIN_SUCCESS",
+            resourceType: "UserAccount",
+            resourceId: session.user.id,
+            metadata: { email: session.user.email },
             req,
-            details: { email: session.user.email },
         });
 
         return NextResponse.json({ ok: true });

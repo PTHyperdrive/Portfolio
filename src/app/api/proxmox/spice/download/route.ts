@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getSpiceTicket } from "@/lib/proxmox";
+import { audit } from "@/lib/audit";
 
 /**
  * GET /api/proxmox/spice/download?vmId=150&node=Timox-1
@@ -62,6 +63,16 @@ export async function GET(req: NextRequest) {
             `delete-this-file=1`,
             `ca=${spice.ca}`,
         ].join("\n") + "\n";
+
+        // ISO 27001: Audit SPICE console access
+        void audit({
+            userId: session.user.id,
+            action: "CONSOLE_SPICE_ACCESS",
+            resourceType: "VirtualMachine",
+            resourceId: vmId,
+            metadata: { node },
+            req,
+        });
 
         return new Response(vvContent, {
             status: 200,

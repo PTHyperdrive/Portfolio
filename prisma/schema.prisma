@@ -36,7 +36,7 @@ model User {
   blogPosts     BlogPost[]
   vpsInstances  VpsInstance[]
   transactions  Transaction[]
-  activityLogs  ActivityLog[]
+  auditLogs     AuditLog[]
   creditTxns    CreditTransaction[]
   appliedPromos AppliedPromoCode[]
   deploymentTickets DeploymentTicket[]
@@ -270,22 +270,62 @@ model Transaction {
   @@index([userId])
 }
 
-// ─── Activity Log ─────────────────────────────────────────
+// ─── ISO 27001 A.12.4 — Immutable Audit Logging ─────────────────
 
-model ActivityLog {
-  id        String   @id @default(cuid())
-  userId    String
-  action    String   // e.g., "VM Created", "Login Success"
-  service   String   // e.g., "Compute", "Auth", "Billing"
-  status    String   // e.g., "Success", "Failed"
-  ipAddress String?
-  userAgent String?
-  details   Json?
-  createdAt DateTime @default(now())
+enum AuditAction {
+  // Auth
+  LOGIN_SUCCESS
+  LOGIN_FAILED
+  LOGOUT
+  ACCOUNT_CREATED
+  TFA_ENABLED
+  TFA_DISABLED
+  PASSWORD_CHANGED
+  SESSION_REVOKED
+  // VM Lifecycle
+  VM_CREATE
+  VM_START
+  VM_STOP
+  VM_REBOOT
+  VM_DESTROY
+  VM_REINSTALL
+  VM_DISPLAY_CHANGE
+  // Console Access
+  CONSOLE_VNC_ACCESS
+  CONSOLE_SPICE_ACCESS
+  // Billing
+  CREDIT_TOPUP
+  CREDIT_DEDUCTION
+  PROMO_APPLIED
+  PLAN_ACTIVATED
+  // Admin
+  ADMIN_USER_MODIFY
+  ADMIN_VM_ASSIGN
+  ADMIN_VM_MODIFY
+  ADMIN_PRICING_CHANGE
+  // Data
+  DATA_EXPORT
+  DATA_DELETION_REQUEST
+  USER_ANONYMIZED
+}
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+model AuditLog {
+  id             String      @id @default(cuid())
+  userId         String
+  action         AuditAction
+  resourceType   String      // "VirtualMachine", "UserAccount", "Network", "Billing"
+  resourceId     String?     // ID of the target resource (vmId, orderId, etc.)
+  ipAddress      String?
+  userAgent      String?
+  metadata       Json?       // Payload diffs, extra context
+  outcome        String      @default("SUCCESS") // "SUCCESS" | "FAILED" | "DENIED"
+  createdAt      DateTime    @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   @@index([userId])
+  @@index([action])
+  @@index([resourceType, resourceId])
   @@index([createdAt])
 }
 

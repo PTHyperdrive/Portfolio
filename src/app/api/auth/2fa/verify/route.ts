@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import speakeasy from "speakeasy";
+import { audit } from "@/lib/audit";
 
 /**
  * POST /api/auth/2fa/verify
@@ -67,6 +68,15 @@ export async function POST(req: Request) {
         await prisma.user.update({
             where: { id: userId },
             data: { twoFactorEnabled: true },
+        });
+
+        // ISO 27001: Audit 2FA enablement
+        void audit({
+            userId,
+            action: "TFA_ENABLED",
+            resourceType: "UserAccount",
+            resourceId: userId,
+            req,
         });
 
         return NextResponse.json({

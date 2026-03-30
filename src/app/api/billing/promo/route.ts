@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { logUserActivity } from "@/lib/logger";
+import { audit } from "@/lib/audit";
 
 export async function POST(req: Request) {
     try {
@@ -83,14 +83,13 @@ export async function POST(req: Request) {
 
         const newBalance = Number(updatedUser?.credits ?? 0);
 
-        // ── 7. Fire-and-forget activity log ───────────────────────────
-        void logUserActivity({
+        // ISO 27001: Audit promo code redemption
+        void audit({
             userId,
-            action:  "Promo Code Redeemed",
-            service: "Billing",
-            status:  "Success",
+            action: "PROMO_APPLIED",
+            resourceType: "Billing",
+            metadata: { code: upperCode, creditsAdded: promo.creditValue, newBalance },
             req,
-            details: { code: upperCode, creditsAdded: promo.creditValue, newBalance },
         });
 
         return NextResponse.json({

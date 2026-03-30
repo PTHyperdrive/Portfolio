@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { verifyPassword, hashPassword } from "@/lib/security";
+import { audit } from "@/lib/audit";
 
 export async function PATCH(req: Request) {
     try {
@@ -38,6 +39,15 @@ export async function PATCH(req: Request) {
         await prisma.user.update({
             where: { id: session.user.id },
             data: { passwordHash: newHash },
+        });
+
+        // ISO 27001: Audit password change
+        void audit({
+            userId: session.user.id,
+            action: "PASSWORD_CHANGED",
+            resourceType: "UserAccount",
+            resourceId: session.user.id,
+            req,
         });
 
         return NextResponse.json({ success: true });

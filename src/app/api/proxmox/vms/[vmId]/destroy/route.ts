@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { Prisma } from "@/generated/prisma";
 import { destroyVM } from "@/lib/proxmox";
 import { verifyPassword } from "@/lib/security";
+import { audit } from "@/lib/audit";
 
 
 /**
@@ -93,6 +94,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ vmId: s
         await prisma.$transaction(ops);
 
         const ticketReleased = !!instance.ticketId;
+
+        // ISO 27001: Audit VM destruction
+        void audit({
+            userId: session.user.id,
+            action: "VM_DESTROY",
+            resourceType: "VirtualMachine",
+            resourceId: vmId,
+            metadata: { node, ticketReleased },
+            req,
+        });
 
         return NextResponse.json({
             success: true,

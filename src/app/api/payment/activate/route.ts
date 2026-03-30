@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { audit } from "@/lib/audit";
 
 /**
  * POST /api/payment/activate
@@ -60,6 +61,15 @@ export async function POST(req: Request) {
                 },
             }),
         ]);
+
+        // ISO 27001: Audit plan activation
+        void audit({
+            userId: session.user.id,
+            action: "PLAN_ACTIVATED",
+            resourceType: "Billing",
+            metadata: { plan, amount, method },
+            req,
+        });
 
         return NextResponse.json({ success: true, transaction });
     } catch (error) {

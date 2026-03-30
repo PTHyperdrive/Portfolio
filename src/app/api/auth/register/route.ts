@@ -3,6 +3,7 @@ import prisma from '@/lib/db';
 import { hashPassword, checkRateLimit, sanitizeInput } from '@/lib/security';
 import { registerSchema } from '@/lib/validation';
 import { headers } from 'next/headers';
+import { audit } from '@/lib/audit';
 
 export async function POST(request: Request) {
     try {
@@ -56,6 +57,16 @@ export async function POST(request: Request) {
                 email: true,
                 createdAt: true,
             },
+        });
+
+        // ISO 27001: Audit account creation
+        void audit({
+            userId: user.id,
+            action: "ACCOUNT_CREATED",
+            resourceType: "UserAccount",
+            resourceId: user.id,
+            metadata: { email: user.email },
+            req: request,
         });
 
         return NextResponse.json(

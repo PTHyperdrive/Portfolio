@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { startVM, stopVM, restartVM, getVMStatus, changeVMIso } from "@/lib/proxmox";
 import { getIsoById } from "@/lib/windows-isos";
+import { audit } from "@/lib/audit";
 
 /**
  * GET /api/proxmox/vms/[vmId] — Get VM detail with live data
@@ -109,6 +110,22 @@ export async function POST(
 
             default:
                 return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+        }
+
+        // ISO 27001: Audit VM action
+        const actionMap: Record<string, "VM_START" | "VM_STOP" | "VM_REBOOT" | "VM_REINSTALL"> = {
+            start: "VM_START", stop: "VM_STOP", restart: "VM_REBOOT", reinstall: "VM_REINSTALL",
+        };
+        const auditAction = actionMap[action];
+        if (auditAction) {
+            void audit({
+                userId: session.user.id,
+                action: auditAction,
+                resourceType: "VirtualMachine",
+                resourceId: vmId,
+                metadata: { node, action },
+                req,
+            });
         }
 
         return NextResponse.json({ success: true, action, vmId });

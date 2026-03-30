@@ -12,6 +12,7 @@ import {
     generateMac,
 } from "@/lib/proxmox";
 import { getIsoById, WINDOWS_ISOS } from "@/lib/windows-isos";
+import { audit } from "@/lib/audit";
 
 /**
  * POST /api/proxmox/provision
@@ -164,6 +165,16 @@ export async function POST(req: Request) {
                 },
                 expiresAt,
             },
+        });
+
+        // ISO 27001: Audit VM creation
+        void audit({
+            userId,
+            action: "VM_CREATE",
+            resourceType: "VirtualMachine",
+            resourceId: String(vmid),
+            metadata: { node, plan, iso: iso.name, vmName },
+            req,
         });
 
         return NextResponse.json({
