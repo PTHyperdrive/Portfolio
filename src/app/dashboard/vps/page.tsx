@@ -553,7 +553,7 @@ export default function VpsDashboard() {
                                                         {[
                                                             vm.specs?.vcpu    && `${vm.specs.vcpu} vCPU`,
                                                             vm.specs?.ram_gb  && `${vm.specs.ram_gb} GB RAM`,
-                                                            vm.specs?.disk_gb && `${vm.specs.disk_gb} GB NVMe`,
+                                                            vm.specs?.disk_gb && `${vm.specs.disk_gb} GB SATA`,
                                                         ].filter(Boolean).join(" · ") || "—"}
                                                     </div>
                                                     <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 4 }}>

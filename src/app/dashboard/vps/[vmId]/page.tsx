@@ -343,7 +343,7 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
                                 {[
                                     ["vCPU", `${vm.specs?.vcpu || "—"} Cores`],
                                     ["RAM", `${vm.specs?.ram_gb || "—"} GB`],
-                                    ["Disk", `${vm.specs?.disk_gb || "—"} GB NVMe`],
+                                    ["Disk", `${vm.specs?.disk_gb || "—"} GB SATA`],
                                     ["GPU", vm.specs?.gpu || "None"],
                                     ["Network In", formatBytes(live?.netin || 0)],
                                     ["Network Out", formatBytes(live?.netout || 0)],

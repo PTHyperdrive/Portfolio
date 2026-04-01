@@ -8,11 +8,13 @@ import {
     selectBestStorage,
     getNextVmId,
     createVM,
+    updateVMConfig,
     setBootOrder,
     generateMac,
 } from "@/lib/proxmox";
 import { getIsoById, WINDOWS_ISOS } from "@/lib/windows-isos";
 import { audit } from "@/lib/audit";
+import { allocateGpu, INSUFFICIENT_GPU } from "@/lib/gpu-allocator";
 
 /**
  * POST /api/proxmox/provision
@@ -65,10 +67,17 @@ export async function POST(req: Request) {
 
         // ── Smart storage selection ──────────────────────────────────
         const allPools = await getAllNodesStorage();
-        const best = selectBestStorage(allPools, planCfg.storageKeyword);
+        // strict=true for NVMe plans — prevents silently landing on HDD
+        // when the SSD-NVME-2TB pool is full or offline.
+        const isNvme = planCfg.storageKeyword.toLowerCase().includes("nvme");
+        const best = selectBestStorage(allPools, planCfg.storageKeyword, isNvme);
 
         if (!best) {
-            return NextResponse.json({ error: "No suitable storage pool found on any node" }, { status: 503 });
+            const poolLabel = isNvme ? "SSD-NVME-2TB" : "a suitable storage pool";
+            return NextResponse.json(
+                { error: `No available space on ${poolLabel}. Please try again later or contact support.` },
+                { status: 503 }
+            );
         }
 
         const { node, storage } = best;
@@ -85,7 +94,7 @@ export async function POST(req: Request) {
             : `virtio=${mac},bridge=vmbr0`;
 
         // ── Create VM on Proxmox ─────────────────────────────────────
-        await createVM(node, {
+        const vmConfig: Record<string, string | number | boolean> = {
             vmid,
             name: vmName,
             cores: planCfg.vcpu,
@@ -96,24 +105,75 @@ export async function POST(req: Request) {
             bios: "ovmf",
             // EFI disk
             efidisk0: `${storage}:1,efitype=4m,pre-enrolled-keys=1`,
-            // OS disk
-            scsi0: `${storage}:${planCfg.diskGb},cache=writeback`,
-            scsihw: "virtio-scsi-pci",
+            // OS disk — SATA (AHCI): works out-of-the-box on all OSes,
+            // no manual driver injection needed (unlike VirtIO SCSI).
+            sata0: `${storage}:${planCfg.diskGb},cache=writeback`,
             // CD-ROM with ISO
             ide2: `${iso.iso},media=cdrom`,
             // Network
             net0,
-            // Boot from CD-ROM first
-            boot: "order=ide2;scsi0",
+            // Boot order: SATA disk → CD-ROM → network (PXE fallback)
+            boot: "order=sata0;ide2;net0",
             // Display
             vga: "qxl",
             // Misc
             onboot: 0,
             agent: "enabled=1,fstrim_cloned_disks=1",
-        });
+        };
+
+        // ── GPU Allocation (GPU plans only) ──────────────────────────
+        // Runs BEFORE the Proxmox API call so we never spin up a VM
+        // that has no GPU to attach.
+        let gpuAllocation: { gpuNodeId: string; pciAddress: string; label: string | null } | null = null;
+
+        if (planCfg.requiresGpu) {
+            try {
+                // Atomic: allocate inside a short transaction so concurrent
+                // requests cannot both pass the capacity check.
+                gpuAllocation = await prisma.$transaction(async (tx) => allocateGpu(tx));
+
+                // Add PCIe passthrough to VM config
+                vmConfig["hostpci0"] = `${gpuAllocation.pciAddress},pcie=1,x-vga=1`;
+
+                void audit({
+                    userId,
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    action: "VM_GPU_ALLOCATE" as any,
+                    resourceType: "VirtualMachine",
+                    resourceId: String(vmid),
+                    metadata: {
+                        gpuNodeId:  gpuAllocation.gpuNodeId,
+                        pciAddress: gpuAllocation.pciAddress,
+                        plan,
+                    },
+                    req,
+                });
+            } catch (err) {
+                if (err instanceof Error && err.message === INSUFFICIENT_GPU) {
+                    return NextResponse.json({
+                        success: false,
+                        error:  "All GPU nodes are currently at capacity.",
+                        action: "TRIGGER_UPSELL_FLOW",
+                    }, { status: 409 });
+                }
+                throw err; // re-throw unexpected errors
+            }
+        }
+
+        await createVM(node, vmConfig);
 
         // Ensure boot order is correctly set after creation
         try { await setBootOrder(node, String(vmid)); } catch { /* non-fatal */ }
+
+        // GPU plans: update VM config with the resolved pciAddress after creation
+        // (hostpci0 was already included in createVM, this is a no-op safety call)
+        if (gpuAllocation) {
+            try {
+                await updateVMConfig(node, String(vmid), {
+                    hostpci0: `${gpuAllocation.pciAddress},pcie=1,x-vga=1`,
+                });
+            } catch { /* already set, non-fatal */ }
+        }
 
         // ── Mark trial as used (for Trial Plan, non-admin) ──────────
         if (plan === "Trial Plan" && !dbUser.hasUsedTrial) {
@@ -148,7 +208,8 @@ export async function POST(req: Request) {
             ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
             : null;
 
-        const instance = await prisma.vpsInstance.create({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const instance = await (prisma.vpsInstance.create as any)({
             data: {
                 userId,
                 orderId: order.id,
@@ -157,15 +218,22 @@ export async function POST(req: Request) {
                 name: vmName,
                 os: iso.name,
                 status: "provisioning",
+                gpuNodeId: gpuAllocation?.gpuNodeId ?? null,
                 specs: {
                     vcpu: planCfg.vcpu,
                     ram_gb: planCfg.ramMb / 1024,
                     disk_gb: planCfg.diskGb,
                     storage,
+                    storageKeyword: planCfg.storageKeyword,
+                    ...(gpuAllocation && {
+                        gpu:        gpuAllocation.label ?? gpuAllocation.pciAddress,
+                        pciAddress: gpuAllocation.pciAddress,
+                        gpuNodeId:  gpuAllocation.gpuNodeId,
+                    }),
                 },
                 expiresAt,
             },
-        });
+        }) as Awaited<ReturnType<typeof prisma.vpsInstance.create>>;
 
         // ISO 27001: Audit VM creation
         void audit({

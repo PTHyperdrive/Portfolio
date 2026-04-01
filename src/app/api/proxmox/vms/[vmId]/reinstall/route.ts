@@ -4,9 +4,14 @@ import { prisma } from "@/lib/db";
 import {
     stopVM,
     startVM,
+    waitForVMStopped,
+    detectPrimaryDisk,
     detachAndDeleteDisk,
     addDisk,
     changeVMIso,
+    setBootOrder,
+    getAllNodesStorage,
+    selectBestStorage,
 } from "@/lib/proxmox";
 import { getIsoById } from "@/lib/windows-isos";
 import { audit } from "@/lib/audit";
@@ -15,11 +20,12 @@ import { audit } from "@/lib/audit";
  * POST /api/proxmox/vms/[vmId]/reinstall
  *
  * Factory-resets a VM:
- *   1. Stop VM
- *   2. Delete current boot disk (scsi0)
- *   3. Re-allocate a fresh blank disk of the original plan size
- *   4. Mount the selected ISO on ide2
- *   5. Start VM (will boot into OS installer)
+ *   1. Stop VM and poll until confirmed stopped
+ *   2. Detect existing primary disk slot (sata0 / scsi0 / virtio0 / ide0)
+ *   3. Delete old disk volume from storage pool (no Unused Disk leak)
+ *   4. Allocate a fresh sata0 disk (maximum OS compatibility, no driver injection)
+ *   5. Mount requested ISO on ide2, set boot order: sata0 → ide2
+ *   6. Start VM (boots into OS installer)
  *
  * Body: { node: string, isoId: string }
  */
@@ -55,23 +61,45 @@ export async function POST(
             return NextResponse.json({ error: "Invalid ISO ID" }, { status: 400 });
         }
 
-        // Get disk size from stored specs (fallback to 32 GB)
-        const specs = instance.specs as Record<string, unknown> | null;
-        const diskGb = (specs?.disk_gb as number) || 32;
-        const storage = (specs?.storage as string) || "local-zfs";
+        // Get disk size + storage from persisted specs
+        const specs          = instance.specs as Record<string, unknown> | null;
+        const diskGb         = (specs?.disk_gb as number)  || 32;
+        const storageKeyword = (specs?.storageKeyword as string) || "";
+        // Re-run pool selection to pick the best-available pool of the same type.
+        // Falls back to the originally provisioned pool name (handles old instances
+        // that pre-date storageKeyword persistence).
+        let storage = (specs?.storage as string) || "local-zfs";
+        if (storageKeyword) {
+            const allPools = await getAllNodesStorage();
+            const isNvme   = storageKeyword.toLowerCase().includes("nvme");
+            const best     = selectBestStorage(allPools, storageKeyword, isNvme);
+            if (best) storage = best.storage;
+        }
 
-        // Step 1: Stop VM (ignore if already stopped)
-        try { await stopVM(node, vmId); } catch { /* already stopped */ }
-        await new Promise((r) => setTimeout(r, 3000));
+        // Step 1: Stop VM, then poll until Proxmox confirms stopped.
+        // Blind sleep is insufficient — disk ops on a running VM cause corruption.
+        try { await stopVM(node, vmId); } catch { /* already stopped — continue */ }
+        await waitForVMStopped(node, vmId, 60_000);
 
-        // Step 2: Detach & delete current boot disk
-        await detachAndDeleteDisk(node, vmId, "scsi0");
+        // Step 2: Detect the primary disk slot dynamically.
+        // Legacy VMs may be on scsi0 or virtio0; newer ones use sata0.
+        const oldDiskKey = await detectPrimaryDisk(node, vmId);
+        if (!oldDiskKey) {
+            return NextResponse.json(
+                { error: "Could not detect a primary disk on this VM. Reinstall aborted." },
+                { status: 422 }
+            );
+        }
 
-        // Step 3: Allocate a fresh blank disk
+        // Step 3: Fully delete the old volume from storage (prevents Unused Disk leak).
+        await detachAndDeleteDisk(node, vmId, oldDiskKey);
+
+        // Step 4: Allocate fresh sata0 disk — works out-of-the-box on all OSes.
         await addDisk(node, vmId, storage, diskGb);
 
-        // Step 4: Mount new ISO
+        // Step 5: Mount new ISO on ide2 and set boot order: sata0 → ide2.
         await changeVMIso(node, vmId, iso.iso);
+        await setBootOrder(node, vmId);
 
         // Step 5: Update DB record
         await prisma.vpsInstance.update({

@@ -5,6 +5,7 @@ import { Prisma } from "@/generated/prisma";
 import { destroyVM } from "@/lib/proxmox";
 import { verifyPassword } from "@/lib/security";
 import { audit } from "@/lib/audit";
+import { releaseGpu } from "@/lib/gpu-allocator";
 
 
 /**
@@ -31,11 +32,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ vmId: s
             return NextResponse.json({ error: "Node is required" }, { status: 400 });
         }
 
-        // 1. Verify ownership — load ticket relation too
+        // 1. Verify ownership — load ticket + GPU relation
         const instance = await prisma.vpsInstance.findFirst({
             where: { vmId, userId: session.user.id },
-            select: { id: true, ticketId: true },
-        });
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            select: { id: true, ticketId: true, gpuNodeId: true } as any,
+        }) as { id: string; ticketId: string | null; gpuNodeId: string | null } | null;
 
         if (!instance) {
             return NextResponse.json({ error: "VPS Instance not found or access denied" }, { status: 404 });
@@ -65,6 +67,27 @@ export async function POST(req: Request, { params }: { params: Promise<{ vmId: s
             // Allow "already deleted" errors through so we still clean up DB
             if (!msg.includes("does not exist") && !msg.includes("404")) {
                 return NextResponse.json({ error: `Proxmox error: ${msg}` }, { status: 500 });
+            }
+        }
+
+        // 3a. Release GPU VRAM (if this was a GPU-backed VM)
+        // Done before DB cleanup so a partial DB error doesn’t strand VRAM.
+        const gpuNodeId = instance.gpuNodeId;
+        if (gpuNodeId) {
+            try {
+                await releaseGpu(gpuNodeId);
+                void audit({
+                    userId: session.user.id,
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    action: "VM_GPU_RELEASE" as any,
+                    resourceType: "VirtualMachine",
+                    resourceId: vmId,
+                    metadata: { gpuNodeId, node },
+                    req,
+                });
+            } catch (gpuErr) {
+                // Non-fatal: log but continue with DB cleanup
+                console.error("[destroy] GPU release failed:", gpuErr);
             }
         }
 

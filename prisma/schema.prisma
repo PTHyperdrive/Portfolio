@@ -222,15 +222,39 @@ model VpsInstance {
   ipAddress      String?
   expiresAt      DateTime?
   ticketId       String?   @unique  // Links to DeploymentTicket
+  gpuNodeId      String?            // Links to GpuNode (null = no GPU)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  user   User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  order  Order             @relation(fields: [orderId], references: [id])
-  ticket DeploymentTicket? @relation(fields: [ticketId], references: [id])
+  user    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order   Order             @relation(fields: [orderId], references: [id])
+  ticket  DeploymentTicket? @relation(fields: [ticketId], references: [id])
+  gpuNode GpuNode?          @relation(fields: [gpuNodeId], references: [id], onDelete: Restrict)
 
   @@unique([vmId, node])
   @@index([userId])
+  @@index([gpuNodeId])
+}
+
+// ─── GPU Node Inventory ──────────────────────────────────────────
+
+/// Tracks physical GPU hardware available for PCIe passthrough.
+/// usedVram is incremented/decremented atomically via Prisma transactions
+/// to prevent over-provisioning across concurrent requests.
+model GpuNode {
+  id         String      @id @default(cuid())
+  pciAddress String      @unique // e.g. "0000:03:00.0" or "0000:81:00.0"
+  label      String?              // human-readable name e.g. "TU106-GPU1-6GB"
+  totalVram  Int                  // allocatable VRAM in GB
+  usedVram   Int         @default(0)
+  maxVms     Int                  // hard cap (e.g. 1 for 6GB GPU, 3 for 12GB)
+  active     Boolean     @default(true)  // set false to drain without deleting
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  vms VpsInstance[]
+
+  @@index([active])
 }
 
 // ─── Blog Models ────────────────────────────────────────────────
@@ -290,6 +314,8 @@ enum AuditAction {
   VM_DESTROY
   VM_REINSTALL
   VM_DISPLAY_CHANGE
+  VM_GPU_ALLOCATE
+  VM_GPU_RELEASE
   // Console Access
   CONSOLE_VNC_ACCESS
   CONSOLE_SPICE_ACCESS

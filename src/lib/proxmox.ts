@@ -334,11 +334,15 @@ export async function getAllNodesStorage(): Promise<StoragePool[]> {
 /**
  * From a list of storage pools, pick the node+storage combination with
  * the most available space, filtered by a keyword in the storage name.
- * Falls back to any pool if no keyword match found.
+ *
+ * @param strict - When true, returns null instead of falling back to any
+ *   pool if no keyword match is found. Use this for paid plans where the
+ *   pool type (e.g. NVMe vs HDD) is a billing requirement.
  */
 export function selectBestStorage(
     pools: StoragePool[],
-    keyword: string
+    keyword: string,
+    strict = false
 ): { node: string; storage: string } | null {
     if (pools.length === 0) return null;
 
@@ -347,7 +351,12 @@ export function selectBestStorage(
         p.storage.toLowerCase().includes(kw) && p.active === 1 && p.enabled === 1 && p.avail > 0
     );
 
-    const candidates = filtered.length > 0 ? filtered : pools.filter((p) => p.active === 1 && p.enabled === 1);
+    // strict = true: no keyword match → fail fast (prevents billing mismatch)
+    if (filtered.length === 0 && strict) return null;
+
+    const candidates = filtered.length > 0
+        ? filtered
+        : pools.filter((p) => p.active === 1 && p.enabled === 1 && p.avail > 0);
     candidates.sort((a, b) => b.avail - a.avail);
 
     if (candidates.length === 0) return null;
@@ -383,40 +392,148 @@ export async function updateVMConfig(node: string, vmId: string, config: Record<
 }
 
 /**
- * Detach and permanently delete a disk from a VM.
- * Step 1: Remove the disk from config (sets it to "unused:X").
- * Step 2: Delete the unused disk to free the storage.
+ * Poll Proxmox until the VM reports status "stopped", with a timeout.
+ * This prevents running destructive disk operations on a live VM.
+ *
+ * @param node   - Proxmox node name
+ * @param vmId   - VMID string
+ * @param timeoutMs - Maximum wait time in ms (default 60 s)
  */
-export async function detachAndDeleteDisk(node: string, vmId: string, disk = "scsi0") {
-    // Step 1: detach by setting delete flag
+export async function waitForVMStopped(
+    node: string,
+    vmId: string,
+    timeoutMs = 60_000
+): Promise<void> {
+    const interval = 2_000; // poll every 2 s
+    const deadline = Date.now() + timeoutMs;
+
+    while (Date.now() < deadline) {
+        const status = await pveFetch(`/nodes/${node}/qemu/${vmId}/status/current`) as { status: string };
+        if (status.status === "stopped") return;
+        await new Promise((r) => setTimeout(r, interval));
+    }
+
+    throw new Error(`VM ${vmId} on ${node} did not stop within ${timeoutMs / 1000}s`);
+}
+
+/**
+ * Detach and **permanently delete** a disk volume from a VM.
+ *
+ * The naive approach (setting `delete: "scsi0"` in the VM config) only
+ * detaches the disk from the VM config — it leaves an "Unused disk" entry
+ * in Proxmox storage, causing a storage leak over time.
+ *
+ * This function:
+ *   1. Reads the current VM config to find the exact volume identifier
+ *      (e.g. `local-zfs:vm-150-disk-0`) attached to the specified slot.
+ *   2. Removes the disk from the VM config via `delete`.
+ *   3. Calls `DELETE /nodes/{node}/storage/{storageId}/content/{volumeId}`
+ *      to fully destroy the volume from the storage pool.
+ *
+ * @param node  - Proxmox node name
+ * @param vmId  - VM ID string
+ * @param disk  - Config slot to target (default: "scsi0")
+ */
+export async function detachAndDeleteDisk(
+    node: string,
+    vmId: string,
+    disk = "scsi0"
+): Promise<void> {
+    // ── 1. Read current VM config to find the volume name ────────────
+    const config = await pveFetch(`/nodes/${node}/qemu/${vmId}/config`) as Record<string, string>;
+    const rawDiskValue = config[disk]; // e.g. "local-zfs:vm-150-disk-0,size=32G" or undefined
+
+    // ── 2. Detach from VM config ──────────────────────────────────────
+    // Using `delete` removes the slot from the VM config.
+    // The volume may briefly appear as "unusedN" — we delete it next.
     await pveFetch(`/nodes/${node}/qemu/${vmId}/config`, {
         method: "PUT",
         body: JSON.stringify({ delete: disk }),
     });
-    // Brief pause to let Proxmox process the detach before further ops
-    await new Promise((r) => setTimeout(r, 1500));
+
+    // Brief pause for Proxmox to process the detach
+    await new Promise((r) => setTimeout(r, 1_500));
+
+    // ── 3. Destroy the volume from storage ───────────────────────────
+    if (rawDiskValue) {
+        // rawDiskValue format: "<storage>:<volume>[,options]"
+        // e.g. "local-zfs:vm-150-disk-0,size=32G"
+        const volumeWithOptions = rawDiskValue.split(",")[0]; // "local-zfs:vm-150-disk-0"
+        const colonIdx = volumeWithOptions.indexOf(":");
+
+        if (colonIdx !== -1) {
+            const storageId = volumeWithOptions.slice(0, colonIdx);   // "local-zfs"
+            const volumeId  = volumeWithOptions.slice(colonIdx + 1);  // "vm-150-disk-0"
+
+            try {
+                // Encode the volume ID — some pools use slashes (e.g. ceph/vm-150-disk-0)
+                const encodedVolume = encodeURIComponent(volumeId);
+                await pveFetch(
+                    `/nodes/${node}/storage/${storageId}/content/${encodedVolume}`,
+                    { method: "DELETE" }
+                );
+            } catch (err) {
+                // Non-fatal: log and continue. Volume may already be gone
+                // or Proxmox auto-cleaned it. Do not abort the reinstall.
+                console.warn(
+                    `[detachAndDeleteDisk] Could not delete volume ${volumeId} ` +
+                    `from ${storageId} — it may have been auto-cleaned:`,
+                    err
+                );
+            }
+        }
+    }
 }
 
 /**
- * Allocate a fresh blank disk on scsi0 for a VM.
+ * Allocate a fresh blank disk on sata0 for a VM.
+ *
+ * SATA (AHCI) is used instead of VirtIO SCSI because it works
+ * out of the box on all mainstream OSes (Windows, Linux, BSD)
+ * without requiring manual driver injection.
+ *
  * Example: addDisk("Timox-1", "150", "local-zfs", 32)
  */
 export async function addDisk(node: string, vmId: string, storage: string, diskGb: number) {
     return pveFetch(`/nodes/${node}/qemu/${vmId}/config`, {
         method: "PUT",
-        body: JSON.stringify({ scsi0: `${storage}:${diskGb}` }),
+        body: JSON.stringify({ sata0: `${storage}:${diskGb}` }),
     });
 }
 
 /**
- * Set the VM boot order to prefer CD-ROM then disk.
- * This ensures the VM boots into the ISO installer on first start.
+ * Set the VM boot order to: SATA disk first, then CD-ROM.
+ *
+ * Updated from the legacy "order=ide2;scsi0" to "order=sata0;ide2"
+ * to match the SATA bus migration.
  */
 export async function setBootOrder(node: string, vmId: string) {
     return pveFetch(`/nodes/${node}/qemu/${vmId}/config`, {
         method: "PUT",
-        body: JSON.stringify({ boot: "order=ide2;scsi0" }),
+        body: JSON.stringify({ boot: "order=sata0;ide2" }),
     });
+}
+
+/**
+ * Detect the primary OS disk slot on an existing VM.
+ *
+ * Older VMs may have been provisioned on scsi0 or virtio0; newer ones
+ * use sata0. This function inspects the live config and returns the
+ * first occupied slot from the candidate list, so the reinstall API
+ * can destroy the correct volume regardless of bus type.
+ *
+ * @returns The config key (e.g. "sata0", "scsi0") or null if not found.
+ */
+export async function detectPrimaryDisk(
+    node: string,
+    vmId: string
+): Promise<string | null> {
+    const config = await pveFetch(`/nodes/${node}/qemu/${vmId}/config`) as Record<string, string>;
+    const candidates = ["sata0", "scsi0", "virtio0", "ide0"] as const;
+    for (const slot of candidates) {
+        if (config[slot]) return slot;
+    }
+    return null;
 }
 
 /**

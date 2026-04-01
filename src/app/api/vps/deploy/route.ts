@@ -145,10 +145,16 @@ export async function POST(req: Request) {
         // ── 5. Resolve ISO & storage ──────────────────────────────────
         const iso      = getIsoById(isoId) ?? WINDOWS_ISOS[0];
         const allPools = await getAllNodesStorage();
-        const best     = selectBestStorage(allPools, planCfg.storageKeyword);
+        // strict=true for NVMe plans — never silently fall back to HDD
+        const isNvme   = planCfg.storageKeyword.toLowerCase().includes("nvme");
+        const best     = selectBestStorage(allPools, planCfg.storageKeyword, isNvme);
 
         if (!best) {
-            return NextResponse.json({ error: "No suitable storage pool found." }, { status: 503 });
+            const poolLabel = isNvme ? "SSD-NVME-2TB" : "a suitable storage pool";
+            return NextResponse.json(
+                { error: `No available space on ${poolLabel}. Please try again later or contact support.` },
+                { status: 503 }
+            );
         }
         const { node, storage } = best;
 
@@ -185,11 +191,11 @@ export async function POST(req: Request) {
                 machine:  "pc-q35-10.1",
                 bios:     "ovmf",
                 efidisk0: `${storage}:1,efitype=4m,pre-enrolled-keys=1`,
-                scsi0:    `${storage}:${planCfg.diskGb},cache=writeback`,
-                scsihw:   "virtio-scsi-pci",
+                // SATA (AHCI) — max OS compatibility, no driver injection needed
+                sata0:    `${storage}:${planCfg.diskGb},cache=writeback`,
                 ide2:     `${iso.iso},media=cdrom`,
                 net0,
-                boot:   "order=ide2;scsi0",
+                boot:   "order=sata0;ide2;net0",
                 vga:    "qxl",
                 onboot: 0,
                 agent:  "enabled=1,fstrim_cloned_disks=1",
@@ -293,10 +299,11 @@ export async function POST(req: Request) {
                         ticketId:  ticket?.id ?? undefined,
                         expiresAt: ticket?.validUntil ?? expiresAt30d,
                         specs:     {
-                            vcpu:    planCfg.vcpu,
-                            ram_gb:  planCfg.ramMb / 1024,
-                            disk_gb: planCfg.diskGb,
-                            storage,
+                            vcpu:           planCfg.vcpu,
+                            ram_gb:         planCfg.ramMb / 1024,
+                            disk_gb:        planCfg.diskGb,
+                            storage,          // actual pool name e.g. "SSD-NVME-2TB"
+                            storageKeyword: planCfg.storageKeyword, // for reinstall re-selection
                         },
                     },
                 })
