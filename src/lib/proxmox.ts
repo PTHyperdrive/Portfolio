@@ -582,3 +582,170 @@ export function generateMac(): string {
     return `02:${hex()}:${hex()}:${hex()}:${hex()}:${hex()}`;
 }
 
+// ── Snapshots ────────────────────────────────────────────────────────────────
+
+export interface VmSnapshot {
+    name:        string;
+    description: string;
+    snaptime:    number;
+    vmstate:     number; // 1 = includes RAM state
+    parent?:     string;
+}
+
+/**
+ * List all snapshots for a VM.
+ * Excludes the virtual "current" pseudo-snapshot Proxmox always returns.
+ */
+export async function listSnapshots(node: string, vmId: string): Promise<VmSnapshot[]> {
+    const data = await pveFetch(`/nodes/${node}/qemu/${vmId}/snapshot`);
+    return ((data as VmSnapshot[]) ?? []).filter((s) => s.name !== "current");
+}
+
+/**
+ * Create a snapshot.
+ * @param snapname    - Alphanumeric snapshot name (no spaces; max 40 chars)
+ * @param description - Human-readable description stored with the snapshot
+ * @param includeRam  - If true, captures live RAM state (VM keeps running but creates larger snapshot)
+ */
+export async function createSnapshot(
+    node:        string,
+    vmId:        string,
+    snapname:    string,
+    description: string,
+    includeRam = false
+): Promise<string> {
+    // Proxmox returns a task UPID string
+    const upid = await pveFetch(`/nodes/${node}/qemu/${vmId}/snapshot`, {
+        method: "POST",
+        body: JSON.stringify({
+            snapname,
+            description,
+            ...(includeRam ? { vmstate: 1 } : {}),
+        }),
+    });
+    return upid as string;
+}
+
+/**
+ * Delete a snapshot by name.
+ * @param force - If true, also removes associated disk changes (removes all child snapshots)
+ */
+export async function deleteSnapshot(
+    node:     string,
+    vmId:     string,
+    snapname: string,
+    force = false
+): Promise<string> {
+    const upid = await pveFetch(`/nodes/${node}/qemu/${vmId}/snapshot/${snapname}`, {
+        method: "DELETE",
+        body: JSON.stringify({ force: force ? 1 : 0 }),
+    });
+    return upid as string;
+}
+
+/**
+ * Roll back a VM to a snapshot.
+ * ⚠ This will stop the VM if it is running.
+ */
+export async function rollbackSnapshot(
+    node:     string,
+    vmId:     string,
+    snapname: string
+): Promise<string> {
+    const upid = await pveFetch(`/nodes/${node}/qemu/${vmId}/snapshot/${snapname}/rollback`, {
+        method: "POST",
+        body: JSON.stringify({}),
+    });
+    return upid as string;
+}
+
+// ── Backups ──────────────────────────────────────────────────────────────────
+
+export interface BackupJob {
+    upid:      string;
+    starttime: number;
+    status:    string;
+    volid?:    string;  // resulting archive volume ID
+    size?:     number;  // bytes
+}
+
+/**
+ * Trigger a live block-level backup of a VM.
+ *
+ * Business rules (enforced, not configurable):
+ *   - mode: snapshot  → VM keeps running during backup (no downtime)
+ *   - compress: zstd  → best speed/size ratio
+ *   - remove: 0       → keep existing backups (retention managed separately)
+ *
+ * @param storage - Proxmox storage ID that can hold backups (type: dir or btrfs with max-protected-backups)
+ */
+export async function createBackup(
+    node:    string,
+    vmId:    string,
+    storage: string,
+    notes?:  string
+): Promise<string> {
+    const upid = await pveFetch(`/nodes/${node}/vzdump`, {
+        method: "POST",
+        body: JSON.stringify({
+            vmid:     vmId,
+            storage,
+            mode:     "snapshot",   // ENFORCED: no downtime
+            compress: "zstd",       // ENFORCED: storage optimization
+            remove:   0,            // keep all backups
+            ...(notes ? { "notes-template": notes } : {}),
+        }),
+    });
+    return upid as string;
+}
+
+/**
+ * List backups stored on a given storage that belong to a specific VM.
+ */
+export async function listBackups(
+    node:    string,
+    storage: string,
+    vmId?:   string
+): Promise<{ volid: string; ctime: number; size: number; notes?: string; vmid?: string }[]> {
+    const data = await pveFetch(`/nodes/${node}/storage/${storage}/content?content=backup`);
+    const all  = data as { volid: string; ctime: number; size: number; notes?: string; vmid?: string }[];
+    return vmId ? all.filter((b) => String(b.vmid) === String(vmId)) : all;
+}
+
+/**
+ * Delete a backup archive from storage.
+ * @param volid - Full volume ID, e.g. "backups:backup/vzdump-qemu-150-2024_01_01.vma.zst"
+ */
+export async function deleteBackup(
+    node:  string,
+    volid: string
+): Promise<string> {
+    const [storageId, volumePath] = volid.split(":");
+    const encoded = encodeURIComponent(volumePath ?? volid);
+    const upid = await pveFetch(`/nodes/${node}/storage/${storageId}/content/${encoded}`, {
+        method: "DELETE",
+    });
+    return upid as string;
+}
+
+/**
+ * Poll a Proxmox task UPID until it completes or times out.
+ * Returns the exitstatus string ("OK" on success).
+ */
+export async function waitForTask(
+    node:       string,
+    upid:       string,
+    timeoutMs = 300_000,
+    intervalMs = 3_000
+): Promise<string> {
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+        const status = await pveFetch(`/nodes/${node}/tasks/${encodeURIComponent(upid)}/status`) as {
+            status: string; exitstatus?: string;
+        };
+        if (status.status === "stopped") return status.exitstatus ?? "OK";
+        await new Promise((r) => setTimeout(r, intervalMs));
+    }
+    throw new Error(`Task ${upid} timed out after ${timeoutMs / 1000}s`);
+}
+

@@ -42,7 +42,14 @@ const SIDEBAR_STRUCTURE: NavGroup[] = [
             },
             { label: "SSH Keys", icon: Key, href: "/dashboard/ssh" },
             { label: "Networks", icon: Globe, href: "/dashboard/networks", hasArrow: true },
-            { label: "Orchestration", icon: SettingsIcon, href: "/dashboard/orchestration", hasArrow: true },
+            {
+                label: "Orchestration", icon: SettingsIcon, href: "/dashboard/orchestration",
+                subItems: [
+                    { label: "Backups",   href: "/dashboard/orchestration/backups"   },
+                    { label: "Snapshots", href: "/dashboard/orchestration/snapshots" },
+                    { label: "ISOs",      href: "/dashboard/orchestration/isos"      },
+                ]
+            },
         ],
     },
     {
