@@ -278,6 +278,35 @@ export async function changeVMIso(node: string, vmId: string, isoPath: string) {
 }
 
 /**
+ * Inject an SSH public key into a VM via cloud-init.
+ *
+ * Proxmox requires the key to be URL-encoded when passed through the API.
+ * Multiple keys can be joined with newlines before encoding.
+ *
+ * @param node      - Proxmox node name
+ * @param vmId      - VM ID string
+ * @param publicKey - One SSH public key string (or newline-joined set)
+ */
+export async function injectSshKey(node: string, vmId: string, publicKey: string) {
+    // Proxmox cloud-init requires URL-encoded keys
+    const encoded = encodeURIComponent(publicKey.trim());
+    return pveFetch(`/nodes/${node}/qemu/${vmId}/config`, {
+        method: "PUT",
+        body: JSON.stringify({ sshkeys: encoded }),
+    });
+}
+
+/**
+ * Regenerate the cloud-init drive image after config changes.
+ * Call this after injectSshKey() for changes to take effect on next boot.
+ */
+export async function triggerCloudInitRegen(node: string, vmId: string) {
+    return pveFetch(`/nodes/${node}/qemu/${vmId}/cloudinit`, {
+        method: "PUT",
+    });
+}
+
+/**
  * Destroy (delete) a VM and all its disks.
  * Stops the VM first if it's running.
  */
@@ -389,6 +418,14 @@ export async function updateVMConfig(node: string, vmId: string, config: Record<
         method: "PUT",
         body: JSON.stringify(config),
     });
+}
+
+/**
+ * Read the current configuration of a VM.
+ * Returns the raw Proxmox config object (disk slots, cpu, memory, etc.)
+ */
+export async function getVMConfig(node: string, vmId: string): Promise<Record<string, string>> {
+    return pveFetch(`/nodes/${node}/qemu/${vmId}/config`) as Promise<Record<string, string>>;
 }
 
 /**

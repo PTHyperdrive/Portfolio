@@ -11,6 +11,8 @@ import {
     updateVMConfig,
     setBootOrder,
     generateMac,
+    injectSshKey,
+    triggerCloudInitRegen,
 } from "@/lib/proxmox";
 import { getIsoById, WINDOWS_ISOS } from "@/lib/windows-isos";
 import { audit } from "@/lib/audit";
@@ -166,13 +168,35 @@ export async function POST(req: Request) {
         try { await setBootOrder(node, String(vmid)); } catch { /* non-fatal */ }
 
         // GPU plans: update VM config with the resolved pciAddress after creation
-        // (hostpci0 was already included in createVM, this is a no-op safety call)
         if (gpuAllocation) {
             try {
                 await updateVMConfig(node, String(vmid), {
                     hostpci0: `${gpuAllocation.pciAddress},pcie=1,x-vga=1`,
                 });
             } catch { /* already set, non-fatal */ }
+        }
+
+        // ── SSH Key Injection via cloud-init ───────────────────────────
+        // Fetch the user’s default SSH key (or first key if none set as default).
+        // Non-fatal: VM provisions successfully either way.
+        // User can add a key later — they will need to trigger cloud-init manually.
+        const defaultKey = await prisma.sshKey.findFirst({
+            where:   { userId, isDefault: true },
+            select:  { publicKey: true },
+        }) ?? await prisma.sshKey.findFirst({
+            where:   { userId },
+            orderBy: { createdAt: "asc" },
+            select:  { publicKey: true },
+        });
+
+        if (defaultKey) {
+            try {
+                await injectSshKey(node, String(vmid), defaultKey.publicKey);
+                await triggerCloudInitRegen(node, String(vmid));
+            } catch (sshErr) {
+                // Non-fatal: log but continue
+                console.warn(`[provision] SSH key injection failed for VM ${vmid}:`, sshErr);
+            }
         }
 
         // ── Mark trial as used (for Trial Plan, non-admin) ──────────

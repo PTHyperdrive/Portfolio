@@ -27,20 +27,22 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  accounts      Account[]
-  sessions      Session[]
-  orders        Order[]
-  vpnConfigs    VpnConfig[]
-  proxyAccounts ProxyAccount[]
-  emailAccounts EmailAccount[]
-  blogPosts     BlogPost[]
-  vpsInstances  VpsInstance[]
-  transactions  Transaction[]
-  auditLogs     AuditLog[]
-  creditTxns    CreditTransaction[]
-  appliedPromos AppliedPromoCode[]
+  accounts          Account[]
+  sessions          Session[]
+  orders            Order[]
+  vpnConfigs        VpnConfig[]
+  proxyAccounts     ProxyAccount[]
+  emailAccounts     EmailAccount[]
+  blogPosts         BlogPost[]
+  vpsInstances      VpsInstance[]
+  transactions      Transaction[]
+  auditLogs         AuditLog[]
+  creditTxns        CreditTransaction[]
+  appliedPromos     AppliedPromoCode[]
   deploymentTickets DeploymentTicket[]
-  deviceSessions DeviceSession[]
+  deviceSessions    DeviceSession[]
+  sshKeys           SshKey[]
+  nextcloudStorage  UserNextcloudStorage?
 }
 
 model Account {
@@ -89,7 +91,23 @@ model DeviceSession {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-// ─── Business Models ────────────────────────────────────────────
+// ─── SSH Key Management ──────────────────────────────────────────
+
+/// User-owned SSH public keys injected into VMs via cloud-init.
+/// Password auth is disabled on all provisioned VMs — key auth only.
+model SshKey {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String   // e.g. "MacBook Pro", "ePass2003 YubiKey"
+  publicKey String   @db.Text // full "ssh-ed25519 AAAA..." string
+  isDefault Boolean  @default(false) // injected first during provisioning
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
 
 enum Role {
   USER
@@ -228,8 +246,9 @@ model VpsInstance {
 
   user    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   order   Order             @relation(fields: [orderId], references: [id])
-  ticket  DeploymentTicket? @relation(fields: [ticketId], references: [id])
-  gpuNode GpuNode?          @relation(fields: [gpuNodeId], references: [id], onDelete: Restrict)
+  ticket        DeploymentTicket?  @relation(fields: [ticketId], references: [id])
+  gpuNode       GpuNode?           @relation(fields: [gpuNodeId], references: [id], onDelete: Restrict)
+  blockStorage  VmBlockStorageAddon[]
 
   @@unique([vmId, node])
   @@index([userId])
@@ -255,6 +274,52 @@ model GpuNode {
   vms VpsInstance[]
 
   @@index([active])
+}
+
+// ─── Phase 1: Proxmox VM Block Storage Addons ──────────────────────
+
+/// Tracks extra Proxmox block disk volumes attached to a specific VM.
+/// Provisioned via Proxmox API (equivalent to `qm set <vmid> --scsiN pool:sizeG`).
+/// Pricing: NVME 2000 VND/GB • SATA 1200 VND/GB • HDD 350 VND/GB
+model VmBlockStorageAddon {
+  id            String   @id @default(cuid())
+  vpsInstanceId String
+  storagePool   String   // Proxmox pool name e.g. "SSD-NVME-2TB", "local-zfs"
+  storageType   String   // "nvme" | "sata" | "hdd" (tier classification)
+  diskSlot      String   // e.g. "sata1", "scsi1" (bus:index assigned)
+  sizeGb        Int      // GB attached in this transaction
+  pricePerGb    Int      // VND/GB snapshot at purchase time
+  totalCost     Int      // sizeGb × pricePerGb
+  active        Boolean  @default(true)
+  purchasedAt   DateTime @default(now())
+
+  vpsInstance VpsInstance @relation(fields: [vpsInstanceId], references: [id], onDelete: Cascade)
+
+  @@index([vpsInstanceId])
+}
+
+// ─── Phase 2: Per-User Nextcloud Cloud Storage ─────────────────────
+
+/// One record per user. Tracks their Nextcloud cloud storage quota.
+/// Rules:
+///   - 5 GB free base (granted when first eligible VM is provisioned)
+///   - Paid expansion: must be in 5 GB increments (5, 10, 15 … 95 GB extra)
+///   - Hard cap: 100 GB total (5 GB free + up to 95 GB paid)
+///   - Prerequisite: user must have ≥1 active VpsInstance (min. Nano-NAT tier)
+model UserNextcloudStorage {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  ncUsername    String   @unique // NC account name; convention: "user-<userId[0..7]>"
+  freeGb        Int      @default(5)  // base free tier
+  paidGb        Int      @default(0)  // total paid expansion GB
+  totalGb       Int      @default(5)  // freeGb + paidGb (denormalised for fast reads)
+  active        Boolean  @default(true)
+  provisionedAt DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([ncUsername])
 }
 
 // ─── Blog Models ────────────────────────────────────────────────
@@ -324,6 +389,7 @@ enum AuditAction {
   CREDIT_DEDUCTION
   PROMO_APPLIED
   PLAN_ACTIVATED
+  STORAGE_PURCHASE
   // Admin
   ADMIN_USER_MODIFY
   ADMIN_VM_ASSIGN
@@ -333,6 +399,9 @@ enum AuditAction {
   DATA_EXPORT
   DATA_DELETION_REQUEST
   USER_ANONYMIZED
+  // Security
+  SSH_KEY_ADD
+  SSH_KEY_REMOVE
 }
 
 model AuditLog {
