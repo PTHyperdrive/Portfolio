@@ -33,7 +33,13 @@ const SIDEBAR_STRUCTURE: NavGroup[] = [
                 ]
             },
             { label: "Game Hosting", icon: Gamepad2, href: "/dashboard/game" },
-            { label: "Storage", icon: Cloud, href: "/dashboard/storage", hasArrow: true },
+            {
+                label: "Storage", icon: Cloud, href: "/dashboard/storage",
+                subItems: [
+                    { label: "Nextcloud", href: "/dashboard/storage/nextcloud" },
+                    { label: "Block Storage", href: "/dashboard/storage/block" },
+                ]
+            },
             { label: "SSH Keys", icon: Key, href: "/dashboard/ssh" },
             { label: "Networks", icon: Globe, href: "/dashboard/networks", hasArrow: true },
             { label: "Orchestration", icon: SettingsIcon, href: "/dashboard/orchestration", hasArrow: true },
