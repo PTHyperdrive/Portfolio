@@ -72,10 +72,37 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
     }, [vmId, node]);
 
     useEffect(() => {
+        // Initial full load — fetches DB-persisted fields (name, os, specs, etc.)
+        // plus a first live snapshot from Proxmox.
         loadVm();
-        const interval = setInterval(loadVm, 10000);
-        return () => clearInterval(interval);
-    }, [loadVm]);
+
+        // ── Server-Sent Events: live telemetry push ──────────────────
+        // The /stream route pushes a JSON payload every 10 s, replacing the
+        // old setInterval(loadVm, 10000) that fired a full round-trip each time.
+        // EventSource reconnects automatically on network hiccups.
+        const es = new EventSource(
+            `/api/proxmox/vms/${vmId}/stream?node=${encodeURIComponent(node)}`
+        );
+
+        es.onmessage = (event: MessageEvent<string>) => {
+            try {
+                const liveData = JSON.parse(event.data) as VmDetail["liveData"];
+                setVm((prev) => prev ? { ...prev, liveData } : prev);
+            } catch {
+                // Malformed JSON — ignore; next push will correct state
+            }
+        };
+
+        es.onerror = () => {
+            // On unrecoverable error the browser will retry automatically.
+            // Close explicitly only if the component unmounts (see cleanup below).
+        };
+
+        return () => {
+            // Cleanup: close the SSE connection when navigating away.
+            es.close();
+        };
+    }, [vmId, node, loadVm]);
 
     const handleAction = async (action: string, isoId?: string) => {
         setActionLoading(action);

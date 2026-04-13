@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 548 162" fill="none" role="img" aria-label="NOTRESPOND LABS">
+
+  <!-- Background -->
+  <rect width="548" height="162" fill="#000"/>
+
+  <!--
+    ICON — centered at (81, 81)
+    Ring:   r=44, stroke-width=12, stroke-linecap=round
+            10 curved arc segments, each spanning 18°, gap=18°
+            Segment starts at: -90°, -54°, -18°, 18°, 54°, 90°, 126°, 162°, 198°, 234°
+    Spokes: inner r=58, outer r=76, stroke-width=11, stroke-linecap=round
+            8 spokes at 45° intervals (offset +22.5° from ring segments)
+  -->
+  <g transform="translate(81,81)" stroke="#fff" stroke-linecap="round" fill="none">
+
+    <!-- ── Dashed ring: 10 curved arcs (r=44, each 18°, gap=18°) ── -->
+    <g stroke-width="12">
+      <!-- 0°  start=-90°  end=-72° -->
+      <path d="M 0,-44 A 44,44,0,0,1,13.60,-41.85"/>
+      <!-- 1°  start=-54°  end=-36° -->
+      <path d="M 25.86,-35.60 A 44,44,0,0,1,35.60,-25.86"/>
+      <!-- 2°  start=-18°  end=0° -->
+      <path d="M 41.85,-13.60 A 44,44,0,0,1,44,0"/>
+      <!-- 3°  start=18°   end=36° -->
+      <path d="M 41.85,13.60 A 44,44,0,0,1,35.60,25.86"/>
+      <!-- 4°  start=54°   end=72° -->
+      <path d="M 25.86,35.60 A 44,44,0,0,1,13.60,41.85"/>
+      <!-- 5°  start=90°   end=108° -->
+      <path d="M 0,44 A 44,44,0,0,1,-13.60,41.85"/>
+      <!-- 6°  start=126°  end=144° -->
+      <path d="M -25.86,35.60 A 44,44,0,0,1,-35.60,25.86"/>
+      <!-- 7°  start=162°  end=180° -->
+      <path d="M -41.85,13.60 A 44,44,0,0,1,-44,0"/>
+      <!-- 8°  start=198°  end=216° -->
+      <path d="M -41.85,-13.60 A 44,44,0,0,1,-35.60,-25.86"/>
+      <!-- 9°  start=234°  end=252° -->
+      <path d="M -25.86,-35.60 A 44,44,0,0,1,-13.60,-41.85"/>
+    </g>
+
+    <!--
+      ── 8 straight spokes, offset +22.5° from ring segments ──
+      Spokes at: -67.5°, -22.5°, 22.5°, 67.5°, 112.5°, 157.5°, 202.5°, 247.5°
+      Inner radius: 58  |  Outer radius: 76
+      Precomputed: cos/sin values × radius
+        -67.5°: cos=0.3827  sin=-0.9239
+        -22.5°: cos=0.9239  sin=-0.3827
+         22.5°: cos=0.9239  sin= 0.3827
+         67.5°: cos=0.3827  sin= 0.9239
+        112.5°: cos=-0.3827 sin= 0.9239
+        157.5°: cos=-0.9239 sin= 0.3827
+        202.5°: cos=-0.9239 sin=-0.3827
+        247.5°: cos=-0.3827 sin=-0.9239
+    -->
+    <g stroke-width="11">
+      <!-- spoke at -67.5°  (between ring 0 and 1) -->
+      <line x1="22.20" y1="-53.59" x2="29.08" y2="-70.22"/>
+      <!-- spoke at -22.5° -->
+      <line x1="53.59" y1="-22.20" x2="70.22" y2="-29.08"/>
+      <!-- spoke at 22.5° -->
+      <line x1="53.59" y1="22.20" x2="70.22" y2="29.08"/>
+      <!-- spoke at 67.5° -->
+      <line x1="22.20" y1="53.59" x2="29.08" y2="70.22"/>
+      <!-- spoke at 112.5° -->
+      <line x1="-22.20" y1="53.59" x2="-29.08" y2="70.22"/>
+      <!-- spoke at 157.5° -->
+      <line x1="-53.59" y1="22.20" x2="-70.22" y2="29.08"/>
+      <!-- spoke at 202.5° -->
+      <line x1="-53.59" y1="-22.20" x2="-70.22" y2="-29.08"/>
+      <!-- spoke at 247.5° -->
+      <line x1="-22.20" y1="-53.59" x2="-29.08" y2="-70.22"/>
+    </g>
+
+  </g>
+
+  <!--
+    TYPOGRAPHY — "NOTRESPOND" / "LABS"
+    Font: Inter Black / Helvetica Neue Black / Arial Black (system fallback chain)
+    Vertically centered relative to icon (center y=81)
+    Text block: 2 lines × ~52px = ~104px block, centered at y=81 → top baseline ≈ y=60, bottom ≈ y=116
+  -->
+  <text
+    x="178" y="71"
+    fill="#fff"
+    font-family="'Inter','Helvetica Neue',Arial,sans-serif"
+    font-weight="900"
+    font-size="52"
+    letter-spacing="1.5"
+  >NOTRESPOND</text>
+
+  <text
+    x="178" y="131"
+    fill="#fff"
+    font-family="'Inter','Helvetica Neue',Arial,sans-serif"
+    font-weight="900"
+    font-size="52"
+    letter-spacing="1.5"
+  >LABS</text>
+
+</svg>

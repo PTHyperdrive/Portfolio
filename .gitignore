@@ -9,7 +9,9 @@
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
-
+CHECKPOINT-*.md
+PERSONA.md
+ROLES.md
 # testing
 /coverage
 

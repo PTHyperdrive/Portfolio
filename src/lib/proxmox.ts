@@ -429,11 +429,19 @@ export async function getVMConfig(node: string, vmId: string): Promise<Record<st
 }
 
 /**
- * Poll Proxmox until the VM reports status "stopped", with a timeout.
- * This prevents running destructive disk operations on a live VM.
+ * Wait until the VM reports status "stopped", with a timeout.
  *
- * @param node   - Proxmox node name
- * @param vmId   - VMID string
+ * Uses exponential backoff with jitter instead of a fixed poll interval:
+ *   - Starts at 1 s, doubles each round, caps at 16 s.
+ *   - ±250 ms jitter prevents thundering-herd across concurrent reinstall requests.
+ *   - Under load this reduces Proxmox API call rate by ~4–8× vs the legacy
+ *     fixed-2 s loop, avoiding pvedaemon rate-limiting.
+ *
+ * This is a server-side blocking guard — never call from a browser.
+ * The VM must be stopped before any destructive disk operations.
+ *
+ * @param node      - Proxmox node name
+ * @param vmId      - VMID string
  * @param timeoutMs - Maximum wait time in ms (default 60 s)
  */
 export async function waitForVMStopped(
@@ -441,13 +449,24 @@ export async function waitForVMStopped(
     vmId: string,
     timeoutMs = 60_000
 ): Promise<void> {
-    const interval = 2_000; // poll every 2 s
-    const deadline = Date.now() + timeoutMs;
+    const deadline  = Date.now() + timeoutMs;
+    const maxDelay  = 16_000;
+    const jitter    = () => Math.random() * 500 - 250; // ±250 ms
+    let   delay     = 1_000; // start at 1 s
 
     while (Date.now() < deadline) {
-        const status = await pveFetch(`/nodes/${node}/qemu/${vmId}/status/current`) as { status: string };
+        const status = await pveFetch(
+            `/nodes/${node}/qemu/${vmId}/status/current`
+        ) as { status: string };
         if (status.status === "stopped") return;
-        await new Promise((r) => setTimeout(r, interval));
+
+        // Clamp wait so we never overshoot the deadline
+        const remaining = deadline - Date.now();
+        const wait = Math.min(delay, remaining, maxDelay) + jitter();
+        if (wait <= 0) break;
+
+        await new Promise((r) => setTimeout(r, wait));
+        delay = Math.min(delay * 2, maxDelay);
     }
 
     throw new Error(`VM ${vmId} on ${node} did not stop within ${timeoutMs / 1000}s`);
@@ -731,21 +750,44 @@ export async function deleteBackup(
 /**
  * Poll a Proxmox task UPID until it completes or times out.
  * Returns the exitstatus string ("OK" on success).
+ *
+ * Uses exponential backoff with jitter instead of a fixed poll interval:
+ *   - Starts at 1 s, doubles each round, caps at 16 s.
+ *   - ±250 ms jitter spreads concurrent backup/snapshot task watchers.
+ *   - The legacy fixed-3 s `intervalMs` parameter has been removed;
+ *     callers that previously customised the interval should rely on
+ *     `timeoutMs` to control the maximum wait window instead.
+ *
+ * @param node      - Proxmox node name
+ * @param upid      - Task UPID string returned by snapshot/backup/Task APIs
+ * @param timeoutMs - Maximum wait time in ms (default 300 s / 5 min)
  */
 export async function waitForTask(
     node:       string,
     upid:       string,
-    timeoutMs = 300_000,
-    intervalMs = 3_000
+    timeoutMs = 300_000
 ): Promise<string> {
-    const deadline = Date.now() + timeoutMs;
+    const deadline  = Date.now() + timeoutMs;
+    const maxDelay  = 16_000;
+    const jitter    = () => Math.random() * 500 - 250; // ±250 ms
+    let   delay     = 1_000; // start at 1 s
+
     while (Date.now() < deadline) {
-        const status = await pveFetch(`/nodes/${node}/tasks/${encodeURIComponent(upid)}/status`) as {
-            status: string; exitstatus?: string;
-        };
+        const status = await pveFetch(
+            `/nodes/${node}/tasks/${encodeURIComponent(upid)}/status`
+        ) as { status: string; exitstatus?: string };
+
         if (status.status === "stopped") return status.exitstatus ?? "OK";
-        await new Promise((r) => setTimeout(r, intervalMs));
+
+        // Clamp wait so we never overshoot the deadline
+        const remaining = deadline - Date.now();
+        const wait = Math.min(delay, remaining, maxDelay) + jitter();
+        if (wait <= 0) break;
+
+        await new Promise((r) => setTimeout(r, wait));
+        delay = Math.min(delay * 2, maxDelay);
     }
+
     throw new Error(`Task ${upid} timed out after ${timeoutMs / 1000}s`);
 }
 
