@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Ban, CheckCircle } from "lucide-react";
 
 function SubNav({ active }: { active: "snapshots" | "backups" | "isos" }) {
     const tabs = [
@@ -54,13 +55,15 @@ export default function IsosPage() {
 
                 <div style={{ display: "flex", flexDirection: "column", gap: 10, maxWidth: 440, margin: "0 auto 32px", textAlign: "left" }}>
                     {[
-                        { icon: "🚫", text: "Custom ISO upload — blocked" },
-                        { icon: "🚫", text: "CD/DVD drive mounting (ide2 / cdrom) — blocked" },
-                        { icon: "🚫", text: "Boot order override to ISO — blocked" },
-                        { icon: "✅", text: "OS reinstall from approved image library — permitted" },
+                        { icon: "blocked", text: "Custom ISO upload — blocked" },
+                        { icon: "blocked", text: "CD/DVD drive mounting (ide2 / cdrom) — blocked" },
+                        { icon: "blocked", text: "Boot order override to ISO — blocked" },
+                        { icon: "permitted", text: "OS reinstall from approved image library — permitted" },
                     ].map(item => (
                         <div key={item.text} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 14px", borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
-                            <span style={{ fontSize: "1rem" }}>{item.icon}</span>
+                            {item.icon === "blocked"
+                                ? <Ban style={{ width: 16, height: 16, color: "#ef4444", flexShrink: 0 }} />
+                                : <CheckCircle style={{ width: 16, height: 16, color: "#10b981", flexShrink: 0 }} />}
                             <span style={{ fontSize: "0.84rem", color: item.text.includes("permitted") ? "#10b981" : "#475569" }}>{item.text}</span>
                         </div>
                     ))}

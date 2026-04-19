@@ -192,7 +192,7 @@ export default function VPSPage() {
                 <div className="container">
                     {visiblePlans.length === 0 ? (
                         <div className="glass-card stagger" style={{ padding: "48px 32px", textAlign: "center", maxWidth: "600px", margin: "0 auto" }}>
-                            <div style={{ fontSize: "3.5rem", marginBottom: "20px" }}>🎉</div>
+                            <div style={{ fontSize: "3.5rem", marginBottom: "20px" }}></div>
                             <h3 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "16px", color: "var(--text-primary)" }}>
                                 You own all available plans!
                             </h3>
@@ -288,15 +288,15 @@ export default function VPSPage() {
                     </h2>
                     <div className="grid-3 stagger">
                         {[
-                            { icon: "💻", title: "AMD EPYC & Intel Xeon", desc: "Latest gen processors with up to 64 cores per node" },
-                            { icon: "🎮", title: "NVIDIA Data Center GPUs", desc: "RTX6000, RTX2060, RTX4000 full CUDA & Tensor Core support" },
-                            { icon: "💾", title: "NVMe SSD RAID", desc: "Enterprise NVMe SSDs in ZFS RAID-10 for speed and redundancy" },
-                            { icon: "🌐", title: "10 Gbps Network", desc: "Low-latency network with global peering and DDoS mitigation" },
-                            { icon: "🔄", title: "Instant Provisioning", desc: "Servers deployed in under 60 seconds with your chosen OS" },
-                            { icon: "🛡️", title: "Secure Hypervisor", desc: "KVM-based isolation with hardware-level security" },
+                            { icon: "CPU", title: "AMD EPYC & Intel Xeon", desc: "Latest gen processors with up to 64 cores per node" },
+                            { icon: "GPU", title: "NVIDIA Data Center GPUs", desc: "RTX6000, RTX2060, RTX4000 full CUDA & Tensor Core support" },
+                            { icon: "SSD", title: "NVMe SSD RAID", desc: "Enterprise NVMe SSDs in ZFS RAID-10 for speed and redundancy" },
+                            { icon: "NET", title: "10 Gbps Network", desc: "Low-latency network with global peering and DDoS mitigation" },
+                            { icon: "CLK", title: "Instant Provisioning", desc: "Servers deployed in under 60 seconds with your chosen OS" },
+                            { icon: "SEC", title: "Secure Hypervisor", desc: "KVM-based isolation with hardware-level security" },
                         ].map((item) => (
                             <div key={item.title} className="glass-card" style={{ padding: "28px", textAlign: "center" }}>
-                                <div style={{ fontSize: "2rem", marginBottom: "12px" }}>{item.icon}</div>
+                                <div style={{ fontSize: "0.78rem", fontWeight: 800, letterSpacing: "0.1em", color: "var(--accent-cyan)", marginBottom: "12px", fontFamily: "monospace" }}>{item.icon}</div>
                                 <h4 style={{ fontWeight: 700, marginBottom: "8px", fontSize: "1rem" }}>{item.title}</h4>
                                 <p style={{ color: "var(--text-secondary)", fontSize: "0.88rem" }}>{item.desc}</p>
                             </div>

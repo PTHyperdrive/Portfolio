@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { Save } from "lucide-react";
 
 interface VpsInstance { id: string; vmId: string; name: string; node: string; }
 interface Backup { volid: string; ctime: number; size: number; notes?: string; vmid?: string; }
@@ -152,7 +153,7 @@ export default function BackupsPage() {
                             </div>
                             <button type="submit" id="btn-create-backup" disabled={submitting || !selectedVm || !selectedStorage}
                                 style={{ padding: "9px 24px", borderRadius: 8, border: "none", background: submitting ? "#064e3b" : "linear-gradient(135deg, #10b981, #059669)", color: "#fff", fontWeight: 700, fontSize: "0.875rem", cursor: submitting ? "not-allowed" : "pointer", whiteSpace: "nowrap" }}>
-                                {submitting ? "Queuing…" : "💾 Start Backup"}
+                                {submitting ? "Queuing…" : "Start Backup"}
                             </button>
                         </form>
                     </div>

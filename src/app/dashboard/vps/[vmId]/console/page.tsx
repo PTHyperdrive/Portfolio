@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback, use } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Script from "next/script";
+import { Keyboard, Maximize2, Monitor, AlertTriangle, Unplug, RotateCcw } from "lucide-react";
 
 type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error";
 
@@ -231,7 +232,7 @@ export default function ConsolePage({ params }: { params: Promise<{ vmId: string
                             transition: "all 0.15s",
                         }}
                     >
-                        ⌨️ Ctrl+Alt+Del
+                        <Keyboard style={{ width: 14, height: 14 }} /> Ctrl+Alt+Del
                     </button>
                     <button
                         onClick={handlePopOut}
@@ -244,7 +245,7 @@ export default function ConsolePage({ params }: { params: Promise<{ vmId: string
                             opacity: isPoppedOut ? 0.5 : 1, transition: "all 0.15s",
                         }}
                     >
-                        ⧉ {isPoppedOut ? "Popped Out" : "Pop Out"}
+                        <Maximize2 style={{ width: 14, height: 14 }} /> {isPoppedOut ? "Popped Out" : "Pop Out"}
                     </button>
                     <button
                         onClick={() => void connect()}
@@ -256,7 +257,7 @@ export default function ConsolePage({ params }: { params: Promise<{ vmId: string
                             opacity: status === "connecting" || isPoppedOut ? 0.5 : 1, transition: "all 0.15s",
                         }}
                     >
-                        ↺ Reconnect
+                        <RotateCcw style={{ width: 14, height: 14 }} /> Reconnect
                     </button>
                 </div>
             </div>
@@ -284,7 +285,7 @@ export default function ConsolePage({ params }: { params: Promise<{ vmId: string
                         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
                         background: "rgba(0,0,0,0.9)", backdropFilter: "blur(6px)", gap: 16,
                     }}>
-                        <div style={{ fontSize: "3rem" }}>⧉</div>
+                        <Maximize2 style={{ width: 48, height: 48, color: "#a78bfa" }} />
                         <p style={{ fontWeight: 700, color: "#a78bfa", fontSize: "1.1rem" }}>
                             Console is in pop-out window
                         </p>
@@ -304,7 +305,7 @@ export default function ConsolePage({ params }: { params: Promise<{ vmId: string
                     }}>
                         {status === "connecting" && (
                             <>
-                                <div style={{ fontSize: "2.5rem" }}>🖥️</div>
+                                <Monitor style={{ width: 40, height: 40, color: "var(--accent-cyan)" }} />
                                 <p style={{ fontWeight: 600, color: "var(--text-primary)", fontSize: "1rem" }}>
                                     {statusMsg}
                                 </p>
@@ -317,7 +318,7 @@ export default function ConsolePage({ params }: { params: Promise<{ vmId: string
                         )}
                         {(status === "disconnected" || status === "error") && (
                             <>
-                                <div style={{ fontSize: "2.5rem" }}>{status === "error" ? "⚠️" : "🔌"}</div>
+                                {status === "error" ? <AlertTriangle style={{ width: 40, height: 40, color: "#f87171" }} /> : <Unplug style={{ width: 40, height: 40, color: "var(--text-muted)" }} />}
                                 <p style={{ fontWeight: 700, color: status === "error" ? "#f87171" : "var(--text-primary)", fontSize: "1rem" }}>
                                     {status === "error" ? "Connection Error" : "Disconnected"}
                                 </p>
@@ -329,7 +330,7 @@ export default function ConsolePage({ params }: { params: Promise<{ vmId: string
                                     className="btn btn-primary"
                                     style={{ marginTop: 8 }}
                                 >
-                                    ↺ Try Again
+                                    <RotateCcw style={{ width: 14, height: 14 }} /> Try Again
                                 </button>
                             </>
                         )}

@@ -1,6 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useThemeTokens } from "@/lib/useThemeTokens";
+import {
+    KeyRound, Plus, X, CheckCircle, AlertCircle,
+    Trash2, Loader2, Star
+} from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────
 
@@ -45,6 +50,7 @@ function formatDate(iso: string) {
 // ── Page ───────────────────────────────────────────────────────────
 
 export default function SshKeysPage() {
+    const t = useThemeTokens();
     const [keys, setKeys] = useState<SshKey[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
@@ -126,16 +132,16 @@ export default function SshKeysPage() {
     };
 
     // ── Styles ─────────────────────────────────────────────────────
-    const bg = "#0d1117";
     const card: React.CSSProperties = {
-        background: "#161b22",
-        border: "1px solid rgba(255,255,255,0.07)",
-        borderRadius: 14,
+        background: t.bgCard,
+        border: `1px solid ${t.borderPrimary}`,
+        borderRadius: t.cardRadius,
+        boxShadow: t.shadow,
     };
     const input: React.CSSProperties = {
-        background: "rgba(255,255,255,0.04)",
-        border: "1px solid rgba(255,255,255,0.09)",
-        borderRadius: 8, color: "#e2e8f0",
+        background: t.bgInput,
+        border: `1px solid ${t.borderPrimary}`,
+        borderRadius: t.isMono ? 4 : 8, color: t.textPrimary,
         fontSize: "0.875rem", outline: "none",
         padding: "9px 13px", width: "100%",
         boxSizing: "border-box" as const,
@@ -144,24 +150,22 @@ export default function SshKeysPage() {
     };
 
     return (
-        <div style={{ padding: "32px 36px", minHeight: "100vh", backgroundColor: bg }}>
+        <div style={{ padding: "32px 36px", minHeight: "100vh", backgroundColor: t.bgPrimary }}>
 
             {/* Header */}
             <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 28 }}>
                 <div>
-                    <p style={{ fontSize: "0.78rem", color: "#475569", marginBottom: 6 }}>Dashboard&nbsp;•&nbsp;Security</p>
+                    <p style={{ fontSize: "0.78rem", color: t.textMuted, marginBottom: 6 }}>Dashboard&nbsp;&bull;&nbsp;Security</p>
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="2">
-                            <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4" />
-                        </svg>
-                        <h1 style={{ fontSize: "1.6rem", fontWeight: 800, color: "#f1f5f9" }}>SSH Keys</h1>
+                        <KeyRound style={{ width: 22, height: 22, color: t.statusWarning }} />
+                        <h1 style={{ fontSize: "1.6rem", fontWeight: 800, color: t.textPrimary }}>SSH Keys</h1>
                         {keys.length > 0 && (
-                            <span style={{ padding: "2px 10px", borderRadius: 20, fontSize: "0.72rem", fontWeight: 700, background: "rgba(245,158,11,0.15)", color: "#f59e0b" }}>
+                            <span style={{ padding: "2px 10px", borderRadius: 20, fontSize: "0.72rem", fontWeight: 700, background: t.statusWarningBg, color: t.statusWarning }}>
                                 {keys.length} / 10
                             </span>
                         )}
                     </div>
-                    <p style={{ marginTop: 6, fontSize: "0.83rem", color: "#475569", maxWidth: 520 }}>
+                    <p style={{ marginTop: 6, fontSize: "0.83rem", color: t.textMuted, maxWidth: 520 }}>
                         Public keys are injected into your VMs via cloud-init at provisioning time.
                         Password authentication is disabled on all VMs by default.
                     </p>
@@ -171,27 +175,24 @@ export default function SshKeysPage() {
                     onClick={() => setShowForm(v => !v)}
                     style={{
                         display: "inline-flex", alignItems: "center", gap: 8,
-                        padding: "10px 20px", borderRadius: 9, border: "none",
+                        padding: "10px 20px", borderRadius: t.buttonRadius, border: "none",
                         background: showForm
-                            ? "rgba(255,255,255,0.06)"
-                            : "linear-gradient(135deg, #f59e0b, #d97706)",
-                        color: "#fff", fontWeight: 700, fontSize: "0.875rem",
-                        cursor: "pointer", boxShadow: showForm ? "none" : "0 2px 12px rgba(245,158,11,0.3)",
+                            ? t.bgTertiary
+                            : t.statusWarning,
+                        color: showForm ? t.textSecondary : t.textInverse,
+                        fontWeight: 700, fontSize: "0.875rem",
+                        cursor: "pointer", boxShadow: showForm ? "none" : `0 2px 12px ${t.statusWarning}4d`,
                         transition: "all 0.15s", marginTop: 6,
                     }}
                 >
                     {showForm ? (
                         <>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                <path d="M18 6 6 18M6 6l12 12" />
-                            </svg>
+                            <X style={{ width: 14, height: 14 }} />
                             Cancel
                         </>
                     ) : (
                         <>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-                            </svg>
+                            <Plus style={{ width: 14, height: 14 }} />
                             Add SSH Key
                         </>
                     )}
@@ -200,28 +201,36 @@ export default function SshKeysPage() {
 
             {/* Toasts */}
             {success && (
-                <div style={{ padding: "12px 16px", borderRadius: 9, background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.2)", color: "#10b981", marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between" }}>
-                    ✅ {success}
-                    <button onClick={() => setSuccess("")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer" }}>✕</button>
+                <div style={{ padding: "12px 16px", borderRadius: t.isMono ? 4 : 9, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}33`, color: t.statusSuccess, marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <CheckCircle style={{ width: 15, height: 15 }} /> {success}
+                    </span>
+                    <button onClick={() => setSuccess("")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", padding: 4 }}>
+                        <X style={{ width: 14, height: 14 }} />
+                    </button>
                 </div>
             )}
             {error && (
-                <div style={{ padding: "12px 16px", borderRadius: 9, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", color: "#ef4444", marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between" }}>
-                    {error}
-                    <button onClick={() => setError("")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer" }}>✕</button>
+                <div style={{ padding: "12px 16px", borderRadius: t.isMono ? 4 : 9, background: t.statusErrorBg, border: `1px solid ${t.statusError}33`, color: t.statusError, marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <AlertCircle style={{ width: 15, height: 15 }} /> {error}
+                    </span>
+                    <button onClick={() => setError("")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", padding: 4 }}>
+                        <X style={{ width: 14, height: 14 }} />
+                    </button>
                 </div>
             )}
 
             {/* Add Key Form */}
             {showForm && (
-                <div style={{ ...card, padding: "24px 28px", marginBottom: 24, borderColor: "rgba(245,158,11,0.2)" }}>
-                    <h2 style={{ fontSize: "1rem", fontWeight: 700, color: "#f1f5f9", marginBottom: 20 }}>
+                <div style={{ ...card, padding: "24px 28px", marginBottom: 24, borderColor: `${t.statusWarning}33` }}>
+                    <h2 style={{ fontSize: "1rem", fontWeight: 700, color: t.textPrimary, marginBottom: 20 }}>
                         Add New SSH Public Key
                     </h2>
                     <form onSubmit={handleAdd} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
                             <div>
-                                <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 600, color: "#94a3b8", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                                <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 600, color: t.textMuted, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                                     Key Name *
                                 </label>
                                 <input
@@ -239,7 +248,7 @@ export default function SshKeysPage() {
                                         onClick={() => setFormDefault(v => !v)}
                                         style={{
                                             width: 40, height: 22, borderRadius: 11,
-                                            background: formDefault ? "#f59e0b" : "rgba(255,255,255,0.08)",
+                                            background: formDefault ? t.statusWarning : `${t.textMuted}22`,
                                             position: "relative", cursor: "pointer", transition: "background 0.2s",
                                             flexShrink: 0,
                                         }}
@@ -251,13 +260,13 @@ export default function SshKeysPage() {
                                             background: "#fff", transition: "left 0.2s",
                                         }} />
                                     </div>
-                                    <span style={{ fontSize: "0.84rem", color: "#94a3b8" }}>Set as default key</span>
+                                    <span style={{ fontSize: "0.84rem", color: t.textSecondary }}>Set as default key</span>
                                 </label>
                             </div>
                         </div>
 
                         <div>
-                            <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 600, color: "#94a3b8", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                            <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 600, color: t.textMuted, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                                 Public Key *
                             </label>
                             <textarea
@@ -267,26 +276,26 @@ export default function SshKeysPage() {
                                 placeholder="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI… your_email@example.com"
                                 required
                                 rows={4}
-                                style={{ ...input, fontFamily: "monospace", fontSize: "0.8rem", resize: "vertical" }}
+                                style={{ ...input, fontFamily: t.fontMono, fontSize: "0.8rem", resize: "vertical" }}
                             />
-                            <p style={{ marginTop: 6, fontSize: "0.72rem", color: "#475569" }}>
+                            <p style={{ marginTop: 6, fontSize: "0.72rem", color: t.textMuted }}>
                                 Supported: Ed25519 (recommended) · RSA · ECDSA · SK-Ed25519 (hardware token)
                             </p>
                         </div>
 
                         {formError && (
-                            <div style={{ padding: "10px 14px", borderRadius: 8, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", color: "#ef4444", fontSize: "0.84rem" }}>
+                            <div style={{ padding: "10px 14px", borderRadius: t.isMono ? 4 : 8, background: t.statusErrorBg, border: `1px solid ${t.statusError}33`, color: t.statusError, fontSize: "0.84rem" }}>
                                 {formError}
                             </div>
                         )}
 
                         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
                             <button type="button" onClick={() => setShowForm(false)}
-                                style={{ padding: "9px 20px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.09)", background: "transparent", color: "#64748b", fontSize: "0.875rem", cursor: "pointer" }}>
+                                style={{ padding: "9px 20px", borderRadius: t.buttonRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.875rem", cursor: "pointer" }}>
                                 Cancel
                             </button>
                             <button type="submit" id="btn-ssh-key-submit" disabled={submitting}
-                                style={{ padding: "9px 24px", borderRadius: 8, border: "none", background: submitting ? "#78350f" : "linear-gradient(135deg, #f59e0b, #d97706)", color: "#fff", fontWeight: 700, fontSize: "0.875rem", cursor: submitting ? "not-allowed" : "pointer" }}>
+                                style={{ padding: "9px 24px", borderRadius: t.buttonRadius, border: "none", background: submitting ? `${t.statusWarning}80` : t.statusWarning, color: t.textInverse, fontWeight: 700, fontSize: "0.875rem", cursor: submitting ? "not-allowed" : "pointer" }}>
                                 {submitting ? "Adding…" : "Add Key"}
                             </button>
                         </div>
@@ -297,34 +306,30 @@ export default function SshKeysPage() {
             {/* Key List */}
             <div style={card}>
                 {loading ? (
-                    <div style={{ padding: "40px", display: "flex", alignItems: "center", justifyContent: "center", gap: 12, color: "#475569", fontSize: "0.875rem" }}>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: "spin 1s linear infinite" }}>
-                            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" />
-                        </svg>
+                    <div style={{ padding: "40px", display: "flex", alignItems: "center", justifyContent: "center", gap: 12, color: t.textMuted, fontSize: "0.875rem" }}>
+                        <Loader2 style={{ width: 16, height: 16, animation: "spin 1s linear infinite" }} />
                         Loading keys…
                     </div>
                 ) : keys.length === 0 ? (
                     <div style={{ padding: "60px 40px", display: "flex", flexDirection: "column", alignItems: "center", gap: 16, textAlign: "center" }}>
-                        <div style={{ width: 80, height: 80, borderRadius: 20, background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" strokeWidth="1.5">
-                                <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4" />
-                            </svg>
+                        <div style={{ width: 80, height: 80, borderRadius: t.isMono ? 16 : 20, background: t.statusWarningBg, border: `1px solid ${t.statusWarning}33`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <KeyRound style={{ width: 36, height: 36, color: t.statusWarning }} />
                         </div>
-                        <h2 style={{ fontSize: "1.1rem", fontWeight: 700, color: "#f1f5f9" }}>No SSH keys yet</h2>
-                        <p style={{ color: "#475569", fontSize: "0.875rem", maxWidth: 360, lineHeight: 1.6 }}>
+                        <h2 style={{ fontSize: "1.1rem", fontWeight: 700, color: t.textPrimary }}>No SSH keys yet</h2>
+                        <p style={{ color: t.textMuted, fontSize: "0.875rem", maxWidth: 360, lineHeight: 1.6 }}>
                             Add your first public key to enable secure, passwordless access to your VMs.
                         </p>
                         <button onClick={() => setShowForm(true)}
-                            style={{ padding: "10px 24px", borderRadius: 9, border: "none", background: "linear-gradient(135deg, #f59e0b, #d97706)", color: "#fff", fontWeight: 700, fontSize: "0.875rem", cursor: "pointer" }}>
+                            style={{ padding: "10px 24px", borderRadius: t.buttonRadius, border: "none", background: t.statusWarning, color: t.textInverse, fontWeight: 700, fontSize: "0.875rem", cursor: "pointer" }}>
                             Add SSH Key
                         </button>
                     </div>
                 ) : (
                     <>
                         {/* Table header */}
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 160px 120px 120px auto", gap: 0, padding: "10px 24px", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "rgba(255,255,255,0.015)" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 160px 120px 120px auto", gap: 0, padding: "10px 24px", borderBottom: `1px solid ${t.borderSecondary}`, background: t.bgSecondary }}>
                             {["Name / Fingerprint", "Type", "Added", "Status", "Actions"].map(h => (
-                                <span key={h} style={{ fontSize: "0.7rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.07em" }}>{h}</span>
+                                <span key={h} style={{ fontSize: "0.7rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.07em" }}>{h}</span>
                             ))}
                         </div>
 
@@ -335,54 +340,53 @@ export default function SshKeysPage() {
                                     gridTemplateColumns: "1fr 160px 120px 120px auto",
                                     alignItems: "center",
                                     padding: "16px 24px",
-                                    borderBottom: idx < keys.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
+                                    borderBottom: idx < keys.length - 1 ? `1px solid ${t.borderSecondary}` : "none",
                                     transition: "background 0.12s",
                                 }}
-                                onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = "rgba(255,255,255,0.018)"}
+                                onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = t.bgCardHover}
                                 onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = "transparent"}
                             >
                                 {/* Name + fingerprint */}
                                 <div>
                                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                        <span style={{ fontWeight: 700, color: "#e2e8f0", fontSize: "0.9rem" }}>{key.name}</span>
+                                        <span style={{ fontWeight: 700, color: t.textPrimary, fontSize: "0.9rem" }}>{key.name}</span>
                                         {key.isDefault && (
-                                            <span style={{ padding: "1px 8px", borderRadius: 10, fontSize: "0.65rem", fontWeight: 700, background: "rgba(245,158,11,0.15)", color: "#f59e0b" }}>
+                                            <span style={{ padding: "1px 8px", borderRadius: 10, fontSize: "0.65rem", fontWeight: 700, background: t.statusWarningBg, color: t.statusWarning }}>
                                                 DEFAULT
                                             </span>
                                         )}
                                     </div>
-                                    <span style={{ fontFamily: "monospace", fontSize: "0.72rem", color: "#475569", marginTop: 3, display: "block" }}>
+                                    <span style={{ fontFamily: t.fontMono, fontSize: "0.72rem", color: t.textMuted, marginTop: 3, display: "block" }}>
                                         {keyFingerprint(key.publicKey)}
                                     </span>
                                 </div>
 
                                 {/* Type badge */}
-                                <span style={{ padding: "3px 10px", borderRadius: 6, background: "rgba(99,102,241,0.12)", color: "#818cf8", fontSize: "0.75rem", fontWeight: 600, width: "fit-content" }}>
+                                <span style={{ padding: "3px 10px", borderRadius: 6, background: t.accentPrimaryMuted, color: t.accentPrimary, fontSize: "0.75rem", fontWeight: 600, width: "fit-content" }}>
                                     {keyType(key.publicKey)}
                                 </span>
 
                                 {/* Date */}
-                                <span style={{ fontSize: "0.8rem", color: "#475569" }}>{formatDate(key.createdAt)}</span>
+                                <span style={{ fontSize: "0.8rem", color: t.textMuted }}>{formatDate(key.createdAt)}</span>
 
                                 {/* Status */}
                                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                                    <svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" fill="#10b981" /></svg>
-                                    <span style={{ fontSize: "0.78rem", color: "#10b981", fontWeight: 600 }}>Active</span>
+                                    <div style={{ width: 8, height: 8, borderRadius: "50%", background: t.statusSuccess }} />
+                                    <span style={{ fontSize: "0.78rem", color: t.statusSuccess, fontWeight: 600 }}>Active</span>
                                 </div>
 
                                 {/* Actions */}
                                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                                     {!key.isDefault && (
                                         <button title="Set as default" onClick={() => handleSetDefault(key)}
-                                            style={{ padding: "5px 10px", borderRadius: 6, border: "1px solid rgba(245,158,11,0.2)", background: "rgba(245,158,11,0.06)", color: "#f59e0b", fontSize: "0.75rem", fontWeight: 600, cursor: "pointer" }}>
+                                            style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "5px 10px", borderRadius: t.buttonRadius, border: `1px solid ${t.statusWarning}33`, background: t.statusWarningBg, color: t.statusWarning, fontSize: "0.75rem", fontWeight: 600, cursor: "pointer" }}>
+                                            <Star style={{ width: 11, height: 11 }} />
                                             Set default
                                         </button>
                                     )}
                                     <button title="Delete key" onClick={() => setDeleteTarget(key)}
-                                        style={{ width: 32, height: 32, borderRadius: 7, border: "1px solid rgba(239,68,68,0.2)", background: "rgba(239,68,68,0.06)", color: "#ef4444", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                            <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
-                                        </svg>
+                                        style={{ width: 32, height: 32, borderRadius: t.buttonRadius, border: `1px solid ${t.statusError}33`, background: t.statusErrorBg, color: t.statusError, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                        <Trash2 style={{ width: 13, height: 13 }} />
                                     </button>
                                 </div>
                             </div>
@@ -394,19 +398,19 @@ export default function SshKeysPage() {
             {/* Delete Confirmation Modal */}
             {deleteTarget && (
                 <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
-                    <div style={{ ...card, padding: "28px 32px", width: 420, borderColor: "rgba(239,68,68,0.2)" }}>
-                        <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: "#f1f5f9", marginBottom: 10 }}>Remove SSH Key</h3>
-                        <p style={{ fontSize: "0.875rem", color: "#94a3b8", lineHeight: 1.6 }}>
-                            Remove <strong style={{ color: "#f1f5f9" }}>"{deleteTarget.name}"</strong>?
+                    <div style={{ ...card, padding: "28px 32px", width: 420, borderColor: `${t.statusError}33` }}>
+                        <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: t.textPrimary, marginBottom: 10 }}>Remove SSH Key</h3>
+                        <p style={{ fontSize: "0.875rem", color: t.textSecondary, lineHeight: 1.6 }}>
+                            Remove <strong style={{ color: t.textPrimary }}>&quot;{deleteTarget.name}&quot;</strong>?
                             VMs already using this key will not be affected, but future VMs will not receive it.
                         </p>
                         <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
                             <button onClick={() => setDeleteTarget(null)}
-                                style={{ padding: "9px 20px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.09)", background: "transparent", color: "#64748b", fontSize: "0.875rem", cursor: "pointer" }}>
+                                style={{ padding: "9px 20px", borderRadius: t.buttonRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.875rem", cursor: "pointer" }}>
                                 Cancel
                             </button>
                             <button id="btn-confirm-delete-ssh" onClick={handleDelete} disabled={deleting}
-                                style={{ padding: "9px 20px", borderRadius: 8, border: "none", background: "#ef4444", color: "#fff", fontWeight: 700, fontSize: "0.875rem", cursor: deleting ? "not-allowed" : "pointer" }}>
+                                style={{ padding: "9px 20px", borderRadius: t.buttonRadius, border: "none", background: t.statusError, color: "#fff", fontWeight: 700, fontSize: "0.875rem", cursor: deleting ? "not-allowed" : "pointer" }}>
                                 {deleting ? "Removing…" : "Remove Key"}
                             </button>
                         </div>

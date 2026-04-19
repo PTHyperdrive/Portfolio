@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, Fragment } from "react";
+import { useThemeTokens } from "@/lib/useThemeTokens";
+import { Clock, Search, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface LogEntry {
     id: string;
@@ -14,51 +16,21 @@ interface LogEntry {
     user: { email: string; name: string | null };
 }
 
-const statusColor = (s: string) =>
-    s === "SUCCESS"
-        ? { bg: "rgba(16,185,129,0.15)", color: "#10b981", dot: "#10b981" }
-        : s === "DENIED"
-            ? { bg: "rgba(251,191,36,0.15)", color: "#fbbf24", dot: "#fbbf24" }
-            : { bg: "rgba(239,68,68,0.15)", color: "#ef4444", dot: "#ef4444" };
-
-const resourceColor = (s: string): string => {
-    const map: Record<string, string> = {
-        VirtualMachine: "#3b82f6", UserAccount: "#8b5cf6", Billing: "#f59e0b",
-        Network: "#06b6d4",
-    };
-    return map[s] ?? "#64748b";
-};
-
 function fmtDate(s: string) {
-    return new Date(s).toLocaleString("en-US", {
-        day: "2-digit", month: "2-digit", year: "numeric",
-        hour: "2-digit", minute: "2-digit",
-    });
+    return new Date(s).toLocaleString("en-US", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
-/** IP shown blurred by default, revealed on hover */
-function BlurredIP({ ip }: { ip: string | null }) {
-    if (!ip) return <span style={{ color: "#475569" }}>—</span>;
+function BlurredIP({ ip, color }: { ip: string | null; color: string }) {
+    if (!ip) return <span style={{ color }}>—</span>;
     return (
-        <span
-            className="blurred-ip"
-            title="Hover to reveal IP"
-            style={{
-                fontFamily: "monospace",
-                fontSize: "0.875rem",
-                color: "#e2e8f0",
-                filter: "blur(4px)",
-                transition: "filter 0.2s ease",
-                cursor: "pointer",
-                userSelect: "none",
-            }}
-        >
+        <span className="blurred-ip" title="Hover to reveal IP" style={{ fontFamily: "monospace", fontSize: "0.875rem", color, filter: "blur(4px)", transition: "filter 0.2s ease", cursor: "pointer", userSelect: "none" }}>
             {ip}
         </span>
     );
 }
 
 export default function AuditLogPage() {
+    const t = useThemeTokens();
     const [logs, setLogs] = useState<LogEntry[]>([]);
     const [total, setTotal] = useState(0);
     const [page, setPage] = useState(1);
@@ -68,6 +40,20 @@ export default function AuditLogPage() {
     const [search, setSearch] = useState("");
 
     const PAGE_SIZE = 10;
+
+    const statusColor = (s: string) =>
+        s === "SUCCESS"
+            ? { bg: `${t.statusSuccess}22`, color: t.statusSuccess, dot: t.statusSuccess }
+            : s === "DENIED"
+                ? { bg: `${t.statusWarning}22`, color: t.statusWarning, dot: t.statusWarning }
+                : { bg: `${t.statusError}22`, color: t.statusError, dot: t.statusError };
+
+    const resourceColor = (s: string): string => {
+        const map: Record<string, string> = {
+            VirtualMachine: t.accentPrimary, UserAccount: t.accentSecondary, Billing: t.statusWarning, Network: t.statusSuccess,
+        };
+        return map[s] ?? t.textMuted;
+    };
 
     const load = useCallback(async (p: number) => {
         setLoading(true);
@@ -80,9 +66,7 @@ export default function AuditLogPage() {
             setPage(p);
         } catch (e) {
             setError(e instanceof Error ? e.message : "Failed to load");
-        } finally {
-            setLoading(false);
-        }
+        } finally { setLoading(false); }
     }, []);
 
     useEffect(() => { load(1); }, [load]);
@@ -95,165 +79,114 @@ export default function AuditLogPage() {
 
     const totalPages = Math.ceil(total / PAGE_SIZE);
 
-    const col = {
-        border: "1px solid rgba(255,255,255,0.07)",
-        borderRadius: 16,
-        backgroundColor: "#161b22",
-        overflow: "hidden" as const,
-    };
+    const card: React.CSSProperties = { background: t.bgCard, border: `1px solid ${t.borderPrimary}`, borderRadius: t.cardRadius, boxShadow: t.shadow, overflow: "hidden" };
 
     return (
-        <div style={{ padding: "32px 36px", minHeight: "100vh", backgroundColor: "#0d1117" }}>
-            {/* Global style for IP blur hover */}
-            <style>{`
-                .blurred-ip:hover { filter: blur(0px) !important; user-select: text !important; }
-            `}</style>
+        <div style={{ padding: "32px 36px", minHeight: "100vh", backgroundColor: t.bgPrimary }}>
+            <style>{`.blurred-ip:hover { filter: blur(0px) !important; user-select: text !important; }`}</style>
 
             {/* Header */}
             <div style={{ marginBottom: 28 }}>
-                <p style={{ fontSize: "0.78rem", color: "#475569", marginBottom: 6 }}>
-                    Dashboard &nbsp;•&nbsp; Audit Log
+                <p style={{ fontSize: "0.78rem", color: t.textMuted, marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                    Dashboard <span>&bull;</span>
+                    <span style={{ color: t.accentPrimary, fontWeight: 600, padding: "2px 10px", borderRadius: 6, background: t.accentPrimaryMuted }}>Audit Log</span>
                 </p>
-                <h1 style={{ fontSize: "1.6rem", fontWeight: 800, color: "#f1f5f9" }}>Audit Log</h1>
+                <h1 style={{ fontSize: "1.6rem", fontWeight: 800, color: t.textPrimary }}>Audit Log</h1>
             </div>
 
             {/* Card */}
-            <div style={col}>
+            <div style={card}>
                 {/* Card header */}
-                <div style={{ padding: "20px 24px", borderBottom: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "center", gap: 14 }}>
-                    <div style={{ width: 40, height: 40, borderRadius: 10, background: "rgba(59,130,246,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" /></svg>
+                <div style={{ padding: "20px 24px", borderBottom: `1px solid ${t.borderSecondary}`, display: "flex", alignItems: "center", gap: 14 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: 10, background: t.accentPrimaryMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <Clock style={{ width: 20, height: 20, color: t.accentPrimary }} />
                     </div>
                     <div>
-                        <p style={{ fontWeight: 700, color: "#f1f5f9", fontSize: "0.95rem" }}>Audit Log</p>
-                        <p style={{ color: "#64748b", fontSize: "0.8rem" }}>Immutable record of all actions performed on your account (ISO 27001)</p>
+                        <p style={{ fontWeight: 700, color: t.textPrimary, fontSize: "0.95rem" }}>Audit Log</p>
+                        <p style={{ color: t.textMuted, fontSize: "0.8rem" }}>Immutable record of all actions performed on your account (ISO 27001)</p>
                     </div>
                 </div>
 
                 {/* Search */}
-                <div style={{ padding: "16px 24px", display: "flex", gap: 12, borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                    <div style={{ position: "relative" as const, flex: 1 }}>
-                        <svg style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", pointerEvents: "none" as const }} width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
-                        <input
-                            value={search}
-                            onChange={e => setSearch(e.target.value)}
-                            placeholder="Search activities..."
-                            style={{ width: "100%", paddingLeft: 36, padding: "9px 12px 9px 36px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 8, color: "#e2e8f0", fontSize: "0.875rem", outline: "none", boxSizing: "border-box" as const }}
-                        />
+                <div style={{ padding: "16px 24px", display: "flex", gap: 12, borderBottom: `1px solid ${t.borderSecondary}` }}>
+                    <div style={{ position: "relative", flex: 1 }}>
+                        <Search style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 15, height: 15, color: t.textMuted, pointerEvents: "none" }} />
+                        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search activities..." style={{ width: "100%", paddingLeft: 36, padding: "9px 12px 9px 36px", background: t.bgInput, border: `1px solid ${t.borderPrimary}`, borderRadius: t.isMono ? 4 : 8, color: t.textPrimary, fontSize: "0.875rem", outline: "none", boxSizing: "border-box" }} />
                     </div>
                 </div>
 
-                {error && (
-                    <div style={{ margin: 20, padding: "12px 16px", background: "rgba(239,68,68,0.1)", borderRadius: 8, color: "#ef4444", fontSize: "0.85rem" }}>
-                        {error}
-                    </div>
-                )}
+                {error && <div style={{ margin: 20, padding: "12px 16px", background: t.statusErrorBg, borderRadius: t.isMono ? 4 : 8, color: t.statusError, fontSize: "0.85rem" }}>{error}</div>}
 
                 {/* Table */}
                 {loading ? (
-                    <div style={{ padding: 60, textAlign: "center" as const, color: "#475569" }}>Loading audit log…</div>
+                    <div style={{ padding: 60, textAlign: "center", color: t.textMuted }}>Loading audit log...</div>
                 ) : (
-                    <table style={{ width: "100%", borderCollapse: "collapse" as const }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
                         <thead>
-                            <tr style={{ background: "rgba(255,255,255,0.02)" }}>
+                            <tr style={{ background: t.bgSecondary }}>
                                 {["Action", "Resource", "User", "Created At", "Outcome", ""].map(h => (
-                                    <th key={h} style={{ padding: "12px 20px", textAlign: "left" as const, fontSize: "0.75rem", fontWeight: 700, color: "#475569", textTransform: "uppercase" as const, letterSpacing: "0.06em", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                                        {h}
-                                    </th>
+                                    <th key={h} style={{ padding: "12px 20px", textAlign: "left", fontSize: "0.75rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${t.borderSecondary}` }}>{h}</th>
                                 ))}
                             </tr>
                         </thead>
                         <tbody>
                             {filtered.length === 0 ? (
-                                <tr>
-                                    <td colSpan={6} style={{ padding: "48px 20px", textAlign: "center" as const, color: "#475569", fontSize: "0.9rem" }}>
-                                        No activity recorded yet.
-                                    </td>
-                                </tr>
+                                <tr><td colSpan={6} style={{ padding: "48px 20px", textAlign: "center", color: t.textMuted, fontSize: "0.9rem" }}>No activity recorded yet.</td></tr>
                             ) : filtered.map(log => {
                                 const sc = statusColor(log.outcome);
                                 const svc = resourceColor(log.resourceType);
                                 const isOpen = expanded === log.id;
                                 return (
                                     <Fragment key={log.id}>
-                                        <tr
-                                            key={log.id}
-                                            onClick={() => setExpanded(isOpen ? null : log.id)}
-                                            style={{ borderBottom: "1px solid rgba(255,255,255,0.04)", cursor: "pointer", transition: "background 0.1s", background: isOpen ? "rgba(59,130,246,0.04)" : "transparent" }}
-                                            onMouseEnter={e => { if (!isOpen) (e.currentTarget as HTMLTableRowElement).style.background = "rgba(255,255,255,0.02)"; }}
-                                            onMouseLeave={e => { if (!isOpen) (e.currentTarget as HTMLTableRowElement).style.background = "transparent"; }}
-                                        >
-                                            {/* Activity */}
+                                        <tr onClick={() => setExpanded(isOpen ? null : log.id)} style={{ borderBottom: `1px solid ${t.borderSecondary}`, cursor: "pointer", transition: "background 0.1s", background: isOpen ? t.accentPrimaryMuted : "transparent" }}
+                                            onMouseEnter={e => { if (!isOpen) e.currentTarget.style.background = t.bgCardHover; }}
+                                            onMouseLeave={e => { if (!isOpen) e.currentTarget.style.background = "transparent"; }}>
                                             <td style={{ padding: "14px 20px" }}>
                                                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                                                     <div style={{ width: 36, height: 36, borderRadius: 8, background: `${svc}22`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                                                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={svc} strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" /></svg>
                                                     </div>
                                                     <div>
-                                                        <p style={{ fontWeight: 700, color: "#e2e8f0", fontSize: "0.9rem" }}>{log.action.replace(/_/g, " ")}</p>
-                                                        <p style={{ color: "#475569", fontSize: "0.75rem", fontFamily: "monospace" }}>{log.id.substring(0, 26)}…</p>
+                                                        <p style={{ fontWeight: 700, color: t.textPrimary, fontSize: "0.9rem" }}>{log.action.replace(/_/g, " ")}</p>
+                                                        <p style={{ color: t.textMuted, fontSize: "0.75rem", fontFamily: t.fontMono }}>{log.id.substring(0, 26)}...</p>
                                                     </div>
                                                 </div>
                                             </td>
+                                            <td style={{ padding: "14px 20px" }}><p style={{ fontWeight: 700, color: svc, fontSize: "0.875rem" }}>{log.resourceType}</p></td>
                                             <td style={{ padding: "14px 20px" }}>
-                                                <p style={{ fontWeight: 700, color: svc, fontSize: "0.875rem" }}>{log.resourceType}</p>
+                                                <p style={{ color: t.textPrimary, fontSize: "0.875rem" }}>{log.user.email}</p>
+                                                <BlurredIP ip={log.ipAddress} color={t.textMuted} />
                                             </td>
-                                            {/* User */}
-                                            <td style={{ padding: "14px 20px" }}>
-                                                <p style={{ color: "#e2e8f0", fontSize: "0.875rem" }}>{log.user.email}</p>
-                                                {/* IP shown blurred under email */}
-                                                <BlurredIP ip={log.ipAddress} />
-                                            </td>
-                                            {/* Date */}
-                                            <td style={{ padding: "14px 20px", color: "#94a3b8", fontSize: "0.875rem" }}>
-                                                {fmtDate(log.createdAt)}
-                                            </td>
-                                            {/* Status */}
+                                            <td style={{ padding: "14px 20px", color: t.textSecondary, fontSize: "0.875rem" }}>{fmtDate(log.createdAt)}</td>
                                             <td style={{ padding: "14px 20px" }}>
                                                 <span style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "4px 10px", borderRadius: 20, background: sc.bg, color: sc.color, fontSize: "0.78rem", fontWeight: 700 }}>
-                                                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: sc.dot }} />
-                                                    {log.outcome}
+                                                    <span style={{ width: 6, height: 6, borderRadius: "50%", background: sc.dot }} /> {log.outcome}
                                                 </span>
                                             </td>
-                                            {/* Expand */}
-                                            <td style={{ padding: "14px 16px", color: "#475569" }}>
-                                                <svg style={{ transform: isOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }} width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="m6 9 6 6 6-6" /></svg>
+                                            <td style={{ padding: "14px 16px", color: t.textMuted }}>
+                                                <ChevronDown style={{ width: 16, height: 16, transform: isOpen ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }} />
                                             </td>
                                         </tr>
 
-                                        {/* Expanded Detail Row */}
                                         {isOpen && (
-                                            <tr key={`${log.id}-detail`}>
-                                                <td colSpan={6} style={{ padding: "0 20px 16px", background: "rgba(59,130,246,0.03)" }}>
-                                                    <div style={{ padding: 20, background: "rgba(255,255,255,0.03)", borderRadius: 12, border: "1px solid rgba(255,255,255,0.06)" }}>
-                                                        <p style={{ fontSize: "0.8rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Activity Details</p>
-
-                                                        {/* ── Network info grid ── */}
+                                            <tr>
+                                                <td colSpan={6} style={{ padding: "0 20px 16px", background: t.accentPrimaryMuted }}>
+                                                    <div style={{ padding: 20, background: t.bgSecondary, borderRadius: t.isMono ? 6 : 12, border: `1px solid ${t.borderSecondary}` }}>
+                                                        <p style={{ fontSize: "0.8rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Activity Details</p>
                                                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
                                                             <div>
-                                                                <span style={{ display: "block", fontSize: "0.7rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
-                                                                    IP Address
-                                                                </span>
-                                                                {log.ipAddress
-                                                                    ? <BlurredIP ip={log.ipAddress} />
-                                                                    : <span style={{ fontFamily: "monospace", fontSize: "0.85rem", color: "#475569" }}>N/A</span>
-                                                                }
+                                                                <span style={{ display: "block", fontSize: "0.7rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>IP Address</span>
+                                                                {log.ipAddress ? <BlurredIP ip={log.ipAddress} color={t.textPrimary} /> : <span style={{ fontFamily: t.fontMono, fontSize: "0.85rem", color: t.textMuted }}>N/A</span>}
                                                             </div>
                                                             <div>
-                                                                <span style={{ display: "block", fontSize: "0.7rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>
-                                                                    User Agent
-                                                                </span>
-                                                                <span style={{ fontSize: "0.8rem", color: "#94a3b8", wordBreak: "break-all", lineHeight: 1.5 }}>
-                                                                    {log.userAgent || "N/A"}
-                                                                </span>
+                                                                <span style={{ display: "block", fontSize: "0.7rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>User Agent</span>
+                                                                <span style={{ fontSize: "0.8rem", color: t.textSecondary, wordBreak: "break-all", lineHeight: 1.5 }}>{log.userAgent || "N/A"}</span>
                                                             </div>
                                                         </div>
-
-                                                        {/* ── Details JSON ── */}
                                                         {log.metadata && (
                                                             <div>
-                                                                <p style={{ fontSize: "0.72rem", color: "#475569", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700 }}>Metadata</p>
-                                                                <pre style={{ padding: 14, background: "rgba(0,0,0,0.3)", borderRadius: 8, fontSize: "0.78rem", color: "#94a3b8", overflowX: "auto", fontFamily: "monospace" }}>
+                                                                <p style={{ fontSize: "0.72rem", color: t.textMuted, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700 }}>Metadata</p>
+                                                                <pre style={{ padding: 14, background: t.bgTertiary, borderRadius: t.isMono ? 4 : 8, fontSize: "0.78rem", color: t.textSecondary, overflowX: "auto", fontFamily: t.fontMono }}>
                                                                     {JSON.stringify(log.metadata, null, 2)}
                                                                 </pre>
                                                             </div>
@@ -262,7 +195,6 @@ export default function AuditLogPage() {
                                                 </td>
                                             </tr>
                                         )}
-
                                     </Fragment>
                                 );
                             })}
@@ -272,18 +204,16 @@ export default function AuditLogPage() {
 
                 {/* Pagination */}
                 {totalPages > 1 && (
-                    <div style={{ padding: "14px 24px", borderTop: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                        <p style={{ fontSize: "0.8rem", color: "#475569" }}>
+                    <div style={{ padding: "14px 24px", borderTop: `1px solid ${t.borderSecondary}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                        <p style={{ fontSize: "0.8rem", color: t.textMuted }}>
                             {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total}
                         </p>
                         <div style={{ display: "flex", gap: 8 }}>
-                            <button disabled={page <= 1} onClick={() => load(page - 1)}
-                                style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: page <= 1 ? "#475569" : "#e2e8f0", cursor: page <= 1 ? "not-allowed" : "pointer", fontSize: "0.85rem" }}>
-                                ←
+                            <button disabled={page <= 1} onClick={() => load(page - 1)} style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "6px 12px", borderRadius: t.isMono ? 4 : 8, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: page <= 1 ? t.textMuted : t.textPrimary, cursor: page <= 1 ? "not-allowed" : "pointer", fontSize: "0.85rem" }}>
+                                <ChevronLeft style={{ width: 16, height: 16 }} />
                             </button>
-                            <button disabled={page >= totalPages} onClick={() => load(page + 1)}
-                                style={{ padding: "6px 14px", borderRadius: 8, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: page >= totalPages ? "#475569" : "#e2e8f0", cursor: page >= totalPages ? "not-allowed" : "pointer", fontSize: "0.85rem" }}>
-                                →
+                            <button disabled={page >= totalPages} onClick={() => load(page + 1)} style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "6px 12px", borderRadius: t.isMono ? 4 : 8, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: page >= totalPages ? t.textMuted : t.textPrimary, cursor: page >= totalPages ? "not-allowed" : "pointer", fontSize: "0.85rem" }}>
+                                <ChevronRight style={{ width: 16, height: 16 }} />
                             </button>
                         </div>
                     </div>

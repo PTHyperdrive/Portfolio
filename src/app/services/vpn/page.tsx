@@ -10,7 +10,7 @@ const PROTOCOLS = [
     {
         name: "WireGuard",
         description: "Modern, ultra-fast protocol with state-of-the-art cryptography. Minimal attack surface with ~4,000 lines of code.",
-        icon: "⚡",
+        icon: "WG",
         color: "var(--accent-cyan)",
         speed: "Fastest",
         security: "ChaCha20-Poly1305",
@@ -20,7 +20,7 @@ const PROTOCOLS = [
     {
         name: "OpenVPN",
         description: "Battle-tested protocol trusted worldwide. Highly configurable with support for various encryption ciphers.",
-        icon: "🔐",
+        icon: "OV",
         color: "var(--accent-green)",
         speed: "Fast",
         security: "AES-256-GCM",
@@ -30,7 +30,7 @@ const PROTOCOLS = [
     {
         name: "IKEv2/IPSec",
         description: "Enterprise-grade protocol with seamless reconnection. Ideal for mobile devices that switch between Wi-Fi and cellular.",
-        icon: "📱",
+        icon: "IK",
         color: "var(--accent-purple)",
         speed: "Fast",
         security: "AES-256",
@@ -40,14 +40,14 @@ const PROTOCOLS = [
 ];
 
 const LOCATIONS = [
-    { country: "🇺🇸 United States", cities: ["New York", "Los Angeles", "Chicago", "Miami"], ping: "< 20ms" },
-    { country: "🇬🇧 United Kingdom", cities: ["London", "Manchester"], ping: "< 30ms" },
-    { country: "🇩🇪 Germany", cities: ["Frankfurt", "Berlin"], ping: "< 25ms" },
-    { country: "🇯🇵 Japan", cities: ["Tokyo", "Osaka"], ping: "< 40ms" },
-    { country: "🇸🇬 Singapore", cities: ["Singapore"], ping: "< 35ms" },
-    { country: "🇳🇱 Netherlands", cities: ["Amsterdam"], ping: "< 25ms" },
-    { country: "🇦🇺 Australia", cities: ["Sydney", "Melbourne"], ping: "< 50ms" },
-    { country: "🇨🇦 Canada", cities: ["Toronto", "Vancouver"], ping: "< 30ms" },
+    { country: "US — United States", cities: ["New York", "Los Angeles", "Chicago", "Miami"], ping: "< 20ms" },
+    { country: "GB — United Kingdom", cities: ["London", "Manchester"], ping: "< 30ms" },
+    { country: "DE — Germany", cities: ["Frankfurt", "Berlin"], ping: "< 25ms" },
+    { country: "JP — Japan", cities: ["Tokyo", "Osaka"], ping: "< 40ms" },
+    { country: "SG — Singapore", cities: ["Singapore"], ping: "< 35ms" },
+    { country: "NL — Netherlands", cities: ["Amsterdam"], ping: "< 25ms" },
+    { country: "AU — Australia", cities: ["Sydney", "Melbourne"], ping: "< 50ms" },
+    { country: "CA — Canada", cities: ["Toronto", "Vancouver"], ping: "< 30ms" },
 ];
 
 const PLANS = [
@@ -85,7 +85,7 @@ export default function VPNPage() {
                 <div className="container">
                     <div className="glass-card" style={{ padding: "36px", marginBottom: "60px" }}>
                         <h3 style={{ fontSize: "1.2rem", fontWeight: 700, marginBottom: "20px", display: "flex", alignItems: "center", gap: "10px" }}>
-                            <span style={{ color: "var(--accent-green)" }}>⚙</span> Config Generator Preview
+                            <span style={{ color: "var(--accent-green)", fontFamily: "monospace", fontWeight: 700 }}>CFG</span> Config Generator Preview
                         </h3>
                         <div
                             className="mono"
@@ -131,7 +131,7 @@ export default function VPNPage() {
                                         RECOMMENDED
                                     </span>
                                 )}
-                                <div style={{ fontSize: "2rem", marginBottom: "12px" }}>{p.icon}</div>
+                                <div style={{ fontSize: "0.78rem", fontWeight: 800, letterSpacing: "0.1em", color: p.color, marginBottom: "12px", fontFamily: "monospace" }}>{p.icon}</div>
                                 <h3 style={{ fontSize: "1.3rem", fontWeight: 700, marginBottom: "8px" }}>{p.name}</h3>
                                 <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem", lineHeight: 1.6, marginBottom: "20px" }}>
                                     {p.description}

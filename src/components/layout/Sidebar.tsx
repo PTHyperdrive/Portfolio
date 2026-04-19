@@ -277,9 +277,10 @@ export default function Sidebar() {
                                 backgroundColor: isActive("/dashboard/admin")
                                     ? t.statusWarningBg
                                     : "transparent",
-                                border: t.isMono ? "none" : `1px solid ${t.statusWarningBg}`,
+                                borderTop: t.isMono ? "none" : `1px solid ${t.statusWarningBg}`,
+                                borderRight: t.isMono ? "none" : `1px solid ${t.statusWarningBg}`,
+                                borderBottom: t.isMono ? "none" : `1px solid ${t.statusWarningBg}`,
                                 borderLeft: t.isMono && isActive("/dashboard/admin") ? `3px solid ${t.statusWarning}` : "3px solid transparent",
-                                marginBottom: 0,
                             }}
                             onMouseEnter={() => setHoveredItem("Admin Panel")}
                             onMouseLeave={() => setHoveredItem(null)}

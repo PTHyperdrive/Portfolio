@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useThemeTokens } from "@/lib/useThemeTokens";
+import { Monitor, CreditCard, Rocket, FileText } from "lucide-react";
 
 interface Transaction {
     id: string;
@@ -23,6 +25,7 @@ interface BillingData {
 }
 
 export default function BillingPage() {
+    const t = useThemeTokens();
     const [data, setData] = useState<BillingData | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
@@ -58,51 +61,66 @@ export default function BillingPage() {
     })();
 
     const statusColor = (status: string) =>
-        status === "paid" ? "var(--accent-green)" : status === "pending" ? "#FBBF24" : "var(--accent-magenta)";
+        status === "paid" ? t.statusSuccess : status === "pending" ? t.statusWarning : t.statusError;
+
+    const card: React.CSSProperties = {
+        background: t.bgCard,
+        border: `1px solid ${t.borderPrimary}`,
+        borderRadius: t.cardRadius,
+        boxShadow: t.shadow,
+    };
 
     if (loading) {
         return (
-            <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <p style={{ color: "var(--text-muted)" }}>Loading billing data...</p>
+            <div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: t.bgPrimary }}>
+                <p style={{ color: t.textMuted }}>Loading billing data...</p>
             </div>
         );
     }
 
     return (
-        <div style={{ paddingTop: "120px", paddingBottom: "80px", minHeight: "100vh" }}>
-            <div className="container" style={{ maxWidth: "900px" }}>
+        <div style={{ padding: "32px 36px", minHeight: "100vh", backgroundColor: t.bgPrimary }}>
+
+            {/* Breadcrumb */}
+            <p style={{ fontSize: "0.78rem", color: t.textMuted, marginBottom: 24 }}>
+                Dashboard &nbsp;&bull;&nbsp; Billing
+            </p>
+
+            <div style={{ maxWidth: 900 }}>
                 {/* Header */}
                 <div style={{ marginBottom: "40px" }}>
-                    <h1 style={{ fontSize: "2rem", fontWeight: 800, marginBottom: "8px" }}>
-                        Billing &amp; <span className="gradient-text">Payments</span>
+                    <h1 style={{ fontSize: "1.6rem", fontWeight: 800, marginBottom: "8px", color: t.textPrimary }}>
+                        Billing & Payments
                     </h1>
-                    <p style={{ color: "var(--text-muted)", fontSize: "0.95rem" }}>
+                    <p style={{ color: t.textMuted, fontSize: "0.88rem" }}>
                         Manage your subscriptions, invoices, and payment history.
                     </p>
                 </div>
 
                 {error && (
-                    <div style={{ padding: "14px 20px", borderRadius: "var(--radius-sm)", background: "rgba(255,0,110,0.1)", color: "var(--accent-magenta)", marginBottom: "24px", fontSize: "0.9rem" }}>
+                    <div style={{ padding: "14px 20px", borderRadius: t.isMono ? 4 : 8, background: t.statusErrorBg, color: t.statusError, marginBottom: "24px", fontSize: "0.9rem" }}>
                         {error}
                     </div>
                 )}
 
                 {/* Stats Row */}
-                <div className="grid-3" style={{ marginBottom: "32px", gap: "20px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "20px", marginBottom: "32px" }}>
                     {/* Active Plan */}
-                    <div className="glass-card" style={{ padding: "24px", display: "flex", flexDirection: "column" }}>
-                        <div style={{ fontSize: "1.4rem", marginBottom: "8px" }}>🖥️</div>
-                        <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "6px" }}>Active Plan</p>
-                        <p style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--accent-cyan)" }}>
+                    <div style={{ ...card, padding: "24px", display: "flex", flexDirection: "column" }}>
+                        <div style={{ width: 36, height: 36, borderRadius: t.isMono ? 8 : 12, background: t.accentPrimaryMuted, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+                            <Monitor style={{ width: 18, height: 18, color: t.accentPrimary }} />
+                        </div>
+                        <p style={{ fontSize: "0.78rem", color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "6px" }}>Active Plan</p>
+                        <p style={{ fontSize: "1.1rem", fontWeight: 800, color: t.accentPrimary }}>
                             {data?.activePlan ?? "None"}
                         </p>
                         {data?.planActivatedAt && (
                             <>
-                                <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "4px" }}>
+                                <p style={{ fontSize: "0.78rem", color: t.textMuted, marginTop: "4px" }}>
                                     Since {fmtDate(data.planActivatedAt)}
                                 </p>
                                 {expirationText && (
-                                    <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "2px", fontWeight: 700 }}>
+                                    <p style={{ fontSize: "0.78rem", color: t.textMuted, marginTop: "2px", fontWeight: 700 }}>
                                         {expirationText}
                                     </p>
                                 )}
@@ -110,26 +128,34 @@ export default function BillingPage() {
                         )}
 
                         {/* Deploy action area */}
-                        <div style={{ marginTop: "20px", paddingTop: "20px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                        <div style={{ marginTop: "20px", paddingTop: "20px", borderTop: `1px solid ${t.borderSecondary}` }}>
                             {data?.vpsCount === 0 ? (
                                 <>
-                                    <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginBottom: "12px", lineHeight: "1.4" }}>
+                                    <p style={{ fontSize: "0.82rem", color: t.textMuted, marginBottom: "12px", lineHeight: "1.4" }}>
                                         Ready to launch your first server?
                                     </p>
                                     <Link
                                         href="/dashboard/compute/new"
-                                        className="btn btn-primary"
-                                        style={{ width: "100%", display: "block", textAlign: "center", padding: "10px", fontSize: "0.85rem", textDecoration: "none" }}
+                                        style={{
+                                            width: "100%", display: "block", textAlign: "center", padding: "10px",
+                                            fontSize: "0.85rem", textDecoration: "none", borderRadius: t.buttonRadius,
+                                            background: t.accentPrimary, color: t.textInverse, fontWeight: 700,
+                                        }}
                                     >
-                                        Deploy Now →
+                                        Deploy Now
                                     </Link>
                                 </>
                             ) : (
                                 <>
-                                    <p style={{ fontSize: "0.85rem", color: "var(--accent-magenta)", lineHeight: "1.4" }}>
+                                    <p style={{ fontSize: "0.85rem", color: t.statusError, lineHeight: "1.4" }}>
                                         You have {data?.vpsCount} active VM{(data?.vpsCount ?? 0) > 1 ? "s" : ""}.
                                     </p>
-                                    <Link href="/dashboard/vps" className="btn btn-secondary" style={{ marginTop: "12px", width: "100%", display: "block", padding: "8px", fontSize: "0.85rem", textDecoration: "none", textAlign: "center" }}>
+                                    <Link href="/dashboard/vps" style={{
+                                        marginTop: "12px", width: "100%", display: "block", padding: "8px",
+                                        fontSize: "0.85rem", textDecoration: "none", textAlign: "center",
+                                        borderRadius: t.buttonRadius, border: `1px solid ${t.accentPrimary}`,
+                                        background: "transparent", color: t.accentPrimary, fontWeight: 600,
+                                    }}>
                                         Manage Instances
                                     </Link>
                                 </>
@@ -138,43 +164,64 @@ export default function BillingPage() {
                     </div>
 
                     {/* Current Balance */}
-                    <div className="glass-card" style={{ padding: "24px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                    <div style={{ ...card, padding: "24px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
                         <div>
-                            <div style={{ fontSize: "1.4rem", marginBottom: "8px" }}>💳</div>
-                            <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "6px" }}>Current Balance</p>
+                            <div style={{ width: 36, height: 36, borderRadius: t.isMono ? 8 : 12, background: t.accentPrimaryMuted, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+                                <CreditCard style={{ width: 18, height: 18, color: t.accentPrimary }} />
+                            </div>
+                            <p style={{ fontSize: "0.78rem", color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "6px" }}>Current Balance</p>
                             <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
-                                <p className="gradient-text" style={{ fontSize: "1.8rem", fontWeight: 800 }}>
+                                <p style={{ fontSize: "1.8rem", fontWeight: 800, color: t.textPrimary }}>
                                     {(data?.credits ?? 0).toLocaleString()}
                                 </p>
-                                <span style={{ fontSize: "0.85rem", color: "var(--text-secondary)", fontWeight: 600 }}>VND</span>
+                                <span style={{ fontSize: "0.85rem", color: t.textSecondary, fontWeight: 600 }}>VND</span>
                             </div>
                         </div>
-                        <Link href="/dashboard/billing/topup" className="btn btn-primary" style={{ marginTop: "24px", width: "100%", display: "block", textAlign: "center", padding: "10px", fontSize: "0.85rem", textDecoration: "none" }}>
+                        <Link href="/dashboard/billing/topup" style={{
+                            marginTop: "24px", width: "100%", display: "block", textAlign: "center",
+                            padding: "10px", fontSize: "0.85rem", textDecoration: "none",
+                            borderRadius: t.buttonRadius, background: t.accentPrimary,
+                            color: t.textInverse, fontWeight: 700,
+                        }}>
                             Top Up Balance
                         </Link>
                     </div>
 
                     {/* Upgrade CTA */}
-                    <div className="glass-card" style={{ padding: "24px", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", textAlign: "center" }}>
-                        <div style={{ fontSize: "1.4rem", marginBottom: "8px" }}>🚀</div>
-                        <p style={{ fontSize: "0.88rem", color: "var(--text-secondary)", marginBottom: "14px" }}>
+                    <div style={{ ...card, padding: "24px", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", textAlign: "center" }}>
+                        <div style={{ width: 36, height: 36, borderRadius: t.isMono ? 8 : 12, background: t.accentPrimaryMuted, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+                            <Rocket style={{ width: 18, height: 18, color: t.accentPrimary }} />
+                        </div>
+                        <p style={{ fontSize: "0.88rem", color: t.textSecondary, marginBottom: "14px" }}>
                             Want more power?
                         </p>
-                        <Link href="/services/vps" className="btn btn-primary" style={{ padding: "8px 20px", fontSize: "0.82rem" }}>
+                        <Link href="/services/vps" style={{
+                            padding: "8px 20px", fontSize: "0.82rem", textDecoration: "none",
+                            borderRadius: t.buttonRadius, background: t.accentPrimary,
+                            color: t.textInverse, fontWeight: 700,
+                        }}>
                             Upgrade Plan
                         </Link>
                     </div>
                 </div>
 
                 {/* Invoices Table */}
-                <div className="glass-card" style={{ padding: "28px" }}>
-                    <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "20px" }}>Invoice History</h3>
+                <div style={{ ...card, padding: "28px" }}>
+                    <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "20px", color: t.textPrimary }}>Invoice History</h3>
 
                     {!data?.transactions.length ? (
                         <div style={{ textAlign: "center", padding: "40px 0" }}>
-                            <div style={{ fontSize: "2.5rem", marginBottom: "12px" }}>📄</div>
-                            <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginBottom: "16px" }}>No invoices yet.</p>
-                            <Link href="/services/vps" className="btn btn-secondary" style={{ fontSize: "0.85rem" }}>Browse Plans</Link>
+                            <div style={{ width: 56, height: 56, borderRadius: t.isMono ? 12 : 16, background: t.accentPrimaryMuted, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+                                <FileText style={{ width: 24, height: 24, color: t.accentPrimary }} />
+                            </div>
+                            <p style={{ color: t.textMuted, fontSize: "0.9rem", marginBottom: "16px" }}>No invoices yet.</p>
+                            <Link href="/services/vps" style={{
+                                display: "inline-block", padding: "8px 20px", borderRadius: t.buttonRadius,
+                                border: `1px solid ${t.accentPrimary}`, background: "transparent",
+                                color: t.accentPrimary, fontWeight: 600, fontSize: "0.85rem", textDecoration: "none",
+                            }}>
+                                Browse Plans
+                            </Link>
                         </div>
                     ) : (
                         <div style={{ overflowX: "auto" }}>
@@ -182,7 +229,7 @@ export default function BillingPage() {
                                 <thead>
                                     <tr>
                                         {["Date", "Plan", "Amount", "Method", "Status"].map((h) => (
-                                            <th key={h} style={{ textAlign: "left", padding: "10px 12px", fontSize: "0.75rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                                            <th key={h} style={{ textAlign: "left", padding: "10px 12px", fontSize: "0.75rem", color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: `1px solid ${t.borderSecondary}` }}>
                                                 {h}
                                             </th>
                                         ))}
@@ -190,22 +237,22 @@ export default function BillingPage() {
                                 </thead>
                                 <tbody>
                                     {data.transactions.map((tx) => (
-                                        <tr key={tx.id} style={{ borderBottom: "1px solid rgba(255,255,255,0.03)" }}>
-                                            <td style={{ padding: "14px 12px", fontSize: "0.85rem" }}>
+                                        <tr key={tx.id} style={{ borderBottom: `1px solid ${t.borderSecondary}` }}>
+                                            <td style={{ padding: "14px 12px", fontSize: "0.85rem", color: t.textPrimary }}>
                                                 <div>{fmtDate(tx.createdAt)}</div>
-                                                <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "2px" }}>{fmtTime(tx.createdAt)}</div>
+                                                <div style={{ fontSize: "0.75rem", color: t.textMuted, marginTop: "2px" }}>{fmtTime(tx.createdAt)}</div>
                                             </td>
-                                            <td style={{ padding: "14px 12px", fontSize: "0.85rem", fontWeight: 600 }}>{tx.plan}</td>
-                                            <td style={{ padding: "14px 12px", fontSize: "0.85rem", fontWeight: 700, color: "var(--text-primary)" }}>
+                                            <td style={{ padding: "14px 12px", fontSize: "0.85rem", fontWeight: 600, color: t.textPrimary }}>{tx.plan}</td>
+                                            <td style={{ padding: "14px 12px", fontSize: "0.85rem", fontWeight: 700, color: t.textPrimary }}>
                                                 ${Number(tx.amount).toFixed(2)}
                                             </td>
                                             <td style={{ padding: "14px 12px" }}>
-                                                <span className="mono" style={{ fontSize: "0.8rem", color: "var(--text-muted)", textTransform: "capitalize" }}>
+                                                <span style={{ fontSize: "0.8rem", color: t.textMuted, textTransform: "capitalize", fontFamily: t.fontMono }}>
                                                     {tx.method.replace(/_/g, " ")}
                                                 </span>
                                             </td>
                                             <td style={{ padding: "14px 12px" }}>
-                                                <span className="badge" style={{ background: `${statusColor(tx.status)}15`, color: statusColor(tx.status), fontSize: "0.72rem", textTransform: "capitalize" }}>
+                                                <span style={{ padding: "2px 10px", borderRadius: 20, fontSize: "0.72rem", fontWeight: 700, background: `${statusColor(tx.status)}1a`, color: statusColor(tx.status), textTransform: "capitalize" }}>
                                                     {tx.status}
                                                 </span>
                                             </td>

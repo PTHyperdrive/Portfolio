@@ -10,7 +10,7 @@ const PROXY_TYPES = [
     {
         name: "HTTP/HTTPS",
         badge: "DATACENTER",
-        icon: "🌀",
+        icon: "HTTP",
         color: "var(--accent-cyan)",
         price: "$0.50",
         unit: "/ proxy / month",
@@ -21,7 +21,7 @@ const PROXY_TYPES = [
     {
         name: "SOCKS5",
         badge: "PREMIUM",
-        icon: "🔷",
+        icon: "S5",
         color: "var(--accent-purple)",
         price: "$1.00",
         unit: "/ proxy / month",
@@ -32,7 +32,7 @@ const PROXY_TYPES = [
     {
         name: "Residential",
         badge: "ELITE",
-        icon: "🏠",
+        icon: "RES",
         color: "var(--accent-magenta)",
         price: "$5.00",
         unit: "/ proxy / month",
@@ -43,22 +43,22 @@ const PROXY_TYPES = [
 ];
 
 const LOCATIONS = [
-    { flag: "🇺🇸", country: "United States", code: "US", stock: 2500 },
-    { flag: "🇬🇧", country: "United Kingdom", code: "GB", stock: 800 },
-    { flag: "🇩🇪", country: "Germany", code: "DE", stock: 650 },
-    { flag: "🇫🇷", country: "France", code: "FR", stock: 420 },
-    { flag: "🇯🇵", country: "Japan", code: "JP", stock: 380 },
-    { flag: "🇧🇷", country: "Brazil", code: "BR", stock: 300 },
-    { flag: "🇮🇳", country: "India", code: "IN", stock: 450 },
-    { flag: "🇸🇬", country: "Singapore", code: "SG", stock: 280 },
-    { flag: "🇰🇷", country: "South Korea", code: "KR", stock: 350 },
-    { flag: "🇳🇱", country: "Netherlands", code: "NL", stock: 520 },
-    { flag: "🇦🇺", country: "Australia", code: "AU", stock: 200 },
-    { flag: "🇨🇦", country: "Canada", code: "CA", stock: 380 },
-    { flag: "🇷🇺", country: "Russia", code: "RU", stock: 600 },
-    { flag: "🇻🇳", country: "Vietnam", code: "VN", stock: 180 },
-    { flag: "🇹🇭", country: "Thailand", code: "TH", stock: 150 },
-    { flag: "🇹🇷", country: "Turkey", code: "TR", stock: 220 },
+    { flag: "US", country: "United States", code: "US", stock: 2500 },
+    { flag: "GB", country: "United Kingdom", code: "GB", stock: 800 },
+    { flag: "DE", country: "Germany", code: "DE", stock: 650 },
+    { flag: "FR", country: "France", code: "FR", stock: 420 },
+    { flag: "JP", country: "Japan", code: "JP", stock: 380 },
+    { flag: "BR", country: "Brazil", code: "BR", stock: 300 },
+    { flag: "IN", country: "India", code: "IN", stock: 450 },
+    { flag: "SG", country: "Singapore", code: "SG", stock: 280 },
+    { flag: "KR", country: "South Korea", code: "KR", stock: 350 },
+    { flag: "NL", country: "Netherlands", code: "NL", stock: 520 },
+    { flag: "AU", country: "Australia", code: "AU", stock: 200 },
+    { flag: "CA", country: "Canada", code: "CA", stock: 380 },
+    { flag: "RU", country: "Russia", code: "RU", stock: 600 },
+    { flag: "VN", country: "Vietnam", code: "VN", stock: 180 },
+    { flag: "TH", country: "Thailand", code: "TH", stock: 150 },
+    { flag: "TR", country: "Turkey", code: "TR", stock: 220 },
 ];
 
 const BULK_PRICING = [
@@ -105,7 +105,7 @@ export default function ProxyPage() {
                                 style={{ padding: "32px", display: "flex", flexDirection: "column" }}
                             >
                                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
-                                    <div style={{ fontSize: "2.2rem" }}>{type.icon}</div>
+                                    <div style={{ fontSize: "0.78rem", fontWeight: 800, letterSpacing: "0.1em", color: type.color, fontFamily: "monospace" }}>{type.icon}</div>
                                     <span className="badge" style={{ background: `${type.color}15`, color: type.color }}>
                                         {type.badge}
                                     </span>
@@ -201,7 +201,7 @@ export default function ProxyPage() {
                                 }}
                             >
                                 <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                                    <span style={{ fontSize: "1.5rem" }}>{loc.flag}</span>
+                                    <span style={{ fontSize: "0.78rem", fontWeight: 800, letterSpacing: "0.1em", color: "var(--accent-cyan)", fontFamily: "monospace" }}>{loc.flag}</span>
                                     <div>
                                         <div style={{ fontWeight: 600, fontSize: "0.9rem" }}>{loc.country}</div>
                                         <div className="mono" style={{ color: "var(--text-muted)", fontSize: "0.75rem" }}>{loc.code}</div>

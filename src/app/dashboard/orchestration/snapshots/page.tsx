@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { Camera, AlertTriangle } from "lucide-react";
 
 interface VpsInstance { id: string; vmId: string; name: string; node: string; status: string; }
 interface Snapshot { name: string; description: string; snaptime: number; vmstate: number; parent?: string; }
@@ -173,7 +174,7 @@ export default function SnapshotsPage() {
                                 </label>
                                 <button type="submit" id="btn-create-snapshot" disabled={submitting || !selectedVm}
                                     style={{ padding: "9px 24px", borderRadius: 8, border: "none", background: submitting ? "#1e3a5f" : "linear-gradient(135deg, #3b82f6, #2563eb)", color: "#fff", fontWeight: 700, fontSize: "0.875rem", cursor: submitting ? "not-allowed" : "pointer" }}>
-                                    {submitting ? "Creating…" : "📸 Create Snapshot"}
+                                    {submitting ? "Creating…" : "Create Snapshot"}
                                 </button>
                             </div>
                         </form>
@@ -227,7 +228,7 @@ export default function SnapshotsPage() {
                 <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
                     <div style={{ ...card, padding: "28px 32px", width: 420, borderColor: confirm.action === "rollback" ? "rgba(245,158,11,0.25)" : "rgba(239,68,68,0.25)" }}>
                         <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: "#f1f5f9", marginBottom: 10 }}>
-                            {confirm.action === "rollback" ? "⚠️ Rollback VM?" : "Delete Snapshot?"}
+                            {confirm.action === "rollback" ? "Rollback VM?" : "Delete Snapshot?"}
                         </h3>
                         <p style={{ fontSize: "0.875rem", color: "#94a3b8", lineHeight: 1.6 }}>
                             {confirm.action === "rollback"

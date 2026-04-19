@@ -3,8 +3,15 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { UAParser } from "ua-parser-js";
+import { useThemeTokens } from "@/lib/useThemeTokens";
+import {
+    User, Settings, Lock, ShieldCheck, Camera, AlertTriangle,
+    XCircle, CheckCircle, RefreshCw
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 type Tab = "profile" | "preferences" | "security";
+type FeedbackMsg = { type: "success" | "error"; text: string } | null;
 
 interface DeviceSession {
     id: string;
@@ -16,6 +23,7 @@ interface DeviceSession {
 
 export default function SettingsPage() {
     const { data: session } = useSession();
+    const t = useThemeTokens();
     const [activeTab, setActiveTab] = useState<Tab>("profile");
 
     // Profile state
@@ -23,8 +31,8 @@ export default function SettingsPage() {
     const [email, setEmail] = useState("");
     const [oldPassword, setOldPassword] = useState("");
     const [newPassword, setNewPassword] = useState("");
-    const [profileMsg, setProfileMsg] = useState("");
-    const [pwdMsg, setPwdMsg] = useState("");
+    const [profileMsg, setProfileMsg] = useState<FeedbackMsg>(null);
+    const [pwdMsg, setPwdMsg] = useState<FeedbackMsg>(null);
     const [saving, setSaving] = useState(false);
 
     // Preferences state
@@ -103,7 +111,7 @@ export default function SettingsPage() {
             setQrCodeUrl("");
             setManualSecret("");
             setTotpToken("");
-            setSuccessMsg("✅ Two-factor authentication enabled successfully.");
+            setSuccessMsg("Two-factor authentication enabled successfully.");
             setTimeout(() => setSuccessMsg(""), 4000);
         } catch (err) {
             setTwoFAError(err instanceof Error ? err.message : "Verification failed");
@@ -189,7 +197,7 @@ export default function SettingsPage() {
     const handleProfileSave = async (e: React.FormEvent) => {
         e.preventDefault();
         setSaving(true);
-        setProfileMsg("");
+        setProfileMsg(null);
         try {
             const res = await fetch("/api/user/profile", {
                 method: "PATCH",
@@ -197,9 +205,12 @@ export default function SettingsPage() {
                 body: JSON.stringify({ name, email }),
             });
             const data = await res.json();
-            setProfileMsg(res.ok ? "✅ Profile updated successfully." : `❌ ${data.error}`);
+            setProfileMsg(res.ok
+                ? { type: "success", text: "Profile updated successfully." }
+                : { type: "error", text: data.error }
+            );
         } catch {
-            setProfileMsg("❌ Network error. Please try again.");
+            setProfileMsg({ type: "error", text: "Network error. Please try again." });
         } finally {
             setSaving(false);
         }
@@ -208,7 +219,7 @@ export default function SettingsPage() {
     const handlePasswordSave = async (e: React.FormEvent) => {
         e.preventDefault();
         setSaving(true);
-        setPwdMsg("");
+        setPwdMsg(null);
         try {
             const res = await fetch("/api/user/password", {
                 method: "PATCH",
@@ -217,14 +228,14 @@ export default function SettingsPage() {
             });
             const data = await res.json();
             if (res.ok) {
-                setPwdMsg("✅ Password updated successfully.");
+                setPwdMsg({ type: "success", text: "Password updated successfully." });
                 setOldPassword("");
                 setNewPassword("");
             } else {
-                setPwdMsg(`❌ ${data.error}`);
+                setPwdMsg({ type: "error", text: data.error });
             }
         } catch {
-            setPwdMsg("❌ Network error. Please try again.");
+            setPwdMsg({ type: "error", text: "Network error. Please try again." });
         } finally {
             setSaving(false);
         }
@@ -236,48 +247,75 @@ export default function SettingsPage() {
             ? "—"
             : "Loading...";
 
-    const tabs: { id: Tab; label: string; icon: string }[] = [
-        { id: "profile", label: "Profile", icon: "👤" },
-        { id: "preferences", label: "Preferences", icon: "⚙️" },
-        { id: "security", label: "Security", icon: "🔒" },
+    const tabs: { id: Tab; label: string; Icon: LucideIcon }[] = [
+        { id: "profile", label: "Profile", Icon: User },
+        { id: "preferences", label: "Preferences", Icon: Settings },
+        { id: "security", label: "Security", Icon: Lock },
     ];
+
+    const card: React.CSSProperties = {
+        background: t.bgCard,
+        border: `1px solid ${t.borderPrimary}`,
+        borderRadius: t.cardRadius,
+        boxShadow: t.shadow,
+    };
 
     const inputStyle: React.CSSProperties = {
         width: "100%",
         padding: "10px 14px",
-        background: "rgba(255,255,255,0.04)",
-        border: "1px solid rgba(255,255,255,0.1)",
-        borderRadius: "var(--radius-sm)",
-        color: "var(--text-primary)",
+        background: t.bgInput,
+        border: `1px solid ${t.borderPrimary}`,
+        borderRadius: t.isMono ? 4 : 8,
+        color: t.textPrimary,
         fontSize: "0.9rem",
         outline: "none",
+        fontFamily: "inherit",
     };
 
     const labelStyle: React.CSSProperties = {
         display: "block",
         marginBottom: "6px",
         fontSize: "0.82rem",
-        color: "var(--text-muted)",
+        color: t.textMuted,
         fontWeight: 600,
         textTransform: "uppercase",
         letterSpacing: "0.05em",
     };
 
+    const feedbackLine = (msg: FeedbackMsg) => {
+        if (!msg) return null;
+        const isOk = msg.type === "success";
+        return (
+            <p style={{ fontSize: "0.85rem", color: isOk ? t.statusSuccess : t.statusError, display: "flex", alignItems: "center", gap: 6 }}>
+                {isOk
+                    ? <CheckCircle style={{ width: 14, height: 14, flexShrink: 0 }} />
+                    : <XCircle style={{ width: 14, height: 14, flexShrink: 0 }} />}
+                {msg.text}
+            </p>
+        );
+    };
+
     return (
-        <div style={{ paddingTop: "120px", paddingBottom: "80px", minHeight: "100vh" }}>
-            <div className="container" style={{ maxWidth: "800px" }}>
+        <div style={{ padding: "32px 36px", minHeight: "100vh", backgroundColor: t.bgPrimary }}>
+
+            {/* Breadcrumb */}
+            <p style={{ fontSize: "0.78rem", color: t.textMuted, marginBottom: 24 }}>
+                Dashboard &nbsp;&bull;&nbsp; Settings
+            </p>
+
+            <div style={{ maxWidth: 800 }}>
                 {/* Header */}
                 <div style={{ marginBottom: "40px" }}>
-                    <h1 style={{ fontSize: "2rem", fontWeight: 800, marginBottom: "8px" }}>
-                        <span className="gradient-text">Settings</span>
+                    <h1 style={{ fontSize: "1.6rem", fontWeight: 800, marginBottom: "8px", color: t.textPrimary }}>
+                        Settings
                     </h1>
-                    <p style={{ color: "var(--text-muted)", fontSize: "0.95rem" }}>
+                    <p style={{ color: t.textMuted, fontSize: "0.88rem" }}>
                         Manage your account, preferences, and security settings.
                     </p>
                 </div>
 
                 {/* Tab Bar */}
-                <div style={{ display: "flex", gap: "4px", marginBottom: "32px", borderBottom: "1px solid var(--glass-border)", paddingBottom: "0" }}>
+                <div style={{ display: "flex", gap: "4px", marginBottom: "32px", borderBottom: `1px solid ${t.borderPrimary}`, paddingBottom: "0" }}>
                     {tabs.map((tab) => (
                         <button
                             key={tab.id}
@@ -289,8 +327,8 @@ export default function SettingsPage() {
                                 cursor: "pointer",
                                 fontSize: "0.9rem",
                                 fontWeight: 600,
-                                color: activeTab === tab.id ? "var(--accent-cyan)" : "var(--text-muted)",
-                                borderBottom: activeTab === tab.id ? "2px solid var(--accent-cyan)" : "2px solid transparent",
+                                color: activeTab === tab.id ? t.accentPrimary : t.textMuted,
+                                borderBottom: activeTab === tab.id ? `2px solid ${t.accentPrimary}` : "2px solid transparent",
                                 marginBottom: "-1px",
                                 transition: "all 0.2s ease",
                                 display: "flex",
@@ -298,7 +336,7 @@ export default function SettingsPage() {
                                 gap: "8px",
                             }}
                         >
-                            <span>{tab.icon}</span>
+                            <tab.Icon style={{ width: 15, height: 15 }} />
                             {tab.label}
                         </button>
                     ))}
@@ -308,39 +346,46 @@ export default function SettingsPage() {
                 {activeTab === "profile" && (
                     <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
                         {/* Read-only info card */}
-                        <div className="glass-card" style={{ padding: "24px" }}>
-                            <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "16px" }}>Account Information</h3>
+                        <div style={{ ...card, padding: "24px" }}>
+                            <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "16px", color: t.textPrimary }}>Account Information</h3>
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
                                 <div>
                                     <span style={labelStyle}>Member Since</span>
-                                    <span style={{ fontSize: "0.95rem", color: "var(--text-primary)" }}>{registerDate}</span>
+                                    <span style={{ fontSize: "0.95rem", color: t.textPrimary }}>{registerDate}</span>
                                 </div>
                                 <div>
                                     <span style={labelStyle}>Account ID</span>
-                                    <span className="mono" style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>{session?.user?.id ?? "—"}</span>
+                                    <span style={{ fontSize: "0.8rem", color: t.textMuted, fontFamily: t.fontMono }}>{session?.user?.id ?? "—"}</span>
                                 </div>
                             </div>
                         </div>
 
                         {/* Avatar placeholder */}
-                        <div className="glass-card" style={{ padding: "24px" }}>
-                            <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "16px" }}>Avatar</h3>
+                        <div style={{ ...card, padding: "24px" }}>
+                            <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "16px", color: t.textPrimary }}>Avatar</h3>
                             <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-                                <div style={{ width: 72, height: 72, borderRadius: "16px", background: "var(--gradient-primary)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.8rem", fontWeight: 800, color: "#fff" }}>
+                                <div style={{ width: 72, height: 72, borderRadius: t.isMono ? 12 : 16, background: t.isMono ? t.bgTertiary : "linear-gradient(135deg, #3b82f6, #6366f1)", border: t.isMono ? `1px solid ${t.borderPrimary}` : "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.8rem", fontWeight: 800, color: t.isLight ? t.textPrimary : "#fff" }}>
                                     {(session?.user?.name || session?.user?.email || "U")[0].toUpperCase()}
                                 </div>
                                 <div>
-                                    <button disabled className="btn btn-secondary" style={{ opacity: 0.5, cursor: "not-allowed", fontSize: "0.85rem" }}>
-                                        📷 Upload Photo
+                                    <button disabled style={{
+                                        display: "inline-flex", alignItems: "center", gap: 8,
+                                        padding: "8px 18px", borderRadius: t.buttonRadius,
+                                        border: `1px solid ${t.borderPrimary}`, background: "transparent",
+                                        color: t.textMuted, fontSize: "0.85rem", fontWeight: 600,
+                                        opacity: 0.5, cursor: "not-allowed",
+                                    }}>
+                                        <Camera style={{ width: 14, height: 14 }} />
+                                        Upload Photo
                                     </button>
-                                    <p style={{ marginTop: "8px", fontSize: "0.78rem", color: "var(--text-muted)" }}>Custom avatar upload coming soon.</p>
+                                    <p style={{ marginTop: "8px", fontSize: "0.78rem", color: t.textMuted }}>Custom avatar upload coming soon.</p>
                                 </div>
                             </div>
                         </div>
 
                         {/* Update name & email */}
-                        <form onSubmit={handleProfileSave} className="glass-card" style={{ padding: "24px" }}>
-                            <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "20px" }}>Update Profile</h3>
+                        <form onSubmit={handleProfileSave} style={{ ...card, padding: "24px" }}>
+                            <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "20px", color: t.textPrimary }}>Update Profile</h3>
                             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                                 <div>
                                     <label style={labelStyle}>Display Name</label>
@@ -350,16 +395,20 @@ export default function SettingsPage() {
                                     <label style={labelStyle}>Email Address</label>
                                     <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle} placeholder="your@email.com" />
                                 </div>
-                                {profileMsg && <p style={{ fontSize: "0.85rem", color: profileMsg.startsWith("✅") ? "var(--accent-green)" : "var(--accent-magenta)" }}>{profileMsg}</p>}
-                                <button type="submit" disabled={saving} className="btn btn-primary" style={{ alignSelf: "flex-start", padding: "10px 28px" }}>
+                                {feedbackLine(profileMsg)}
+                                <button type="submit" disabled={saving} style={{
+                                    alignSelf: "flex-start", padding: "10px 28px", borderRadius: t.buttonRadius,
+                                    border: "none", background: t.accentPrimary, color: t.textInverse,
+                                    fontWeight: 700, fontSize: "0.875rem", cursor: saving ? "not-allowed" : "pointer",
+                                }}>
                                     {saving ? "Saving..." : "Save Changes"}
                                 </button>
                             </div>
                         </form>
 
                         {/* Change password */}
-                        <form onSubmit={handlePasswordSave} className="glass-card" style={{ padding: "24px" }}>
-                            <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "20px" }}>Change Password</h3>
+                        <form onSubmit={handlePasswordSave} style={{ ...card, padding: "24px" }}>
+                            <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "20px", color: t.textPrimary }}>Change Password</h3>
                             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                                 <div>
                                     <label style={labelStyle}>Current Password</label>
@@ -369,8 +418,13 @@ export default function SettingsPage() {
                                     <label style={labelStyle}>New Password</label>
                                     <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} style={inputStyle} placeholder="Min. 8 characters" />
                                 </div>
-                                {pwdMsg && <p style={{ fontSize: "0.85rem", color: pwdMsg.startsWith("✅") ? "var(--accent-green)" : "var(--accent-magenta)" }}>{pwdMsg}</p>}
-                                <button type="submit" disabled={saving} className="btn btn-secondary" style={{ alignSelf: "flex-start", padding: "10px 28px" }}>
+                                {feedbackLine(pwdMsg)}
+                                <button type="submit" disabled={saving} style={{
+                                    alignSelf: "flex-start", padding: "10px 28px", borderRadius: t.buttonRadius,
+                                    border: `1px solid ${t.accentPrimary}`, background: "transparent",
+                                    color: t.accentPrimary, fontWeight: 700, fontSize: "0.875rem",
+                                    cursor: saving ? "not-allowed" : "pointer",
+                                }}>
                                     {saving ? "Updating..." : "Update Password"}
                                 </button>
                             </div>
@@ -380,8 +434,8 @@ export default function SettingsPage() {
 
                 {/* ── Preferences Tab ─────────────────────────────────────── */}
                 {activeTab === "preferences" && (
-                    <div className="glass-card" style={{ padding: "32px", display: "flex", flexDirection: "column", gap: "28px" }}>
-                        <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "4px" }}>Display & Network Preferences</h3>
+                    <div style={{ ...card, padding: "32px", display: "flex", flexDirection: "column", gap: "28px" }}>
+                        <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "4px", color: t.textPrimary }}>Display & Network Preferences</h3>
                         <div>
                             <label style={labelStyle}>Website Language</label>
                             <select
@@ -389,11 +443,11 @@ export default function SettingsPage() {
                                 onChange={(e) => setLanguage(e.target.value)}
                                 style={{ ...inputStyle, cursor: "pointer" }}
                             >
-                                <option value="en">🇺🇸 English</option>
-                                <option value="vi">🇻🇳 Vietnamese</option>
-                                <option value="ja">🇯🇵 Japanese</option>
+                                <option value="en">English (US)</option>
+                                <option value="vi">Vietnamese</option>
+                                <option value="ja">Japanese</option>
                             </select>
-                            <p style={{ marginTop: "6px", fontSize: "0.78rem", color: "var(--text-muted)" }}>Full i18n support coming soon. Selection is saved but does not yet change the UI language.</p>
+                            <p style={{ marginTop: "6px", fontSize: "0.78rem", color: t.textMuted }}>Full i18n support coming soon. Selection is saved but does not yet change the UI language.</p>
                         </div>
                         <div>
                             <label style={labelStyle}>Network Preference</label>
@@ -407,7 +461,11 @@ export default function SettingsPage() {
                                 <option value="ipv6">IPv6 Only</option>
                             </select>
                         </div>
-                        <button className="btn btn-primary" style={{ alignSelf: "flex-start", padding: "10px 28px" }}>
+                        <button style={{
+                            alignSelf: "flex-start", padding: "10px 28px", borderRadius: t.buttonRadius,
+                            border: "none", background: t.accentPrimary, color: t.textInverse,
+                            fontWeight: 700, fontSize: "0.875rem", cursor: "pointer",
+                        }}>
                             Save Preferences
                         </button>
                     </div>
@@ -417,19 +475,20 @@ export default function SettingsPage() {
                 {activeTab === "security" && (
                     <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
                         {/* 2FA */}
-                        <div className="glass-card" style={{ padding: "28px" }}>
+                        <div style={{ ...card, padding: "28px" }}>
 
                             {/* Success / status toast */}
                             {successMsg && (
-                                <div style={{ marginBottom: "16px", padding: "12px 16px", borderRadius: 8, background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.3)", color: "#10b981", fontSize: "0.86rem", fontWeight: 600 }}>
+                                <div style={{ marginBottom: "16px", padding: "12px 16px", borderRadius: t.isMono ? 4 : 8, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}4d`, color: t.statusSuccess, fontSize: "0.86rem", fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
+                                    <CheckCircle style={{ width: 16, height: 16, flexShrink: 0 }} />
                                     {successMsg}
                                 </div>
                             )}
 
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
                                 <div>
-                                    <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "4px" }}>Two-Factor Authentication</h3>
-                                    <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                                    <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "4px", color: t.textPrimary }}>Two-Factor Authentication</h3>
+                                    <p style={{ fontSize: "0.85rem", color: t.textMuted }}>
                                         Use Google Authenticator to add an extra layer of security.
                                     </p>
                                 </div>
@@ -441,7 +500,7 @@ export default function SettingsPage() {
                                     style={{
                                         width: 52, height: 28, borderRadius: 14, border: "none",
                                         cursor: twoFALoading ? "not-allowed" : "pointer",
-                                        background: is2FAEnabled ? "var(--accent-cyan)" : "rgba(255,255,255,0.1)",
+                                        background: is2FAEnabled ? t.accentPrimary : `${t.textMuted}33`,
                                         position: "relative", transition: "background 0.25s", flexShrink: 0,
                                         opacity: twoFALoading ? 0.6 : 1,
                                     }}
@@ -457,38 +516,38 @@ export default function SettingsPage() {
 
                             {/* Enabled badge */}
                             {is2FAEnabled && !isDisableModalOpen && !setupOpen && (
-                                <div style={{ padding: "14px 18px", borderRadius: 8, background: "rgba(16,185,129,0.07)", border: "1px solid rgba(16,185,129,0.2)", display: "flex", alignItems: "center", gap: 10 }}>
-                                    <span style={{ fontSize: "1.1rem" }}>🔐</span>
+                                <div style={{ padding: "14px 18px", borderRadius: t.isMono ? 4 : 8, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}33`, display: "flex", alignItems: "center", gap: 10 }}>
+                                    <ShieldCheck style={{ width: 22, height: 22, color: t.statusSuccess, flexShrink: 0 }} />
                                     <div>
-                                        <p style={{ fontSize: "0.88rem", fontWeight: 700, color: "#10b981" }}>2FA is active</p>
-                                        <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: 2 }}>Click the toggle to disable and enter your authenticator code.</p>
+                                        <p style={{ fontSize: "0.88rem", fontWeight: 700, color: t.statusSuccess }}>2FA is active</p>
+                                        <p style={{ fontSize: "0.78rem", color: t.textMuted, marginTop: 2 }}>Click the toggle to disable and enter your authenticator code.</p>
                                     </div>
                                 </div>
                             )}
 
                             {/* ── Setup flow (QR + verify) ── */}
                             {setupOpen && !is2FAEnabled && (
-                                <div style={{ marginTop: "24px", padding: "24px", borderRadius: "var(--radius-sm)", background: "rgba(0,240,255,0.04)", border: "1px solid rgba(0,240,255,0.12)" }}>
+                                <div style={{ marginTop: "24px", padding: "24px", borderRadius: t.isMono ? 4 : 8, background: t.accentPrimaryMuted, border: `1px solid ${t.accentPrimary}1f` }}>
                                     {twoFALoading && !qrCodeUrl && (
-                                        <p style={{ textAlign: "center", fontSize: "0.9rem", color: "var(--text-muted)", padding: "20px 0" }}>Generating QR code…</p>
+                                        <p style={{ textAlign: "center", fontSize: "0.9rem", color: t.textMuted, padding: "20px 0" }}>Generating QR code…</p>
                                     )}
                                     {qrCodeUrl && (
                                         <>
                                             <div style={{ textAlign: "center", marginBottom: "20px" }}>
-                                                <p style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "12px" }}>Step 1 — Scan with your authenticator app</p>
+                                                <p style={{ fontSize: "0.72rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "12px" }}>Step 1 — Scan with your authenticator app</p>
                                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                                 <img src={qrCodeUrl} alt="2FA QR Code" width={192} height={192} style={{ margin: "0 auto", borderRadius: 12, background: "#111", display: "block" }} />
                                             </div>
                                             {manualSecret && (
                                                 <div style={{ textAlign: "center", marginBottom: "24px" }}>
-                                                    <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "6px" }}>Or enter this key manually:</p>
-                                                    <code className="mono" style={{ display: "inline-block", padding: "8px 16px", borderRadius: 8, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", color: "var(--accent-cyan)", fontSize: "0.85rem", fontWeight: 700, letterSpacing: "0.1em", userSelect: "all" }}>
+                                                    <p style={{ fontSize: "0.75rem", color: t.textMuted, marginBottom: "6px" }}>Or enter this key manually:</p>
+                                                    <code style={{ display: "inline-block", padding: "8px 16px", borderRadius: 8, background: t.bgInput, border: `1px solid ${t.borderPrimary}`, color: t.accentPrimary, fontSize: "0.85rem", fontWeight: 700, letterSpacing: "0.1em", userSelect: "all", fontFamily: t.fontMono }}>
                                                         {manualSecret}
                                                     </code>
                                                 </div>
                                             )}
                                             <div style={{ textAlign: "center" }}>
-                                                <p style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "12px" }}>Step 2 — Enter the 6-digit code to confirm</p>
+                                                <p style={{ fontSize: "0.72rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "12px" }}>Step 2 — Enter the 6-digit code to confirm</p>
                                                 <input
                                                     value={totpToken}
                                                     onChange={e => { setTotpToken(e.target.value.replace(/\D/g, "").slice(0, 6)); setTwoFAError(""); }}
@@ -498,20 +557,22 @@ export default function SettingsPage() {
                                                     inputMode="numeric"
                                                     autoComplete="one-time-code"
                                                 />
-                                                {twoFAError && <p style={{ fontSize: "0.82rem", color: "var(--accent-magenta)", marginTop: "8px" }}>❌ {twoFAError}</p>}
+                                                {twoFAError && (
+                                                    <p style={{ fontSize: "0.82rem", color: t.statusError, marginTop: "8px", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
+                                                        <XCircle style={{ width: 14, height: 14 }} /> {twoFAError}
+                                                    </p>
+                                                )}
                                                 <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 14 }}>
                                                     <button
                                                         onClick={() => { setSetupOpen(false); setQrCodeUrl(""); setManualSecret(""); setTotpToken(""); setTwoFAError(""); }}
-                                                        className="btn btn-secondary"
-                                                        style={{ padding: "10px 20px" }}
+                                                        style={{ padding: "10px 20px", borderRadius: t.buttonRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textSecondary, fontWeight: 600, fontSize: "0.875rem", cursor: "pointer" }}
                                                     >
                                                         Cancel
                                                     </button>
                                                     <button
                                                         onClick={handle2FAVerify}
                                                         disabled={twoFALoading || totpToken.length !== 6}
-                                                        className="btn btn-primary"
-                                                        style={{ padding: "10px 28px", opacity: totpToken.length !== 6 ? 0.5 : 1, cursor: totpToken.length !== 6 || twoFALoading ? "not-allowed" : "pointer" }}
+                                                        style={{ padding: "10px 28px", borderRadius: t.buttonRadius, border: "none", background: t.accentPrimary, color: t.textInverse, fontWeight: 700, fontSize: "0.875rem", opacity: totpToken.length !== 6 ? 0.5 : 1, cursor: totpToken.length !== 6 || twoFALoading ? "not-allowed" : "pointer" }}
                                                     >
                                                         {twoFALoading ? "Verifying…" : "Verify & Enable"}
                                                     </button>
@@ -524,9 +585,12 @@ export default function SettingsPage() {
 
                             {/* ── Disable modal (inline) ── */}
                             {isDisableModalOpen && (
-                                <div style={{ marginTop: "20px", padding: "24px", borderRadius: "var(--radius-sm)", background: "rgba(239,68,68,0.05)", border: "1px solid rgba(239,68,68,0.25)" }}>
-                                    <p style={{ fontSize: "0.9rem", fontWeight: 700, color: "#f87171", marginBottom: "6px" }}>⚠️ Disable Two-Factor Authentication</p>
-                                    <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginBottom: "20px" }}>
+                                <div style={{ marginTop: "20px", padding: "24px", borderRadius: t.isMono ? 4 : 8, background: t.statusErrorBg, border: `1px solid ${t.statusError}40` }}>
+                                    <p style={{ fontSize: "0.9rem", fontWeight: 700, color: t.statusError, marginBottom: "6px", display: "flex", alignItems: "center", gap: 8 }}>
+                                        <AlertTriangle style={{ width: 16, height: 16 }} />
+                                        Disable Two-Factor Authentication
+                                    </p>
+                                    <p style={{ fontSize: "0.82rem", color: t.textMuted, marginBottom: "20px" }}>
                                         To disable 2FA, please enter the 6-digit code from your authenticator app.
                                     </p>
                                     <div style={{ textAlign: "center" }}>
@@ -540,12 +604,15 @@ export default function SettingsPage() {
                                             autoComplete="one-time-code"
                                             autoFocus
                                         />
-                                        {disableError && <p style={{ fontSize: "0.82rem", color: "#f87171", marginTop: "8px" }}>❌ {disableError}</p>}
+                                        {disableError && (
+                                            <p style={{ fontSize: "0.82rem", color: t.statusError, marginTop: "8px", display: "flex", alignItems: "center", justifyContent: "center", gap: 5 }}>
+                                                <XCircle style={{ width: 14, height: 14 }} /> {disableError}
+                                            </p>
+                                        )}
                                         <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 16 }}>
                                             <button
                                                 onClick={() => { setIsDisableModalOpen(false); setDisableToken(""); setDisableError(""); }}
-                                                className="btn btn-secondary"
-                                                style={{ padding: "10px 20px" }}
+                                                style={{ padding: "10px 20px", borderRadius: t.buttonRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textSecondary, fontWeight: 600, fontSize: "0.875rem", cursor: "pointer" }}
                                             >
                                                 Cancel
                                             </button>
@@ -553,8 +620,8 @@ export default function SettingsPage() {
                                                 onClick={handle2FADisable}
                                                 disabled={disableLoading || disableToken.length !== 6}
                                                 style={{
-                                                    padding: "10px 24px", borderRadius: 8, border: "none",
-                                                    background: disableToken.length === 6 && !disableLoading ? "#ef4444" : "rgba(239,68,68,0.3)",
+                                                    padding: "10px 24px", borderRadius: t.buttonRadius, border: "none",
+                                                    background: disableToken.length === 6 && !disableLoading ? t.statusError : `${t.statusError}4d`,
                                                     color: "#fff", fontWeight: 700, fontSize: "0.9rem",
                                                     cursor: disableToken.length !== 6 || disableLoading ? "not-allowed" : "pointer",
                                                     transition: "background 0.2s",
@@ -570,32 +637,38 @@ export default function SettingsPage() {
 
 
                         {/* Active Sessions */}
-                        <div className="glass-card" style={{ padding: "28px" }}>
+                        <div style={{ ...card, padding: "28px" }}>
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
                                 <div>
-                                    <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "4px" }}>Active Sessions</h3>
-                                    <p style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>
+                                    <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "4px", color: t.textPrimary }}>Active Sessions</h3>
+                                    <p style={{ fontSize: "0.82rem", color: t.textMuted }}>
                                         Devices that have recently signed in to your account.
                                     </p>
                                 </div>
                                 <button
                                     onClick={loadSessions}
                                     disabled={sessionsLoading}
-                                    className="btn btn-secondary"
-                                    style={{ fontSize: "0.78rem", padding: "6px 14px", opacity: sessionsLoading ? 0.5 : 1 }}
+                                    style={{
+                                        display: "inline-flex", alignItems: "center", gap: 6,
+                                        fontSize: "0.78rem", padding: "6px 14px", borderRadius: t.buttonRadius,
+                                        border: `1px solid ${t.borderPrimary}`, background: "transparent",
+                                        color: t.textSecondary, fontWeight: 600, cursor: sessionsLoading ? "not-allowed" : "pointer",
+                                        opacity: sessionsLoading ? 0.5 : 1,
+                                    }}
                                 >
-                                    {sessionsLoading ? "Loading…" : "↺ Refresh"}
+                                    <RefreshCw style={{ width: 12, height: 12 }} />
+                                    {sessionsLoading ? "Loading…" : "Refresh"}
                                 </button>
                             </div>
 
                             {sessionsLoading && (
-                                <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", textAlign: "center", padding: "20px 0" }}>
+                                <p style={{ fontSize: "0.85rem", color: t.textMuted, textAlign: "center", padding: "20px 0" }}>
                                     Loading sessions…
                                 </p>
                             )}
 
                             {!sessionsLoading && deviceSessions.length === 0 && (
-                                <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", textAlign: "center", padding: "20px 0" }}>
+                                <p style={{ fontSize: "0.85rem", color: t.textMuted, textAlign: "center", padding: "20px 0" }}>
                                     No active sessions found. Sign in to see them here.
                                 </p>
                             )}
@@ -603,19 +676,19 @@ export default function SettingsPage() {
                             {!sessionsLoading && deviceSessions.length > 0 && (
                                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                                     {deviceSessions.map((ds, idx) => (
-                                        <div key={ds.id} style={{ padding: "14px 16px", borderRadius: 8, background: "rgba(255,255,255,0.03)", border: "1px solid var(--glass-border)", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                                        <div key={ds.id} style={{ padding: "14px 16px", borderRadius: t.isMono ? 4 : 8, background: t.bgInput, border: `1px solid ${t.borderSecondary}`, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
                                             <div style={{ minWidth: 0 }}>
                                                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                                                    <p style={{ fontSize: "0.88rem", fontWeight: 600, color: "var(--text-primary)" }}>
+                                                    <p style={{ fontSize: "0.88rem", fontWeight: 600, color: t.textPrimary }}>
                                                         {formatUserAgent(ds.userAgent ?? "")}
                                                     </p>
                                                     {idx === 0 && (
-                                                        <span style={{ fontSize: "0.65rem", fontWeight: 700, padding: "2px 7px", borderRadius: 20, background: "rgba(0,240,255,0.12)", color: "var(--accent-cyan)", border: "1px solid rgba(0,240,255,0.2)", flexShrink: 0 }}>
+                                                        <span style={{ fontSize: "0.65rem", fontWeight: 700, padding: "2px 7px", borderRadius: 20, background: t.accentPrimaryMuted, color: t.accentPrimary, border: `1px solid ${t.accentPrimary}33`, flexShrink: 0 }}>
                                                             LATEST
                                                         </span>
                                                     )}
                                                 </div>
-                                                <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                <p style={{ fontSize: "0.75rem", color: t.textMuted, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                                     {ds.ipAddress ?? "Unknown IP"} · {new Date(ds.lastActive).toLocaleString()}
                                                 </p>
                                             </div>
@@ -623,8 +696,8 @@ export default function SettingsPage() {
                                                 onClick={() => handleRevokeSession(ds.id)}
                                                 disabled={revokingId === ds.id}
                                                 style={{
-                                                    flexShrink: 0, padding: "6px 14px", borderRadius: 6, border: "1px solid rgba(239,68,68,0.3)",
-                                                    background: "rgba(239,68,68,0.06)", color: "#f87171", fontSize: "0.78rem", fontWeight: 600,
+                                                    flexShrink: 0, padding: "6px 14px", borderRadius: t.buttonRadius, border: `1px solid ${t.statusError}4d`,
+                                                    background: t.statusErrorBg, color: t.statusError, fontSize: "0.78rem", fontWeight: 600,
                                                     cursor: revokingId === ds.id ? "not-allowed" : "pointer",
                                                     opacity: revokingId === ds.id ? 0.5 : 1, transition: "all 0.15s",
                                                 }}

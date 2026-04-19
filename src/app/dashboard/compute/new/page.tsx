@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
+import { Gift, Ticket, Tag, AlertTriangle, Sparkles, Camera } from "lucide-react";
 
 // ── Data ─────────────────────────────────────────────────────────────────────
 
@@ -254,7 +255,7 @@ export default function ComputeNewPage() {
                     onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 0 48px rgba(139,92,246,0.22)"; }}
                     onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.boxShadow = "0 0 32px rgba(139,92,246,0.12)"; }}
                 >
-                    <span style={{ fontSize: "2rem", flexShrink: 0 }}>🎁</span>
+                    <Gift style={{ width: 28, height: 28, color: "#a78bfa", flexShrink: 0 }} />
                     <div style={{ flex: 1 }}>
                         <p style={{ fontWeight: 800, color: "#e2e8f0", fontSize: "1rem", marginBottom: 4 }}>
                             You are eligible for a Free Trial!
@@ -294,14 +295,14 @@ export default function ComputeNewPage() {
                                         style={{ ...cardBase, ...(active ? (isTrial ? cardFreeTrial : cardActive) : {}) }}>
                                         {/* Trial badge */}
                                         {isTrial && (
-                                            <div style={{ position: "absolute", top: -10, left: 12, padding: "2px 10px", borderRadius: 20, fontSize: "0.62rem", fontWeight: 800, background: "linear-gradient(90deg,#8b5cf6,#6d28d9)", color: "#fff" }}>
-                                                🎁 FREE TRIAL
+                                            <div style={{ position: "absolute", top: -10, left: 12, padding: "2px 10px", borderRadius: 20, fontSize: "0.62rem", fontWeight: 800, background: "linear-gradient(90deg,#8b5cf6,#6d28d9)", color: "#fff", display: "flex", alignItems: "center", gap: 4 }}>
+                                                <Gift style={{ width: 10, height: 10 }} /> FREE TRIAL
                                             </div>
                                         )}
                                         {/* Ticket badge */}
                                         {hasTicket && (
                                             <div style={{ position: "absolute", top: -10, left: 12, padding: "2px 10px", borderRadius: 20, fontSize: "0.62rem", fontWeight: 800, background: "#10b981", color: "#fff" }}>
-                                                🎟 TICKET AVAILABLE
+                                                <Ticket style={{ width: 10, height: 10 }} /> TICKET AVAILABLE
                                             </div>
                                         )}
                                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
@@ -449,8 +450,8 @@ export default function ComputeNewPage() {
                                     >
                                         <div>
                                             <span style={{ fontWeight: 700, color: isTrial ? "#a78bfa" : "#e2e8f0", fontSize: "0.875rem" }}>{p.label}</span>
-                                            {isTrial && <span style={{ marginLeft: 6, fontSize: "0.62rem", color: "#8b5cf6" }}>🎁</span>}
-                                            {hasTicket && <span style={{ marginLeft: 6, fontSize: "0.62rem", color: "#10b981" }}>🎟</span>}
+                                            {isTrial && <span style={{ marginLeft: 6, fontSize: "0.62rem", color: "#8b5cf6", display: "inline-flex", verticalAlign: "middle" }}><Gift style={{ width: 11, height: 11 }} /></span>}
+                                            {hasTicket && <span style={{ marginLeft: 6, fontSize: "0.62rem", color: "#10b981", display: "inline-flex", verticalAlign: "middle" }}><Ticket style={{ width: 11, height: 11 }} /></span>}
                                         </div>
                                         <span style={{ fontSize: "0.82rem", color: "#94a3b8", fontFamily: "monospace" }}>{p.vcpu}</span>
                                         <span style={{ fontSize: "0.82rem", color: "#94a3b8", fontFamily: "monospace" }}>{p.ram} GB</span>
@@ -542,7 +543,7 @@ export default function ComputeNewPage() {
                     {/* Free Trial notice */}
                     {isFreeTrial && (
                         <div style={{ padding: "10px 14px", borderRadius: 9, background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.25)", marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
-                            <span style={{ fontSize: "1rem" }}>🎁</span>
+                            <Gift style={{ width: 16, height: 16, color: "#a78bfa" }} />
                             <div>
                                 <p style={{ fontSize: "0.78rem", fontWeight: 700, color: "#a78bfa" }}>Free Trial Selected</p>
                                 <p style={{ fontSize: "0.7rem", color: "#475569", marginTop: 2 }}>30-day trial · No credits deducted</p>
@@ -553,7 +554,7 @@ export default function ComputeNewPage() {
                     {/* Ticket notice */}
                     {!isFreeTrial && activeTicket && (
                         <div style={{ padding: "10px 14px", borderRadius: 9, background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)", marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
-                            <span style={{ fontSize: "1rem" }}>🎟</span>
+                            <Ticket style={{ width: 16, height: 16, color: "#10b981" }} />
                             <div>
                                 <p style={{ fontSize: "0.78rem", fontWeight: 700, color: "#10b981" }}>Deployment Ticket Available</p>
                                 <p style={{ fontSize: "0.7rem", color: "#475569", marginTop: 2 }}>
@@ -586,14 +587,14 @@ export default function ComputeNewPage() {
                     <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 18 }}>
                         {isFreeTrial ? (
                             <div style={{ display: "flex", justifyContent: "space-between" }}>
-                                <span style={{ fontSize: "0.8rem", color: "#64748b" }}>🎁 Free Trial (1× {plan.label})</span>
+                                <span style={{ fontSize: "0.8rem", color: "#64748b", display: "flex", alignItems: "center", gap: 4 }}><Gift style={{ width: 12, height: 12 }} /> Free Trial (1× {plan.label})</span>
                                 <span style={{ fontSize: "0.8rem", color: "#a78bfa", fontWeight: 700 }}>FREE</span>
                             </div>
                         ) : (
                             <>
                                 {instancesCoveredByTickets > 0 && (
                                     <div style={{ display: "flex", justifyContent: "space-between" }}>
-                                        <span style={{ fontSize: "0.8rem", color: "#64748b" }}>🎟 {instancesCoveredByTickets}× {plan.label} (ticket)</span>
+                                        <span style={{ fontSize: "0.8rem", color: "#64748b", display: "flex", alignItems: "center", gap: 4 }}><Ticket style={{ width: 12, height: 12 }} /> {instancesCoveredByTickets}× {plan.label} (ticket)</span>
                                         <span style={{ fontSize: "0.8rem", color: "#10b981", fontWeight: 700 }}>FREE</span>
                                     </div>
                                 )}
@@ -617,7 +618,7 @@ export default function ComputeNewPage() {
                                 )}
                                 {promoApplied && !activeTicket && (
                                     <div style={{ display: "flex", justifyContent: "space-between" }}>
-                                        <span style={{ fontSize: "0.8rem", color: "#10b981" }}>🎉 Promo bonus</span>
+                                        <span style={{ fontSize: "0.8rem", color: "#10b981", display: "flex", alignItems: "center", gap: 4 }}><Sparkles style={{ width: 12, height: 12 }} /> Promo bonus</span>
                                         <span style={{ fontSize: "0.8rem", color: "#10b981", fontWeight: 700 }}>-{promoBonus.toLocaleString()} Cr</span>
                                     </div>
                                 )}
@@ -634,20 +635,20 @@ export default function ComputeNewPage() {
                             </span>
                         </div>
                         {isFreeTrial ? (
-                            <p style={{ fontSize: "0.72rem", color: "#a78bfa", textAlign: "right" }}>
-                                🎁 30-day free trial · No credits required
+                            <p style={{ fontSize: "0.72rem", color: "#a78bfa", textAlign: "right", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 4 }}>
+                                <Gift style={{ width: 11, height: 11 }} /> 30-day free trial · No credits required
                             </p>
                         ) : (
                             <>
                                 {total === 0 && instancesCoveredByTickets > 0 && (
-                                    <p style={{ fontSize: "0.72rem", color: "#10b981", textAlign: "right" }}>
-                                        🎟 {instancesCoveredByTickets} ticket(s) applied · valid until{" "}
+                                    <p style={{ fontSize: "0.72rem", color: "#10b981", textAlign: "right", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 4 }}>
+                                        <Ticket style={{ width: 11, height: 11 }} /> {instancesCoveredByTickets} ticket(s) applied · valid until{" "}
                                         {new Date(activeTicket!.validUntil).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
                                     </p>
                                 )}
                                 {isSplitOrder && (
-                                    <p style={{ fontSize: "0.72rem", color: "#f59e0b", textAlign: "right", marginTop: 4 }}>
-                                        🎟 {instancesCoveredByTickets} ticket applied · {instancesToPayFor} billed at standard rate
+                                    <p style={{ fontSize: "0.72rem", color: "#f59e0b", textAlign: "right", marginTop: 4, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 4 }}>
+                                        <Ticket style={{ width: 11, height: 11 }} /> {instancesCoveredByTickets} ticket applied · {instancesToPayFor} billed at standard rate
                                     </p>
                                 )}
                                 {!activeTicket && !isSplitOrder && (
@@ -663,11 +664,11 @@ export default function ComputeNewPage() {
                     {!isFreeTrial && !activeTicket && (
                         <div style={{ marginBottom: 18 }}>
                             <p style={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-                                <span style={{ color: "#f59e0b" }}>🏷</span> Promo Code
+                                <Tag style={{ width: 13, height: 13, color: "#f59e0b" }} /> Promo Code
                             </p>
                             <div style={{ display: "flex", gap: 8 }}>
                                 <input value={promoCode} onChange={e => { setPromoCode(e.target.value.toUpperCase()); setPromoErr(""); }} disabled={promoApplied}
-                                    placeholder="Enter promo code here 🎫"
+                                    placeholder="Enter promo code"
                                     style={{
                                         flex: 1, padding: "8px 12px",
                                         background: promoApplied ? "rgba(16,185,129,0.08)" : "rgba(255,255,255,0.04)",
@@ -683,8 +684,8 @@ export default function ComputeNewPage() {
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5"><path d="M20 6 9 17l-5-5" /></svg>
                                 </button>
                             </div>
-                            {promoErr && <p style={{ fontSize: "0.72rem", color: "#ef4444", marginTop: 6 }}>⚠ {promoErr}</p>}
-                            {promoApplied && <p style={{ fontSize: "0.72rem", color: "#10b981", marginTop: 6 }}>🎉 +{promoBonus.toLocaleString()} credits applied</p>}
+                            {promoErr && <p style={{ fontSize: "0.72rem", color: "#ef4444", marginTop: 6, display: "flex", alignItems: "center", gap: 4 }}><AlertTriangle style={{ width: 11, height: 11 }} /> {promoErr}</p>}
+                            {promoApplied && <p style={{ fontSize: "0.72rem", color: "#10b981", marginTop: 6, display: "flex", alignItems: "center", gap: 4 }}><Sparkles style={{ width: 11, height: 11 }} /> +{promoBonus.toLocaleString()} credits applied</p>}
                         </div>
                     )}
 
@@ -704,8 +705,8 @@ export default function ComputeNewPage() {
                     )}
 
                     {deployErr && (
-                        <div style={{ padding: "10px 14px", borderRadius: 8, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", color: "#ef4444", fontSize: "0.8rem", marginBottom: 14 }}>
-                            ⚠ {deployErr}
+                        <div style={{ padding: "10px 14px", borderRadius: 8, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", color: "#ef4444", fontSize: "0.8rem", marginBottom: 14, display: "flex", alignItems: "center", gap: 6 }}>
+                            <AlertTriangle style={{ width: 13, height: 13, flexShrink: 0 }} /> {deployErr}
                         </div>
                     )}
 
@@ -732,9 +733,9 @@ export default function ComputeNewPage() {
                         {deploying ? (
                             <><svg width="16" height="16" style={{ animation: "spin 1s linear infinite" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /></svg>Deploying…</>
                         ) : isFreeTrial ? (
-                            <><span>🎁</span> Start Free Trial</>
+                            <><Gift style={{ width: 16, height: 16 }} /> Start Free Trial</>
                         ) : activeTicket ? (
-                            <><span>🎟</span> Deploy Now (Free)</>
+                            <><Ticket style={{ width: 16, height: 16 }} /> Deploy Now (Free)</>
                         ) : (
                             <><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg>Deploy Now</>
                         )}
