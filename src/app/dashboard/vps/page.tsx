@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useThemeTokens } from "@/lib/useThemeTokens";
+import { AlertTriangle, Clock, CheckCircle2, X } from "lucide-react";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -239,19 +240,19 @@ export default function VpsDashboard() {
             {/* ── Trial Banners ── */}
             {trialStatus?.isPastGrace && (
                 <div style={{ padding: "14px 20px", borderRadius: t.isMono ? 4 : 10, background: t.statusErrorBg, border: `1px solid ${t.statusError}33`, color: t.statusError, marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span>⚠️ Trial data permanently deleted (33-day limit exceeded).</span>
+                    <span style={{ display: "flex", alignItems: "center", gap: 6 }}><AlertTriangle style={{ width: 14, height: 14, flexShrink: 0 }} /> Trial data permanently deleted (33-day limit exceeded).</span>
                     <Link href="/services/vps" style={{ padding: "6px 16px", borderRadius: t.buttonRadius, background: t.statusError, color: "#fff", fontWeight: 700, fontSize: "0.8rem", textDecoration: "none" }}>View Plans</Link>
                 </div>
             )}
             {trialStatus?.isExpired && !trialStatus.isPastGrace && (
                 <div style={{ padding: "14px 20px", borderRadius: t.isMono ? 4 : 10, background: t.statusWarningBg, border: `1px solid ${t.statusWarning}33`, color: t.statusWarning, marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <span>⏰ <strong>Trial Expired.</strong> VM deletes in <strong>{trialStatus.daysUntilDeletion} day(s)</strong>.</span>
+                    <span style={{ display: "flex", alignItems: "center", gap: 6 }}><Clock style={{ width: 14, height: 14, flexShrink: 0 }} /> <strong>Trial Expired.</strong> VM deletes in <strong>{trialStatus.daysUntilDeletion} day(s)</strong>.</span>
                     <Link href="/payment?plan=Cloud+Starter" style={{ padding: "6px 16px", borderRadius: t.buttonRadius, background: t.accentPrimary, color: t.textInverse, fontWeight: 700, fontSize: "0.8rem", textDecoration: "none" }}>Upgrade Now</Link>
                 </div>
             )}
             {trialStatus?.isActive && (
                 <div style={{ padding: "12px 20px", borderRadius: t.isMono ? 4 : 10, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}22`, color: t.statusSuccess, marginBottom: 20, fontSize: "0.85rem" }}>
-                    ✅ Trial active — <strong>{trialStatus.daysRemaining} day(s)</strong> remaining.
+                    <span style={{ display: "flex", alignItems: "center", gap: 6 }}><CheckCircle2 style={{ width: 14, height: 14, flexShrink: 0 }} /> Trial active — <strong>{trialStatus.daysRemaining} day(s)</strong> remaining.</span>
                 </div>
             )}
 
@@ -259,7 +260,7 @@ export default function VpsDashboard() {
             {error && (
                 <div style={{ padding: "12px 16px", borderRadius: t.isMono ? 4 : 9, background: t.statusErrorBg, border: `1px solid ${t.statusError}33`, color: t.statusError, marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between" }}>
                     {error}
-                    <button onClick={() => setError("")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer" }}>✕</button>
+                    <button onClick={() => setError("")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", display: "flex", alignItems: "center" }}><X style={{ width: 14, height: 14 }} /></button>
                 </div>
             )}
 
@@ -279,9 +280,9 @@ export default function VpsDashboard() {
                     </div>
                     <select id="vm-status-filter" value={statusFilter} onChange={e => setStatusFilter(e.target.value)} style={{ ...inputStyle, cursor: "pointer", paddingRight: 28 }}>
                         <option value="">All Status</option>
-                        <option value="running">🟢 Running</option>
-                        <option value="stopped">🔴 Stopped</option>
-                        <option value="paused">🟡 Paused</option>
+                        <option value="running">Running</option>
+                        <option value="stopped">Stopped</option>
+                        <option value="paused">Paused</option>
                     </select>
                     <select id="vm-sort" value={sortKey} onChange={e => setSortKey(e.target.value)} style={{ ...inputStyle, cursor: "pointer" }}>
                         <option value="createdAt_desc">Newest first</option>
@@ -290,7 +291,7 @@ export default function VpsDashboard() {
                         <option value="name_desc">Name Z→A</option>
                     </select>
                     {hasFilters && (
-                        <button onClick={clearFilters} style={{ ...inputStyle, cursor: "pointer", color: t.statusWarning, borderColor: `${t.statusWarning}33`, background: t.statusWarningBg, whiteSpace: "nowrap" }}>✕ Clear</button>
+                        <button onClick={clearFilters} style={{ ...inputStyle, cursor: "pointer", color: t.statusWarning, borderColor: `${t.statusWarning}33`, background: t.statusWarningBg, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 4 }}><X style={{ width: 12, height: 12 }} /> Clear</button>
                     )}
                     <div style={{ flex: "0 0 auto", marginLeft: "auto" }}>
                         <button onClick={() => loadInstances()} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: t.isMono ? 4 : 7, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>

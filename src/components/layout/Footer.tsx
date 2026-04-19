@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useThemeTokens } from "@/lib/useThemeTokens";
+import { Heart } from "lucide-react";
 
 const FOOTER_LINKS = {
     Services: [
@@ -139,7 +140,7 @@ export default function Footer() {
                         © {new Date().getFullYear()} Notrespond.com. All rights reserved.
                     </p>
                     <p style={{ color: t.textMuted, fontSize: "0.82rem" }}>
-                        Built with <span style={{ color: t.accentPrimary }}>Next.js</span> • Secured with <span style={{ color: t.statusSuccess }}>❤️</span>
+                        Built with <span style={{ color: t.accentPrimary }}>Next.js</span> &bull; Secured with <Heart style={{ width: 13, height: 13, color: t.statusError, display: "inline", verticalAlign: "middle", fill: t.statusError }} />
                     </p>
                 </div>
             </div>

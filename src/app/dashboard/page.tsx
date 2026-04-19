@@ -3,6 +3,11 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useThemeTokens } from "@/lib/useThemeTokens";
+import {
+    Zap, CreditCard, KeyRound, MessageSquare, Monitor,
+    FileText, BookOpen, HelpCircle, Cloud, ChevronRight,
+    AlertTriangle, Clock, Server
+} from "lucide-react";
 
 interface VpsInstance {
     id: string;
@@ -60,7 +65,7 @@ export default function OverviewPage() {
     if (loading) {
         return (
             <div style={{ padding: "48px 36px", background: t.bgPrimary, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <p style={{ color: t.textMuted }}>Loading…</p>
+                <p style={{ color: t.textMuted }}>Loading...</p>
             </div>
         );
     }
@@ -69,15 +74,29 @@ export default function OverviewPage() {
     const vps = data?.vpsInstances ?? [];
     const firstName = user?.name?.split(" ")[0] || user?.email?.split("@")[0] || "there";
 
+    const QUICK_ACTIONS = [
+        { label: "Deploy New Server", href: "/dashboard/billing", Icon: Zap },
+        { label: "Add Credit", href: "/dashboard/billing", Icon: CreditCard },
+        { label: "SSH Keys", href: "/dashboard/ssh", Icon: KeyRound },
+        { label: "Open Ticket", href: "/dashboard/tickets", Icon: MessageSquare },
+    ];
+
+    const SUPPORT_LINKS = [
+        { label: "Developer Docs", Icon: FileText, href: "#" },
+        { label: "How-to Guides", Icon: BookOpen, href: "#" },
+        { label: "FAQs", Icon: HelpCircle, href: "#" },
+        { label: "NRSP Cloud Features", Icon: Cloud, href: "#" },
+    ];
+
     return (
         <div style={{ padding: "32px 36px", minHeight: "100vh", backgroundColor: t.bgPrimary }}>
 
             {/* Breadcrumb */}
             <p style={{ fontSize: "0.78rem", color: t.textMuted, marginBottom: 24 }}>
-                Dashboard &nbsp;•&nbsp; Overview
+                Dashboard &nbsp;&bull;&nbsp; Overview
             </p>
 
-            {/* ── 2FA Warning Banner ── */}
+            {/* 2FA Warning Banner */}
             {user && !user.twoFactorEnabled && (
                 <div style={{
                     display: "flex", alignItems: "center", gap: 14,
@@ -85,10 +104,7 @@ export default function OverviewPage() {
                     background: t.statusWarningBg, border: `1px solid ${t.statusWarning}33`,
                     color: t.statusWarning,
                 }}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={t.statusWarning} strokeWidth="2.5" style={{ flexShrink: 0 }}>
-                        <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-                        <line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" />
-                    </svg>
+                    <AlertTriangle style={{ width: 20, height: 20, flexShrink: 0 }} />
                     <p style={{ fontSize: "0.875rem", lineHeight: 1.5 }}>
                         NRSP Cloud recommends enabling two-factor authentication to enhance your account security.{" "}
                         <Link href="/dashboard/settings" style={{ color: t.accentPrimary, fontWeight: 700, textDecoration: "underline" }}>
@@ -99,16 +115,16 @@ export default function OverviewPage() {
                 </div>
             )}
 
-            {/* ── Main Two-Column Grid ── */}
+            {/* Main Two-Column Grid */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 24, alignItems: "start", width: "100%" }}>
 
-                {/* ── LEFT COLUMN ── */}
+                {/* LEFT COLUMN */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
 
                     {/* Greeting + Quick Actions */}
                     <div style={{ ...card, padding: 28 }}>
                         <h2 style={{ fontSize: "1.3rem", fontWeight: 800, color: t.textPrimary, marginBottom: 6 }}>
-                            {getGreeting()}, {firstName} 👋
+                            {getGreeting()}, {firstName}
                         </h2>
                         <p style={{ color: t.textMuted, fontSize: "0.875rem", marginBottom: 24 }}>
                             Here&apos;s a snapshot of your NRSP Cloud workspace.
@@ -118,12 +134,7 @@ export default function OverviewPage() {
                             Quick Actions
                         </p>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-                            {[
-                                { label: "Deploy New Server", href: "/dashboard/billing", icon: "⚡" },
-                                { label: "Add Credit", href: "/dashboard/billing", icon: "💳" },
-                                { label: "SSH Keys", href: "/dashboard/ssh", icon: "🔑" },
-                                { label: "Open Ticket", href: "/dashboard/tickets", icon: "📋" },
-                            ].map(a => (
+                            {QUICK_ACTIONS.map(a => (
                                 <Link key={a.label} href={a.href} style={{
                                     display: "inline-flex", alignItems: "center", gap: 8,
                                     padding: "8px 16px", borderRadius: t.isMono ? 4 : 8, textDecoration: "none",
@@ -131,7 +142,7 @@ export default function OverviewPage() {
                                     color: t.accentPrimary, fontSize: "0.85rem", fontWeight: 600,
                                     transition: "all 0.15s",
                                 }}>
-                                    <span>{a.icon}</span> {a.label}
+                                    <a.Icon style={{ width: 14, height: 14 }} /> {a.label}
                                 </Link>
                             ))}
                         </div>
@@ -141,17 +152,19 @@ export default function OverviewPage() {
                     <div style={{ ...card, overflow: "hidden" }}>
                         <div style={{ padding: "20px 24px", borderBottom: `1px solid ${t.borderSecondary}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={t.accentPrimary} strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" /></svg>
+                                <Server style={{ width: 18, height: 18, color: t.accentPrimary }} />
                                 <p style={{ fontWeight: 700, color: t.textPrimary, fontSize: "0.95rem" }}>Your Instances</p>
                             </div>
                             <Link href="/dashboard/vps" style={{ fontSize: "0.8rem", color: t.accentPrimary, textDecoration: "none", fontWeight: 600 }}>
-                                View all →
+                                View all &rarr;
                             </Link>
                         </div>
 
                         {vps.length === 0 ? (
                             <div style={{ padding: "56px 24px", textAlign: "center" as const }}>
-                                <div style={{ fontSize: "2.5rem", marginBottom: 12 }}>🖥️</div>
+                                <div style={{ width: 64, height: 64, borderRadius: 16, background: t.accentPrimaryMuted, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+                                    <Monitor style={{ width: 28, height: 28, color: t.accentPrimary }} />
+                                </div>
                                 <p style={{ fontWeight: 700, color: t.textPrimary, fontSize: "1rem", marginBottom: 8 }}>No services yet</p>
                                 <p style={{ color: t.textMuted, fontSize: "0.875rem", marginBottom: 24 }}>
                                     Deploy your first server to get started with NRSP Cloud
@@ -161,7 +174,7 @@ export default function OverviewPage() {
                                     padding: "10px 22px", borderRadius: t.buttonRadius, textDecoration: "none",
                                     background: t.accentPrimary, color: t.textInverse, fontSize: "0.875rem", fontWeight: 700,
                                 }}>
-                                    ⚡ Deploy New Server
+                                    <Zap style={{ width: 14, height: 14 }} /> Deploy New Server
                                 </Link>
                             </div>
                         ) : (
@@ -174,7 +187,7 @@ export default function OverviewPage() {
                                                 <div style={{ width: 8, height: 8, borderRadius: "50%", background: ss.dot, flexShrink: 0 }} />
                                                 <div>
                                                     <p style={{ fontWeight: 700, color: t.textPrimary, fontSize: "0.9rem" }}>{vm.name}</p>
-                                                    <p style={{ color: t.textMuted, fontSize: "0.78rem" }}>{vm.os} · {vm.node} · VM {vm.vmId}</p>
+                                                    <p style={{ color: t.textMuted, fontSize: "0.78rem" }}>{vm.os} &middot; {vm.node} &middot; VM {vm.vmId}</p>
                                                 </div>
                                             </div>
                                             <div style={{ textAlign: "right" as const }}>
@@ -189,13 +202,13 @@ export default function OverviewPage() {
                     </div>
                 </div>
 
-                {/* ── RIGHT COLUMN ── */}
+                {/* RIGHT COLUMN */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
 
                     {/* Cloud Credit Card */}
                     <div style={{ ...card, padding: 24, textAlign: "center" as const }}>
                         <div style={{ width: 56, height: 56, borderRadius: "50%", background: t.accentPrimaryMuted, margin: "0 auto 14px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={t.accentPrimary} strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></svg>
+                            <Clock style={{ width: 24, height: 24, color: t.accentPrimary }} />
                         </div>
                         <p style={{ fontWeight: 800, color: t.textPrimary, fontSize: "1rem", marginBottom: 4 }}>
                             {user?.name || user?.email?.split("@")[0]}
@@ -217,16 +230,11 @@ export default function OverviewPage() {
                     <div style={{ ...card, overflow: "hidden" }}>
                         <div style={{ padding: "16px 20px", borderBottom: `1px solid ${t.borderSecondary}` }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={t.statusSuccess} strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01" /></svg>
+                                <HelpCircle style={{ width: 16, height: 16, color: t.statusSuccess }} />
                                 <p style={{ fontWeight: 700, color: t.textPrimary, fontSize: "0.9rem" }}>Support</p>
                             </div>
                         </div>
-                        {[
-                            { label: "Developer Docs", icon: "📄", href: "#" },
-                            { label: "How-to Guides", icon: "📖", href: "#" },
-                            { label: "FAQs", icon: "❓", href: "#" },
-                            { label: "NRSP Cloud Features", icon: "☁️", href: "#" },
-                        ].map(item => (
+                        {SUPPORT_LINKS.map(item => (
                             <Link key={item.label} href={item.href} style={{
                                 display: "flex", alignItems: "center", justifyContent: "space-between",
                                 padding: "13px 20px", borderBottom: `1px solid ${t.borderSecondary}`,
@@ -237,9 +245,9 @@ export default function OverviewPage() {
                                 onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
                             >
                                 <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                    <span>{item.icon}</span> {item.label}
+                                    <item.Icon style={{ width: 15, height: 15, color: t.textMuted }} /> {item.label}
                                 </span>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.textMuted} strokeWidth="2"><path d="m9 18 6-6-6-6" /></svg>
+                                <ChevronRight style={{ width: 14, height: 14, color: t.textMuted }} />
                             </Link>
                         ))}
                     </div>

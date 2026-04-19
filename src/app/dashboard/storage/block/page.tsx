@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useThemeTokens } from "@/lib/useThemeTokens";
+import { X, AlertTriangle } from "lucide-react";
 
 interface VpsInstance { id: string; vmId: string; name: string; node: string; status: string; }
 interface BlockAddon { id: string; storageType: string; storagePool: string; diskSlot: string; sizeGb: number; pricePerGb: number; totalCost: number; purchasedAt: string; }
@@ -36,7 +37,7 @@ export default function BlockStoragePage() {
         const json = await res.json();
         if (!res.ok) { setError(json.error || "Failed."); setSubmitting(false); return; }
         setSuccess(`+${sizeGb} GB ${TIER_LABELS[storageType]} attached to VM ${selectedVm} (${json.diskSlot})`);
-        if (json.manualCommand) setSuccess(prev => `${prev}\n⚠️ Manual: ${json.manualCommand}`);
+        if (json.manualCommand) setSuccess(prev => `${prev}\nManual: ${json.manualCommand}`);
         setSizeGb(50); loadInfo(selectedVm); setSubmitting(false);
     };
 
@@ -70,8 +71,8 @@ export default function BlockStoragePage() {
             </div>
 
             {/* Toasts */}
-            {success && <div style={{ padding: "12px 16px", borderRadius: t.isMono ? 4 : 9, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}33`, color: t.statusSuccess, marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between", whiteSpace: "pre-line" }}>{success}<button onClick={() => setSuccess("")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", flexShrink: 0, alignSelf: "flex-start" }}>✕</button></div>}
-            {error && <div style={{ padding: "12px 16px", borderRadius: t.isMono ? 4 : 9, background: t.statusErrorBg, border: `1px solid ${t.statusError}33`, color: t.statusError, marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between" }}>{error}<button onClick={() => setError("")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer" }}>✕</button></div>}
+            {success && <div style={{ padding: "12px 16px", borderRadius: t.isMono ? 4 : 9, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}33`, color: t.statusSuccess, marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between", whiteSpace: "pre-line" }}>{success}<button onClick={() => setSuccess("")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", flexShrink: 0, alignSelf: "flex-start", display: "flex", alignItems: "center" }}><X style={{ width: 14, height: 14 }} /></button></div>}
+            {error && <div style={{ padding: "12px 16px", borderRadius: t.isMono ? 4 : 9, background: t.statusErrorBg, border: `1px solid ${t.statusError}33`, color: t.statusError, marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between" }}>{error}<button onClick={() => setError("")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", display: "flex", alignItems: "center" }}><X style={{ width: 14, height: 14 }} /></button></div>}
 
             {loading ? (
                 <div style={{ padding: 60, display: "flex", alignItems: "center", justifyContent: "center", color: t.textMuted, gap: 10 }}>Loading VMs…</div>
@@ -157,7 +158,7 @@ export default function BlockStoragePage() {
                                     </form>
                                 </div>
                             ) : (
-                                <div style={{ ...card, padding: "20px 24px", textAlign: "center", borderColor: `${t.statusError}33` }}><p style={{ color: t.statusError, fontWeight: 600 }}>⚠ All 5 extra disk slots are occupied.</p></div>
+                                <div style={{ ...card, padding: "20px 24px", textAlign: "center", borderColor: `${t.statusError}33` }}><p style={{ color: t.statusError, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}><AlertTriangle style={{ width: 14, height: 14 }} /> All 5 extra disk slots are occupied.</p></div>
                             )}
                         </>
                     )}

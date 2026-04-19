@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { WINDOWS_ISOS, getIsosByCategory } from "@/lib/windows-isos";
 import { useThemeTokens } from "@/lib/useThemeTokens";
+import { AlertTriangle, Play, X } from "lucide-react";
 
 interface VmDetail {
     id: string;
@@ -166,7 +167,7 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
                                 <button onClick={() => handleAction("stop")} disabled={!!actionLoading} style={{ padding: "8px 16px", borderRadius: t.buttonRadius, border: "none", background: t.statusError, color: "#fff", cursor: "pointer", fontSize: "0.85rem", fontWeight: 700 }}>{actionLoading === "stop" ? "Stopping…" : "Stop"}</button>
                             </>
                         ) : (
-                            <button onClick={() => handleAction("start")} disabled={!!actionLoading} style={{ padding: "8px 20px", borderRadius: t.buttonRadius, border: "none", background: t.accentPrimary, color: t.textInverse, cursor: "pointer", fontSize: "0.85rem", fontWeight: 700 }}>{actionLoading === "start" ? "Starting…" : "▶ Start"}</button>
+                            <button onClick={() => handleAction("start")} disabled={!!actionLoading} style={{ padding: "8px 20px", borderRadius: t.buttonRadius, border: "none", background: t.accentPrimary, color: t.textInverse, cursor: "pointer", fontSize: "0.85rem", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 6 }}>{actionLoading === "start" ? "Starting..." : <><Play style={{ width: 12, height: 12 }} /> Start</>}</button>
                         )}
                     </div>
                 </div>
@@ -174,7 +175,7 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
 
             {error && (
                 <div style={{ padding: "12px 18px", borderRadius: t.isMono ? 4 : 8, background: t.statusErrorBg, border: `1px solid ${t.statusError}33`, color: t.statusError, marginBottom: 20, fontSize: "0.88rem" }}>
-                    {error} <button onClick={() => setError("")} style={{ float: "right", background: "none", border: "none", color: "inherit", cursor: "pointer" }}>✕</button>
+                    {error} <button onClick={() => setError("")} style={{ float: "right", background: "none", border: "none", color: "inherit", cursor: "pointer", display: "inline-flex", alignItems: "center" }}><X style={{ width: 14, height: 14 }} /></button>
                 </div>
             )}
 
@@ -259,7 +260,7 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
                         <div style={{ ...card, textAlign: "center", padding: 60 }}>
                             <h3 style={{ marginBottom: 8, color: t.textPrimary }}>VM is not running</h3>
                             <p style={{ color: t.textMuted, marginBottom: 20 }}>Start the VM to access the console.</p>
-                            <button onClick={() => handleAction("start")} disabled={!!actionLoading} style={{ padding: "10px 24px", borderRadius: t.buttonRadius, border: "none", background: t.accentPrimary, color: t.textInverse, fontWeight: 700, cursor: "pointer" }}>{actionLoading === "start" ? "Starting…" : "▶ Start VM"}</button>
+                            <button onClick={() => handleAction("start")} disabled={!!actionLoading} style={{ padding: "10px 24px", borderRadius: t.buttonRadius, border: "none", background: t.accentPrimary, color: t.textInverse, fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>{actionLoading === "start" ? "Starting..." : <><Play style={{ width: 13, height: 13 }} /> Start VM</>}</button>
                         </div>
                     )}
                 </div>
@@ -273,8 +274,8 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
                         <h3 style={{ fontSize: "1.05rem", fontWeight: 700, marginBottom: 4, color: t.textPrimary }}>Console Display Type</h3>
                         <p style={{ color: t.textMuted, fontSize: "0.85rem", marginBottom: 16 }}><strong>noVNC</strong> = browser-based. <strong>SPICE</strong> = external client (virt-viewer).</p>
                         {isRunning && (
-                            <div style={{ padding: "12px 16px", borderRadius: t.isMono ? 4 : 8, background: t.statusWarningBg, border: `1px solid ${t.statusWarning}33`, color: t.statusWarning, fontSize: "0.85rem", fontWeight: 600, marginBottom: 16 }}>
-                                ⚠️ Power off the VM before changing the display adapter.
+                            <div style={{ padding: "12px 16px", borderRadius: t.isMono ? 4 : 8, background: t.statusWarningBg, border: `1px solid ${t.statusWarning}33`, color: t.statusWarning, fontSize: "0.85rem", fontWeight: 600, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+                                <AlertTriangle style={{ width: 14, height: 14, flexShrink: 0 }} /> Power off the VM before changing the display adapter.
                             </div>
                         )}
                         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
@@ -347,7 +348,7 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
                 <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: t.isLight ? "rgba(0,0,0,0.4)" : "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
                     <div style={{ ...card, width: "100%", maxWidth: 480, padding: 32, border: `1px solid ${t.statusError}55`, boxShadow: `0 10px 40px ${t.statusError}22` }}>
                         <h2 style={{ fontSize: "1.3rem", fontWeight: 800, color: t.textPrimary, marginBottom: 12, display: "flex", alignItems: "center", gap: 8 }}>
-                            <span style={{ color: t.statusError }}>⚠️</span> Confirm Destruction
+                            <AlertTriangle style={{ width: 20, height: 20, color: t.statusError }} /> Confirm Destruction
                         </h2>
                         <p style={{ color: t.textMuted, fontSize: "0.92rem", marginBottom: 24, lineHeight: 1.6 }}>
                             Are you absolutely sure you want to destroy <strong>{vm.name}</strong>? All data will be wiped permanently.

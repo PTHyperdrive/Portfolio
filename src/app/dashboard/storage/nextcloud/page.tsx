@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useThemeTokens } from "@/lib/useThemeTokens";
+import { X, CheckCircle2, AlertCircle, CloudUpload } from "lucide-react";
 
 interface NcStorage { provisioned: boolean; eligible: boolean; ncUsername: string | null; freeGb: number; paidGb: number; totalGb: number; remainingGb?: number; maxTotalGb: number; stepGb: number; pricing: { nvme: number; sata: number; hdd: number }; limits: { min: number; max: number; step: number }; }
 type StorageType = "nvme" | "sata" | "hdd";
@@ -21,7 +22,7 @@ export default function NextcloudStoragePage() {
     const load = useCallback(async () => { try { const res = await fetch("/api/user/nextcloud-storage"); if (!res.ok) throw new Error("Failed."); setData(await res.json()); } catch (err) { setError(err instanceof Error ? err.message : "Failed."); } finally { setLoading(false); } }, []);
     useEffect(() => { load(); }, [load]);
 
-    const handleProvision = async () => { setSubmitting(true); setError(""); const res = await fetch("/api/user/nextcloud-storage", { method: "POST" }); const json = await res.json(); if (!res.ok) { setError(json.error || "Failed."); setSubmitting(false); return; } setSuccess(`✅ ${json.message || "Nextcloud storage activated!"}`); load(); setSubmitting(false); };
+    const handleProvision = async () => { setSubmitting(true); setError(""); const res = await fetch("/api/user/nextcloud-storage", { method: "POST" }); const json = await res.json(); if (!res.ok) { setError(json.error || "Failed."); setSubmitting(false); return; } setSuccess(json.message || "Nextcloud storage activated!"); load(); setSubmitting(false); };
     const handleExpand = async (e: React.FormEvent) => { e.preventDefault(); setSubmitting(true); setError(""); const res = await fetch("/api/user/nextcloud-storage", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ storageType: expandType, expandGb }) }); const json = await res.json(); if (!res.ok) { setError(json.error || "Failed."); setSubmitting(false); return; } setSuccess(`+${expandGb} GB ${TIER_LABELS[expandType]} cloud storage added.`); setExpandGb(5); load(); setSubmitting(false); };
 
     const card: React.CSSProperties = { background: t.bgCard, border: `1px solid ${t.borderPrimary}`, borderRadius: t.cardRadius, boxShadow: t.shadow };
@@ -41,8 +42,8 @@ export default function NextcloudStoragePage() {
                 <p style={{ marginTop: 6, fontSize: "0.83rem", color: t.textMuted, maxWidth: 520 }}>Cloud file storage accessible from any device. 5 GB free with any active VM lease. Expand in 5 GB blocks up to 100 GB total.</p>
             </div>
 
-            {success && <div style={{ padding: "12px 16px", borderRadius: t.isMono ? 4 : 9, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}33`, color: t.statusSuccess, marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between" }}>{success}<button onClick={() => setSuccess("")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer" }}>✕</button></div>}
-            {error && <div style={{ padding: "12px 16px", borderRadius: t.isMono ? 4 : 9, background: t.statusErrorBg, border: `1px solid ${t.statusError}33`, color: t.statusError, marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between" }}>{error}<button onClick={() => setError("")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer" }}>✕</button></div>}
+            {success && <div style={{ padding: "12px 16px", borderRadius: t.isMono ? 4 : 9, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}33`, color: t.statusSuccess, marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}><span style={{ display: "flex", alignItems: "center", gap: 6 }}><CheckCircle2 style={{ width: 14, height: 14, flexShrink: 0 }} /> {success}</span><button onClick={() => setSuccess("")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", display: "flex", alignItems: "center" }}><X style={{ width: 14, height: 14 }} /></button></div>}
+            {error && <div style={{ padding: "12px 16px", borderRadius: t.isMono ? 4 : 9, background: t.statusErrorBg, border: `1px solid ${t.statusError}33`, color: t.statusError, marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}><span style={{ display: "flex", alignItems: "center", gap: 6 }}><AlertCircle style={{ width: 14, height: 14, flexShrink: 0 }} /> {error}</span><button onClick={() => setError("")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", display: "flex", alignItems: "center" }}><X style={{ width: 14, height: 14 }} /></button></div>}
 
             {loading ? <div style={{ padding: 60, display: "flex", alignItems: "center", justifyContent: "center", color: t.textMuted }}>Loading…</div> : !data ? null : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -135,7 +136,7 @@ export default function NextcloudStoragePage() {
                                     </form>
                                 </div>
                             ) : (
-                                <div style={{ ...card, padding: "20px 24px", textAlign: "center", borderColor: `${t.statusSuccess}33` }}><p style={{ color: t.statusSuccess, fontWeight: 600 }}>✅ Maximum quota reached (100 GB)</p></div>
+                                <div style={{ ...card, padding: "20px 24px", textAlign: "center", borderColor: `${t.statusSuccess}33` }}><p style={{ color: t.statusSuccess, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}><CheckCircle2 style={{ width: 14, height: 14 }} /> Maximum quota reached (100 GB)</p></div>
                             )}
                         </>
                     )}

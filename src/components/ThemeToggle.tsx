@@ -1,11 +1,12 @@
 "use client";
 
 import { useTheme, type ThemeId } from "@/components/ThemeProvider";
+import { Palette, Moon, Sun } from "lucide-react";
 
-const THEME_META: Record<ThemeId, { label: string; icon: string; shortLabel: string }> = {
-    slop: { label: "Slop Theme", icon: "🎨", shortLabel: "SLOP" },
-    "mono-dark": { label: "Mono Dark", icon: "🌙", shortLabel: "DARK" },
-    "mono-light": { label: "Mono Light", icon: "☀️", shortLabel: "LIGHT" },
+const THEME_META: Record<ThemeId, { label: string; shortLabel: string; Icon: typeof Palette }> = {
+    slop: { label: "Slop Theme", Icon: Palette, shortLabel: "SLOP" },
+    "mono-dark": { label: "OLED Dark", Icon: Moon, shortLabel: "DARK" },
+    "mono-light": { label: "Mono Light", Icon: Sun, shortLabel: "LIGHT" },
 };
 
 /**
@@ -40,7 +41,7 @@ export default function ThemeToggle({ variant = "navbar" }: { variant?: "navbar"
                     letterSpacing: "0.03em",
                 }}
             >
-                <span>{meta.icon}</span>
+                <meta.Icon style={{ width: 13, height: 13 }} />
                 <span>{meta.shortLabel}</span>
             </button>
         );
@@ -89,7 +90,7 @@ export default function ThemeToggle({ variant = "navbar" }: { variant?: "navbar"
                             gap: 3,
                         }}
                     >
-                        <span style={{ fontSize: "0.72rem" }}>{m.icon}</span>
+                        <m.Icon style={{ width: 11, height: 11 }} />
                         <span>{m.shortLabel}</span>
                     </button>
                 );

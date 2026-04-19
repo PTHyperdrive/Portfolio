@@ -81,13 +81,13 @@ const SLOP_TOKENS: ThemeTokens = {
 };
 
 const MONO_DARK_TOKENS: ThemeTokens = {
-    bgPrimary: "#1a1a1a",
-    bgSecondary: "#232323",
-    bgTertiary: "#2d2d2d",
-    bgCard: "#292929",
-    bgCardHover: "#303030",
-    bgInput: "#232323",
-    borderPrimary: "rgba(255,255,255,0.12)",
+    bgPrimary: "#000000",
+    bgSecondary: "#0a0a0a",
+    bgTertiary: "#141414",
+    bgCard: "#111111",
+    bgCardHover: "#1a1a1a",
+    bgInput: "#0a0a0a",
+    borderPrimary: "rgba(255,255,255,0.10)",
     borderSecondary: "rgba(255,255,255,0.06)",
     textPrimary: "#e8eaed",
     textSecondary: "#9aa0a6",

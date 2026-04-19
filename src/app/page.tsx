@@ -1,11 +1,18 @@
-import Link from "next/link";
+"use client";
 
-const SERVICES = [
+import Link from "next/link";
+import {
+  Monitor, Mail, Lock, Globe, Zap,
+  Shield, Wrench, BarChart3, DollarSign, Earth
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+
+const SERVICES: { title: string; subtitle: string; description: string; Icon: LucideIcon; href: string; color: string; features: string[] }[] = [
   {
     title: "VPS Hosting",
     subtitle: "v-GPU • GPU • Cloud Server",
     description: "High-performance virtual private servers with optional GPU acceleration. Perfect for AI/ML workloads, rendering, and enterprise applications.",
-    icon: "🖥️",
+    Icon: Monitor,
     href: "/services/vps",
     color: "var(--accent-cyan)",
     features: ["NVMe SSD Storage", "GPU Passthrough", "99.9% Uptime SLA", "DDoS Protection"],
@@ -14,7 +21,7 @@ const SERVICES = [
     title: "Email Solutions",
     subtitle: "Postfix • Exchange",
     description: "Self-hosted email infrastructure with full control. Choose between Postfix for Linux-native performance or Exchange for enterprise features.",
-    icon: "📧",
+    Icon: Mail,
     href: "/services/email",
     color: "var(--accent-purple)",
     features: ["Custom Domains", "Spam Filtering", "Unlimited Aliases", "Encrypted Storage"],
@@ -23,7 +30,7 @@ const SERVICES = [
     title: "VPN Access",
     subtitle: "WireGuard • OpenVPN • IKEv2",
     description: "Generate your own VPN configurations instantly. Multiple protocols, global server locations, and zero-log policy.",
-    icon: "🔒",
+    Icon: Lock,
     href: "/services/vpn",
     color: "var(--accent-green)",
     features: ["Config Generator", "Multi-Protocol", "Global Locations", "Kill Switch"],
@@ -32,7 +39,7 @@ const SERVICES = [
     title: "Proxy Network",
     subtitle: "HTTP • SOCKS5 • Residential",
     description: "Premium proxy accounts with locations worldwide. Residential IPs, datacenter proxies, and rotating endpoints for any use case.",
-    icon: "🌐",
+    Icon: Globe,
     href: "/services/proxy",
     color: "var(--accent-magenta)",
     features: ["100+ Locations", "Rotating IPs", "API Access", "Bulk Pricing"],
@@ -90,8 +97,8 @@ export default function HomePage() {
         <div className="container" style={{ textAlign: "center", position: "relative" }}>
           {/* Badge */}
           <div className="animate-fade-in" style={{ marginBottom: "24px" }}>
-            <span className="badge badge-cyan" style={{ fontSize: "0.8rem", padding: "6px 18px" }}>
-              ⚡ Infrastructure as a Service
+            <span className="badge badge-cyan" style={{ fontSize: "0.8rem", padding: "6px 18px", display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <Zap style={{ width: 13, height: 13 }} /> Infrastructure as a Service
             </span>
           </div>
 
@@ -234,7 +241,9 @@ export default function HomePage() {
                   }}
                 />
 
-                <div style={{ fontSize: "2.5rem", marginBottom: "16px" }}>{service.icon}</div>
+                <div style={{ width: 56, height: 56, borderRadius: 14, background: "var(--glass-bg)", border: "1px solid var(--glass-border)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "16px" }}>
+                  <service.Icon style={{ width: 26, height: 26, color: service.color }} />
+                </div>
                 <h3 style={{ fontSize: "1.35rem", fontWeight: 700, color: "var(--text-primary)", marginBottom: "4px" }}>
                   {service.title}
                 </h3>
@@ -282,40 +291,42 @@ export default function HomePage() {
           </div>
 
           <div className="grid-3 stagger">
-            {[
+            {([
               {
-                icon: "🛡️",
+                Icon: Shield,
                 title: "Security First",
                 description: "Protection against SQLi, XSS, CSRF, brute-force, and more. All data encrypted at rest and in transit.",
               },
               {
-                icon: "⚡",
+                Icon: Zap,
                 title: "Blazing Fast",
                 description: "NVMe SSD storage, low-latency networks, and optimized infrastructure for maximum performance.",
               },
               {
-                icon: "🔧",
+                Icon: Wrench,
                 title: "Full Control",
                 description: "Root access to your VPS, custom email domains, self-generated VPN configs, and flexible proxy options.",
               },
               {
-                icon: "📊",
+                Icon: BarChart3,
                 title: "Real-Time Monitoring",
                 description: "Dashboard with live metrics, usage tracking, and instant alerts for your services.",
               },
               {
-                icon: "💰",
+                Icon: DollarSign,
                 title: "Competitive Pricing",
                 description: "Transparent pricing with no hidden fees. Pay only for what you use with flexible plans.",
               },
               {
-                icon: "🌍",
+                Icon: Earth,
                 title: "Global Network",
                 description: "Data centers and proxy endpoints across 50+ locations, ensuring low latency worldwide.",
               },
-            ].map((item) => (
+            ] as { Icon: LucideIcon; title: string; description: string }[]).map((item) => (
               <div key={item.title} className="glass-card" style={{ padding: "30px", textAlign: "center" }}>
-                <div style={{ fontSize: "2.2rem", marginBottom: "16px" }}>{item.icon}</div>
+                <div style={{ width: 52, height: 52, borderRadius: 14, background: "var(--glass-bg)", border: "1px solid var(--glass-border)", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+                  <item.Icon style={{ width: 24, height: 24, color: "var(--accent-cyan)" }} />
+                </div>
                 <h3 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "10px", color: "var(--text-primary)" }}>
                   {item.title}
                 </h3>
