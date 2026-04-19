@@ -1,6 +1,7 @@
 @import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&family=Roboto+Mono:wght@400;500&display=swap');
 
-/* ─── Design System: Materialist Dark Theme ───────────────────── */
+/* ─── Design System: Materialist Dark Theme (Slop — Default) ──── */
 
 :root {
   /* Background */
@@ -594,4 +595,302 @@ h6 {
   .footer-grid {
     grid-template-columns: 1fr !important;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MONOCHROME DARK THEME — GCP-inspired
+   ═══════════════════════════════════════════════════════════════════ */
+
+[data-theme="mono-dark"] {
+  /* Background */
+  --bg-primary: #1a1a1a;
+  --bg-secondary: #232323;
+  --bg-tertiary: #2d2d2d;
+  --bg-card: #292929;
+  --bg-glass: #232323;
+
+  /* Text */
+  --text-primary: #e8eaed;
+  --text-secondary: #9aa0a6;
+  --text-muted: #5f6368;
+  --text-inverse: #202124;
+
+  /* Accent — single monochrome blue */
+  --accent-cyan: #8ab4f8;
+  --accent-magenta: #f28b82;
+  --accent-purple: #8ab4f8;
+  --accent-green: #81c995;
+  --accent-orange: #fdd663;
+
+  /* Gradients — flattened */
+  --gradient-primary: #8ab4f8;
+  --gradient-secondary: #f28b82;
+  --gradient-dark: #1a1a1a;
+
+  /* Glass → solid */
+  --glass-bg: #292929;
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-hover: #303030;
+
+  /* Shadows — subtle */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 2px 6px rgba(0, 0, 0, 0.3);
+  --shadow-glow-cyan: none;
+  --shadow-glow-magenta: none;
+
+  /* Border Radius — tighter GCP style */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+
+  /* Extra mono tokens */
+  --border-primary: rgba(255, 255, 255, 0.12);
+  --accent-primary: #8ab4f8;
+  --accent-primary-muted: rgba(138, 180, 248, 0.12);
+}
+
+[data-theme="mono-dark"] body {
+  font-family: 'Roboto', system-ui, -apple-system, sans-serif;
+  background: #1a1a1a;
+}
+
+[data-theme="mono-dark"] ::selection {
+  background: rgba(138, 180, 248, 0.3);
+  color: #fff;
+}
+
+[data-theme="mono-dark"] ::-webkit-scrollbar-track {
+  background: #232323;
+}
+
+[data-theme="mono-dark"] ::-webkit-scrollbar-thumb {
+  background: #3c3c3c;
+}
+
+[data-theme="mono-dark"] ::-webkit-scrollbar-thumb:hover {
+  background: #4a4a4a;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   MONOCHROME LIGHT THEME — GCP-inspired
+   ═══════════════════════════════════════════════════════════════════ */
+
+[data-theme="mono-light"] {
+  /* Background */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8f9fa;
+  --bg-tertiary: #f1f3f4;
+  --bg-card: #ffffff;
+  --bg-glass: #ffffff;
+
+  /* Text */
+  --text-primary: #202124;
+  --text-secondary: #5f6368;
+  --text-muted: #80868b;
+  --text-inverse: #ffffff;
+
+  /* Accent — Google blue */
+  --accent-cyan: #1a73e8;
+  --accent-magenta: #d93025;
+  --accent-purple: #1a73e8;
+  --accent-green: #188038;
+  --accent-orange: #e37400;
+
+  /* Gradients — flattened */
+  --gradient-primary: #1a73e8;
+  --gradient-secondary: #d93025;
+  --gradient-dark: #ffffff;
+
+  /* Glass → solid */
+  --glass-bg: #ffffff;
+  --glass-border: #dadce0;
+  --glass-hover: #f8f9fa;
+
+  /* Shadows — Material elevation */
+  --shadow-sm: 0 1px 2px rgba(60, 64, 67, 0.1);
+  --shadow-md: 0 1px 3px rgba(60, 64, 67, 0.15);
+  --shadow-lg: 0 4px 8px rgba(60, 64, 67, 0.15);
+  --shadow-glow-cyan: none;
+  --shadow-glow-magenta: none;
+
+  /* Border Radius — tighter GCP style */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+
+  /* Extra mono tokens */
+  --border-primary: #dadce0;
+  --accent-primary: #1a73e8;
+  --accent-primary-muted: rgba(26, 115, 232, 0.08);
+}
+
+[data-theme="mono-light"] body {
+  font-family: 'Roboto', system-ui, -apple-system, sans-serif;
+  background: #ffffff;
+  color: #202124;
+}
+
+[data-theme="mono-light"] ::selection {
+  background: rgba(26, 115, 232, 0.2);
+  color: #202124;
+}
+
+[data-theme="mono-light"] ::-webkit-scrollbar-track {
+  background: #f1f3f4;
+}
+
+[data-theme="mono-light"] ::-webkit-scrollbar-thumb {
+  background: #dadce0;
+}
+
+[data-theme="mono-light"] ::-webkit-scrollbar-thumb:hover {
+  background: #bdc1c6;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   MONO THEME — Shared Component Overrides (both dark & light)
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ─── Glass Card → Flat Card ─── */
+[data-theme^="mono"] .glass-card {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: var(--bg-card);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+[data-theme^="mono"] .glass-card:hover {
+  background: var(--glass-hover);
+  transform: none;
+  box-shadow: var(--shadow-md);
+}
+
+/* ─── Gradient Text → Solid Accent ─── */
+[data-theme^="mono"] .gradient-text,
+[data-theme^="mono"] .gradient-text-secondary {
+  background: none;
+  -webkit-background-clip: unset;
+  -webkit-text-fill-color: var(--accent-cyan);
+  background-clip: unset;
+}
+
+/* ─── Buttons → Flat GCP Style ─── */
+[data-theme^="mono"] .btn-primary {
+  background: var(--accent-cyan);
+  box-shadow: none;
+  border-radius: var(--radius-sm);
+}
+
+[data-theme^="mono"] .btn-primary:hover {
+  transform: none;
+  box-shadow: var(--shadow-sm);
+  filter: brightness(1.1);
+}
+
+[data-theme^="mono"] .btn-secondary {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+  border-radius: var(--radius-sm);
+}
+
+[data-theme^="mono"] .btn-secondary:hover {
+  background: var(--accent-primary-muted, rgba(138, 180, 248, 0.12));
+}
+
+[data-theme^="mono"] .btn-ghost:hover {
+  background: var(--glass-hover);
+}
+
+[data-theme^="mono"] .btn-danger {
+  background: var(--accent-magenta);
+  border-radius: var(--radius-sm);
+}
+
+/* ─── Input Fields → GCP Outlined ─── */
+[data-theme^="mono"] .input-field {
+  background: var(--bg-glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+}
+
+[data-theme^="mono"] .input-field:focus {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 0 2px var(--accent-primary-muted, rgba(138, 180, 248, 0.12));
+}
+
+/* ─── Badges → Monochrome ─── */
+[data-theme^="mono"] .badge-cyan {
+  background: var(--accent-primary-muted, rgba(138, 180, 248, 0.12));
+  color: var(--accent-cyan);
+}
+
+[data-theme^="mono"] .badge-magenta {
+  background: rgba(242, 139, 130, 0.12);
+  color: var(--accent-magenta);
+}
+
+[data-theme^="mono"] .badge-green {
+  background: rgba(129, 201, 149, 0.12);
+  color: var(--accent-green);
+}
+
+[data-theme^="mono"] .badge-purple {
+  background: var(--accent-primary-muted, rgba(138, 180, 248, 0.12));
+  color: var(--accent-cyan);
+}
+
+/* ─── Glow Effects → Disabled ─── */
+[data-theme^="mono"] .glow-cyan,
+[data-theme^="mono"] .glow-magenta {
+  text-shadow: none;
+}
+
+[data-theme^="mono"] .border-glow::before {
+  display: none;
+}
+
+[data-theme^="mono"] .animate-glow {
+  animation: none;
+}
+
+/* ─── Particles Background → Hidden ─── */
+[data-theme^="mono"] .particles-bg {
+  display: none;
+}
+
+/* ─── Data Table → Dense GCP Style ─── */
+[data-theme^="mono"] .data-table th {
+  padding: 10px 16px;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--glass-border);
+  background: var(--bg-secondary);
+}
+
+[data-theme^="mono"] .data-table td {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--glass-border);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+[data-theme^="mono"] .data-table tr:hover td {
+  background: var(--glass-hover);
+}
+
+/* ─── Pricing Card → Flat ─── */
+[data-theme^="mono"] .pricing-card.featured {
+  border-color: var(--accent-cyan);
+  box-shadow: var(--shadow-md);
+}
+
+[data-theme^="mono"] .pricing-card.featured::before {
+  background: var(--accent-cyan);
 }

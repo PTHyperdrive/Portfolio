@@ -2,17 +2,32 @@
 
 import Sidebar from "@/components/layout/Sidebar";
 import SessionGuard from "@/components/SessionGuard";
+import { useThemeTokens } from "@/lib/useThemeTokens";
 
 export default function DashboardLayout({
     children,
 }: {
     children: React.ReactNode;
 }) {
+    const t = useThemeTokens();
     return (
-        <div className="flex h-screen w-full overflow-hidden bg-slate-950 text-slate-200" style={{ fontFamily: "var(--font-inter), sans-serif" }}>
+        <div style={{
+            display: "flex",
+            height: "100vh",
+            width: "100%",
+            overflow: "hidden",
+            backgroundColor: t.bgPrimary,
+            color: t.textPrimary,
+            fontFamily: t.fontFamily,
+        }}>
             <SessionGuard />
             <Sidebar />
-            <main className="flex-1 overflow-y-auto relative" style={{ backgroundColor: "#0d1117" }}>
+            <main style={{
+                flex: 1,
+                overflowY: "auto",
+                position: "relative",
+                backgroundColor: t.bgPrimary,
+            }}>
                 {children}
             </main>
         </div>

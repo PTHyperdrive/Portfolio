@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
+import { Inter, JetBrains_Mono, Roboto, Roboto_Mono } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
@@ -14,6 +14,17 @@ const inter = Inter({
 const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
+});
+
+const roboto = Roboto({
+  subsets: ["latin"],
+  weight: ["400", "500", "700"],
+  variable: "--font-roboto",
+});
+
+const robotoMono = Roboto_Mono({
+  subsets: ["latin"],
+  variable: "--font-roboto-mono",
 });
 
 export const metadata: Metadata = {
@@ -45,7 +56,7 @@ export default async function RootLayout({
   const isBare = pathname.startsWith("/console-window");
 
   return (
-    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable}`} style={{ scrollBehavior: "smooth" }}>
+    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable} ${roboto.variable} ${robotoMono.variable}`} style={{ scrollBehavior: "smooth" }}>
       <body>
         <Providers session={session}>
           {!isBare && <div className="particles-bg" aria-hidden="true" />}

@@ -10,6 +10,8 @@ import {
     Users, History, BarChart2, Wallet, User, Sliders, MessageSquare,
     ChevronDown, ChevronRight, LogOut, Shield
 } from "lucide-react";
+import ThemeToggle from "@/components/ThemeToggle";
+import { useThemeTokens } from "@/lib/useThemeTokens";
 
 type SubItem = { label: string; href: string };
 type NavItem = {
@@ -71,150 +73,10 @@ const SIDEBAR_STRUCTURE: NavGroup[] = [
     },
 ];
 
-const S = {
-    aside: {
-        width: "260px",
-        minWidth: "260px",
-        height: "100%",
-        display: "flex",
-        flexDirection: "column" as const,
-        backgroundColor: "#0d1117",
-        borderRight: "1px solid rgba(255,255,255,0.07)",
-        flexShrink: 0,
-    },
-    brand: {
-        display: "flex",
-        alignItems: "center",
-        gap: "12px",
-        padding: "20px 20px 18px",
-        flexShrink: 0,
-        textDecoration: "none",
-    },
-    logoBox: {
-        width: 36,
-        height: 36,
-        borderRadius: 10,
-        background: "linear-gradient(135deg,#3b82f6,#6366f1)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0,
-    },
-    brandText: {
-        fontWeight: 800,
-        fontSize: "1.05rem",
-        color: "#fff",
-        letterSpacing: "-0.02em",
-    },
-    nav: {
-        flex: 1,
-        overflowY: "auto" as const,
-        overflowX: "hidden" as const,
-        padding: "4px 12px 16px",
-        scrollbarWidth: "none" as const,
-    },
-    overviewLink: (active: boolean): React.CSSProperties => ({
-        display: "flex",
-        alignItems: "center",
-        gap: "12px",
-        padding: "11px 12px",
-        borderRadius: "10px",
-        fontSize: "0.92rem",
-        fontWeight: 600,
-        marginBottom: "20px",
-        textDecoration: "none",
-        transition: "all 0.15s",
-        color: active ? "#60a5fa" : "#94a3b8",
-        backgroundColor: active ? "rgba(59,130,246,0.15)" : "transparent",
-        cursor: "pointer",
-    }),
-    group: {
-        marginBottom: "28px",
-    },
-    groupLabel: {
-        fontSize: "0.68rem",
-        fontWeight: 700,
-        letterSpacing: "0.12em",
-        color: "#475569",
-        textTransform: "uppercase" as const,
-        paddingLeft: "12px",
-        marginBottom: "8px",
-        display: "block",
-    },
-    navRow: (active: boolean): React.CSSProperties => ({
-        display: "flex",
-        alignItems: "center",
-        gap: "12px",
-        padding: "10px 12px",
-        borderRadius: "10px",
-        fontSize: "0.9rem",
-        fontWeight: 600,
-        textDecoration: "none",
-        transition: "all 0.15s",
-        color: active ? "#60a5fa" : "#94a3b8",
-        backgroundColor: active ? "rgba(59,130,246,0.15)" : "transparent",
-        cursor: "pointer",
-        width: "100%",
-        boxSizing: "border-box" as const,
-        border: "none",
-        textAlign: "left" as const,
-        justifyContent: "space-between",
-        marginBottom: "2px",
-    }),
-    subList: {
-        marginLeft: "20px",
-        paddingLeft: "14px",
-        borderLeft: "1px solid rgba(100,116,139,0.2)",
-        marginTop: "2px",
-        marginBottom: "4px",
-    },
-    subRow: (active: boolean): React.CSSProperties => ({
-        display: "flex",
-        alignItems: "center",
-        gap: "10px",
-        padding: "9px 12px",
-        borderRadius: "8px",
-        fontSize: "0.875rem",
-        fontWeight: 500,
-        textDecoration: "none",
-        transition: "all 0.15s",
-        color: active ? "#e2e8f0" : "#64748b",
-        backgroundColor: active ? "rgba(255,255,255,0.05)" : "transparent",
-        marginBottom: "1px",
-    }),
-    dot: (active: boolean): React.CSSProperties => ({
-        width: 6,
-        height: 6,
-        borderRadius: "50%",
-        backgroundColor: active ? "#60a5fa" : "#475569",
-        flexShrink: 0,
-    }),
-    footer: {
-        flexShrink: 0,
-        padding: "16px",
-        borderTop: "1px solid rgba(255,255,255,0.07)",
-        display: "flex",
-        alignItems: "center",
-        gap: "12px",
-    },
-    avatar: {
-        width: 34,
-        height: 34,
-        borderRadius: "50%",
-        flexShrink: 0,
-        background: "linear-gradient(135deg,#8b5cf6,#3b82f6)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: "0.8rem",
-        fontWeight: 700,
-        color: "#fff",
-    },
-};
-
 export default function Sidebar() {
     const pathname = usePathname();
     const { data: session } = useSession();
+    const t = useThemeTokens();
     const [expanded, setExpanded] = useState<Record<string, boolean>>({ Compute: true });
     const [hoveredItem, setHoveredItem] = useState<string | null>(null);
 
@@ -224,35 +86,90 @@ export default function Sidebar() {
     const isActive = (href: string) =>
         pathname === href || pathname.startsWith(href + "/");
 
-    const rowStyle = (href: string, label: string): React.CSSProperties => {
+    /* ─── Mono-aware active indicator style ─── */
+    const navRow = (href: string, label: string): React.CSSProperties => {
         const active = isActive(href);
         const hovered = hoveredItem === label && !active;
         return {
-            ...S.navRow(active),
-            color: active ? "#60a5fa" : hovered ? "#e2e8f0" : "#94a3b8",
-            backgroundColor: active ? "rgba(59,130,246,0.15)" : hovered ? "rgba(255,255,255,0.05)" : "transparent",
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            padding: t.isMono ? "9px 12px" : "10px 12px",
+            borderRadius: t.isMono ? 6 : 10,
+            fontSize: "0.9rem",
+            fontWeight: 600,
+            textDecoration: "none",
+            transition: "all 0.15s",
+            cursor: "pointer",
+            width: "100%",
+            boxSizing: "border-box" as const,
+            border: "none",
+            textAlign: "left" as const,
+            justifyContent: "space-between",
+            marginBottom: "2px",
+            /* Mono: left-border indicator; Slop: background highlight */
+            borderLeft: t.isMono && active ? `3px solid ${t.accentPrimary}` : "3px solid transparent",
+            color: active ? t.accentPrimary : hovered ? t.textPrimary : t.textSecondary,
+            backgroundColor: active
+                ? (t.isMono ? t.accentPrimaryMuted : "rgba(59,130,246,0.15)")
+                : hovered
+                    ? (t.isMono ? t.bgCardHover : "rgba(255,255,255,0.05)")
+                    : "transparent",
         };
     };
 
     return (
-        <aside style={S.aside}>
+        <aside style={{
+            width: "260px",
+            minWidth: "260px",
+            height: "100%",
+            display: "flex",
+            flexDirection: "column",
+            backgroundColor: t.isMono ? t.bgSecondary : "#0d1117",
+            borderRight: `1px solid ${t.borderPrimary}`,
+            flexShrink: 0,
+            fontFamily: t.fontFamily,
+        }}>
             {/* ── Brand ── */}
-            <Link href="/" style={S.brand}>
-                <div style={S.logoBox}>
+            <Link href="/" style={{
+                display: "flex", alignItems: "center", gap: "12px",
+                padding: "20px 20px 18px", flexShrink: 0, textDecoration: "none",
+            }}>
+                <div style={{
+                    width: 36, height: 36, borderRadius: t.isMono ? 8 : 10,
+                    background: t.isMono ? t.bgTertiary : "linear-gradient(135deg,#3b82f6,#6366f1)",
+                    border: t.isMono ? `1px solid ${t.borderPrimary}` : "none",
+                    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                }}>
                     <Image src="/logo.png" alt="Logo" width={20} height={20}
-                        style={{ objectFit: "contain", filter: "brightness(0) invert(1)" }} />
+                        style={{ objectFit: "contain", filter: t.isLight ? "none" : "brightness(0) invert(1)" }} />
                 </div>
-                <span style={S.brandText}>
-                    Not<span style={{ color: "#60a5fa" }}>Respond</span>
+                <span style={{
+                    fontWeight: 800, fontSize: "1.05rem",
+                    color: t.textPrimary, letterSpacing: "-0.02em",
+                }}>
+                    Not<span style={{ color: t.accentPrimary }}>Respond</span>
                 </span>
             </Link>
 
             {/* ── Scrollable Nav ── */}
-            <nav style={S.nav}>
+            <nav style={{
+                flex: 1, overflowY: "auto", overflowX: "hidden",
+                padding: "4px 12px 16px", scrollbarWidth: "none",
+            }}>
                 {/* Overview */}
                 <Link
                     href="/dashboard"
-                    style={S.overviewLink(pathname === "/dashboard")}
+                    style={{
+                        display: "flex", alignItems: "center", gap: "12px",
+                        padding: t.isMono ? "9px 12px" : "11px 12px",
+                        borderRadius: t.isMono ? 6 : 10,
+                        fontSize: "0.92rem", fontWeight: 600,
+                        marginBottom: "20px", textDecoration: "none", transition: "all 0.15s",
+                        borderLeft: t.isMono && pathname === "/dashboard" ? `3px solid ${t.accentPrimary}` : "3px solid transparent",
+                        color: pathname === "/dashboard" ? t.accentPrimary : t.textSecondary,
+                        backgroundColor: pathname === "/dashboard" ? t.accentPrimaryMuted : "transparent",
+                    }}
                 >
                     <LayoutGrid style={{ width: 18, height: 18, flexShrink: 0 }} />
                     Overview
@@ -260,13 +177,18 @@ export default function Sidebar() {
 
                 {/* Groups */}
                 {SIDEBAR_STRUCTURE.map((group) => (
-                    <div key={group.title} style={S.group}>
-                        <span style={S.groupLabel}>{group.title}</span>
+                    <div key={group.title} style={{ marginBottom: "28px" }}>
+                        <span style={{
+                            fontSize: "0.68rem", fontWeight: 700,
+                            letterSpacing: "0.12em", color: t.textMuted,
+                            textTransform: "uppercase", paddingLeft: "12px",
+                            marginBottom: "8px", display: "block",
+                        }}>{group.title}</span>
 
                         {group.items.map((item) => {
                             const open = !!expanded[item.label];
                             const hasSub = !!item.subItems;
-                            const style = rowStyle(item.href, item.label);
+                            const style = navRow(item.href, item.label);
 
                             return (
                                 <div key={item.label}>
@@ -302,12 +224,28 @@ export default function Sidebar() {
 
                                     {/* Sub-items */}
                                     {hasSub && open && (
-                                        <div style={S.subList}>
+                                        <div style={{
+                                            marginLeft: "20px", paddingLeft: "14px",
+                                            borderLeft: `1px solid ${t.borderSecondary}`,
+                                            marginTop: "2px", marginBottom: "4px",
+                                        }}>
                                             {item.subItems!.map((sub) => {
                                                 const subActive = pathname === sub.href;
                                                 return (
-                                                    <Link key={sub.label} href={sub.href} style={S.subRow(subActive)}>
-                                                        <span style={S.dot(subActive)} />
+                                                    <Link key={sub.label} href={sub.href} style={{
+                                                        display: "flex", alignItems: "center", gap: "10px",
+                                                        padding: "9px 12px", borderRadius: t.isMono ? 4 : 8,
+                                                        fontSize: "0.875rem", fontWeight: 500,
+                                                        textDecoration: "none", transition: "all 0.15s",
+                                                        color: subActive ? t.textPrimary : t.textMuted,
+                                                        backgroundColor: subActive ? t.bgCardHover : "transparent",
+                                                        marginBottom: "1px",
+                                                    }}>
+                                                        <span style={{
+                                                            width: 6, height: 6, borderRadius: "50%",
+                                                            backgroundColor: subActive ? t.accentPrimary : t.textMuted,
+                                                            flexShrink: 0,
+                                                        }} />
                                                         {sub.label}
                                                     </Link>
                                                 );
@@ -322,17 +260,23 @@ export default function Sidebar() {
 
                 {/* Admin Panel link — only rendered for ADMIN role */}
                 {(session?.user as { role?: string })?.role === "ADMIN" && (
-                    <div style={{ marginTop: 8, paddingTop: 16, borderTop: "1px solid rgba(245,158,11,0.15)" }}>
-                        <span style={{ ...S.groupLabel, color: "#92400e" }}>ADMINISTRATION</span>
+                    <div style={{ marginTop: 8, paddingTop: 16, borderTop: `1px solid ${t.borderSecondary}` }}>
+                        <span style={{
+                            fontSize: "0.68rem", fontWeight: 700,
+                            letterSpacing: "0.12em", color: t.textMuted,
+                            textTransform: "uppercase", paddingLeft: "12px",
+                            marginBottom: "8px", display: "block",
+                        }}>ADMINISTRATION</span>
                         <Link
                             href="/dashboard/admin"
                             style={{
-                                ...S.navRow(isActive("/dashboard/admin")),
-                                color: isActive("/dashboard/admin") ? "#fbbf24" : "#d97706",
+                                ...navRow("/dashboard/admin", "Admin Panel"),
+                                color: isActive("/dashboard/admin") ? t.statusWarning : t.textSecondary,
                                 backgroundColor: isActive("/dashboard/admin")
-                                    ? "rgba(245,158,11,0.15)"
-                                    : "rgba(245,158,11,0.04)",
-                                border: "1px solid rgba(245,158,11,0.15)",
+                                    ? t.statusWarningBg
+                                    : "transparent",
+                                border: t.isMono ? "none" : `1px solid ${t.statusWarningBg}`,
+                                borderLeft: t.isMono && isActive("/dashboard/admin") ? `3px solid ${t.statusWarning}` : "3px solid transparent",
                                 marginBottom: 0,
                             }}
                             onMouseEnter={() => setHoveredItem("Admin Panel")}
@@ -342,31 +286,50 @@ export default function Sidebar() {
                                 <Shield style={{ width: 18, height: 18, flexShrink: 0 }} />
                                 Admin Panel
                             </span>
-                            <span style={{ fontSize: "0.6rem", fontWeight: 800, padding: "1px 6px", borderRadius: 20, background: "rgba(245,158,11,0.2)", color: "#f59e0b", letterSpacing: "0.06em" }}>ADMIN</span>
+                            <span style={{
+                                fontSize: "0.6rem", fontWeight: 800, padding: "1px 6px",
+                                borderRadius: 20, background: t.statusWarningBg,
+                                color: t.statusWarning, letterSpacing: "0.06em",
+                            }}>ADMIN</span>
                         </Link>
                     </div>
                 )}
             </nav>
 
+            {/* ── Theme Toggle ── */}
+            <div style={{ padding: "8px 16px 0" }}>
+                <ThemeToggle variant="sidebar" />
+            </div>
+
             {/* ── Anchored Footer ── */}
-            <div style={S.footer}>
-                <div style={S.avatar}>
+            <div style={{
+                flexShrink: 0, padding: "12px 16px 16px",
+                borderTop: `1px solid ${t.borderPrimary}`,
+                display: "flex", alignItems: "center", gap: "12px",
+            }}>
+                <div style={{
+                    width: 34, height: 34, borderRadius: "50%", flexShrink: 0,
+                    background: t.isMono ? t.bgTertiary : "linear-gradient(135deg,#8b5cf6,#3b82f6)",
+                    border: t.isMono ? `1px solid ${t.borderPrimary}` : "none",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: "0.8rem", fontWeight: 700, color: t.textPrimary,
+                }}>
                     {(session?.user?.name || session?.user?.email || "U")[0].toUpperCase()}
                 </div>
                 <div style={{ flex: 1, overflow: "hidden" }}>
-                    <p style={{ fontSize: "0.85rem", fontWeight: 700, color: "#e2e8f0", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.4 }}>
+                    <p style={{ fontSize: "0.85rem", fontWeight: 700, color: t.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.4 }}>
                         {session?.user?.name?.toUpperCase() || session?.user?.email?.split("@")[0]?.toUpperCase() || "GUEST"}
                     </p>
-                    <p style={{ fontSize: "0.72rem", color: "#64748b", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.4 }}>
+                    <p style={{ fontSize: "0.72rem", color: t.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.4 }}>
                         {session?.user?.email || "Not signed in"}
                     </p>
                 </div>
                 <button
                     onClick={() => signOut({ callbackUrl: "/" })}
                     title="Log out"
-                    style={{ padding: 6, borderRadius: 8, border: "none", background: "transparent", cursor: "pointer", color: "#64748b", flexShrink: 0 }}
-                    onMouseEnter={e => (e.currentTarget.style.color = "#f87171")}
-                    onMouseLeave={e => (e.currentTarget.style.color = "#64748b")}
+                    style={{ padding: 6, borderRadius: 8, border: "none", background: "transparent", cursor: "pointer", color: t.textMuted, flexShrink: 0, transition: "color 0.15s" }}
+                    onMouseEnter={e => (e.currentTarget.style.color = t.statusError)}
+                    onMouseLeave={e => (e.currentTarget.style.color = t.textMuted)}
                 >
                     <LogOut style={{ width: 16, height: 16 }} />
                 </button>

@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { useThemeTokens } from "@/lib/useThemeTokens";
 
 const ADMIN_STATS = [
     { title: "Total Revenue", value: "$0.00", icon: "💰", color: "var(--accent-green)", change: "+0%" },

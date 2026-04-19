@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import { useThemeTokens } from "@/lib/useThemeTokens";
 
 const FOOTER_LINKS = {
     Services: [
@@ -28,6 +29,7 @@ const FOOTER_LINKS = {
 
 export default function Footer() {
     const pathname = usePathname();
+    const t = useThemeTokens();
     if (pathname.startsWith("/dashboard")) return null;
 
     return (
@@ -35,9 +37,11 @@ export default function Footer() {
             style={{
                 position: "relative",
                 zIndex: 1,
-                borderTop: "1px solid var(--glass-border)",
-                background: "rgba(10, 10, 15, 0.6)",
-                backdropFilter: "blur(10px)",
+                borderTop: `1px solid ${t.borderPrimary}`,
+                background: t.isMono
+                    ? (t.isLight ? t.bgSecondary : t.bgSecondary)
+                    : "rgba(10, 10, 15, 0.6)",
+                backdropFilter: t.isMono ? "none" : "blur(10px)",
             }}
         >
             <div className="container" style={{ padding: "60px 24px 30px" }}>
@@ -61,11 +65,11 @@ export default function Footer() {
                                 height={32}
                                 style={{ objectFit: "contain", width: "auto", height: "32px" }}
                             />
-                            <span style={{ fontWeight: 700, fontSize: "1.1rem", color: "var(--text-primary)" }}>
-                                Notrespond<span style={{ color: "var(--accent-cyan)" }}>.com</span>
+                            <span style={{ fontWeight: 700, fontSize: "1.1rem", color: t.textPrimary }}>
+                                Notrespond<span style={{ color: t.accentPrimary }}>.com</span>
                             </span>
                         </Link>
-                        <p style={{ color: "var(--text-muted)", fontSize: "0.88rem", lineHeight: 1.7, maxWidth: "320px" }}>
+                        <p style={{ color: t.textMuted, fontSize: "0.88rem", lineHeight: 1.7, maxWidth: "320px" }}>
                             Premium cloud infrastructure services. High-performance VPS, secure email, encrypted VPN, and reliable proxy solutions for professionals.
                         </p>
                         {/* Social Icons */}
@@ -77,13 +81,13 @@ export default function Footer() {
                                     style={{
                                         width: 36,
                                         height: 36,
-                                        borderRadius: "8px",
-                                        background: "var(--glass-bg)",
-                                        border: "1px solid var(--glass-border)",
+                                        borderRadius: t.isMono ? 4 : 8,
+                                        background: t.isMono ? "transparent" : t.bgCard,
+                                        border: `1px solid ${t.borderPrimary}`,
                                         display: "flex",
                                         alignItems: "center",
                                         justifyContent: "center",
-                                        color: "var(--text-muted)",
+                                        color: t.textMuted,
                                         textDecoration: "none",
                                         fontSize: "0.7rem",
                                         fontWeight: 600,
@@ -100,7 +104,7 @@ export default function Footer() {
                     {/* Link Columns */}
                     {Object.entries(FOOTER_LINKS).map(([title, links]) => (
                         <div key={title}>
-                            <h4 style={{ fontSize: "0.8rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: "var(--text-secondary)", marginBottom: "16px" }}>
+                            <h4 style={{ fontSize: "0.8rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", color: t.textSecondary, marginBottom: "16px" }}>
                                 {title}
                             </h4>
                             <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "10px" }}>
@@ -108,7 +112,7 @@ export default function Footer() {
                                     <li key={link.href}>
                                         <Link
                                             href={link.href}
-                                            style={{ color: "var(--text-muted)", textDecoration: "none", fontSize: "0.88rem", transition: "color 0.2s" }}
+                                            style={{ color: t.textMuted, textDecoration: "none", fontSize: "0.88rem", transition: "color 0.2s" }}
                                         >
                                             {link.label}
                                         </Link>
@@ -122,7 +126,7 @@ export default function Footer() {
                 {/* Bottom Bar */}
                 <div
                     style={{
-                        borderTop: "1px solid var(--glass-border)",
+                        borderTop: `1px solid ${t.borderPrimary}`,
                         paddingTop: "24px",
                         display: "flex",
                         justifyContent: "space-between",
@@ -131,11 +135,11 @@ export default function Footer() {
                         gap: "12px",
                     }}
                 >
-                    <p style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>
+                    <p style={{ color: t.textMuted, fontSize: "0.82rem" }}>
                         © {new Date().getFullYear()} Notrespond.com. All rights reserved.
                     </p>
-                    <p style={{ color: "var(--text-muted)", fontSize: "0.82rem" }}>
-                        Built with <span style={{ color: "var(--accent-cyan)" }}>Next.js</span> • Secured with <span style={{ color: "var(--accent-green)" }}>❤️</span>
+                    <p style={{ color: t.textMuted, fontSize: "0.82rem" }}>
+                        Built with <span style={{ color: t.accentPrimary }}>Next.js</span> • Secured with <span style={{ color: t.statusSuccess }}>❤️</span>
                     </p>
                 </div>
             </div>
