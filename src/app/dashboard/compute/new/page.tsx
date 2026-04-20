@@ -2,9 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import Link from "next/link";
 import Image from "next/image";
-import { Gift, Ticket, Tag, AlertTriangle, Sparkles, Camera } from "lucide-react";
+import { Gift, Ticket, Tag, AlertTriangle, Sparkles, Key, Terminal, Cloud, User, RefreshCw } from "lucide-react";
+import { CLOUD_TEMPLATES, getTemplatesForPlan } from "@/config/templates";
+import type { CloudTemplate } from "@/config/templates";
 
 // ── Data ─────────────────────────────────────────────────────────────────────
 
@@ -110,6 +113,9 @@ function Check() {
 
 export default function ComputeNewPage() {
     const router = useRouter();
+    const { data: session } = useSession();
+    const isAdmin = (session?.user as { role?: string } | undefined)?.role === "ADMIN";
+
     const [selectedPlan,  setSelectedPlan]  = useState("Dev-Standard");
     const [selectedLoc,   setSelectedLoc]   = useState("hcm1");
     const [swTab,         setSwTab]          = useState("Operating System");
@@ -124,9 +130,24 @@ export default function ComputeNewPage() {
     const [deployErr,     setDeployErr]     = useState("");
     const [backupEnabled, setBackupEnabled] = useState(false);
     const [tickets,       setTickets]       = useState<Ticket[]>([]);
-    const [hasUsedTrial,  setHasUsedTrial]  = useState<boolean | null>(null); // null = loading
+    const [hasUsedTrial,  setHasUsedTrial]  = useState<boolean | null>(null);
 
-    // Load available tickets + trial eligibility on mount
+    // ── Cloud-Init guest-specific state ──────────────────────────────
+    const [hostname,      setHostname]      = useState("");
+    const [ciUsername,    setCiUsername]     = useState("");
+    const [sshKeys,       setSshKeys]       = useState("");
+    const [ciPassword,    setCiPassword]    = useState("");
+    const [autoPassword,  setAutoPassword]  = useState(true);
+    const [savedSshKeys,  setSavedSshKeys]  = useState<{ id: string; name: string; publicKey: string }[]>([]);
+
+    // Determine which templates are available for the current plan
+    const currentPlanCfg = PAID_PLANS.find(p => p.id === selectedPlan);
+    const requiresGpu = currentPlanCfg
+        ? ["GPU-Media", "GPU-Compute"].includes(currentPlanCfg.id)
+        : false;
+    const availableTemplates: CloudTemplate[] = getTemplatesForPlan(requiresGpu);
+
+    // Load available tickets + trial eligibility + SSH keys on mount
     useEffect(() => {
         fetch("/api/billing/tickets")
             .then(r => r.json())
@@ -136,7 +157,13 @@ export default function ComputeNewPage() {
         fetch("/api/payment/history")
             .then(r => r.json())
             .then(d => { setHasUsedTrial(d.hasUsedTrial ?? true); })
-            .catch(() => { setHasUsedTrial(true); }); // safe default = no trial shown on error
+            .catch(() => { setHasUsedTrial(true); });
+
+        // Load user's saved SSH keys for Cloud-Init injection
+        fetch("/api/ssh-keys")
+            .then(r => r.json())
+            .then(d => { if (d.keys) setSavedSshKeys(d.keys); })
+            .catch(() => null);
     }, []);
 
     // ── Derived ──────────────────────────────────────────────────────
@@ -205,19 +232,47 @@ export default function ComputeNewPage() {
         setDeploying(true);
         setDeployErr("");
         try {
-            const res = await fetch("/api/vps/deploy", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    plan:          selectedPlan,   // "free-trial" is sent as-is; API handles mapping
-                    isoId:         selectedOs,
-                    node:          location.node,
-                    instanceCount: isFreeTrial ? 1 : instanceCount,
-                }),
-            });
-            const d = await res.json();
-            if (!res.ok) { setDeployErr(d.error ?? "Deployment failed"); return; }
-            router.push("/dashboard/vps");
+            if (isAdmin) {
+                // ── Admin: Legacy ISO-based deploy ───────────────
+                const res = await fetch("/api/vps/deploy", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        plan:          selectedPlan,
+                        isoId:         selectedOs,
+                        node:          location.node,
+                        instanceCount: isFreeTrial ? 1 : instanceCount,
+                    }),
+                });
+                const d = await res.json();
+                if (!res.ok) { setDeployErr(d.error ?? "Deployment failed"); return; }
+                router.push("/dashboard/vps");
+            } else {
+                // ── Guest: Cloud-Init template deploy ────────────
+                const finalHostname = hostname.trim() || `vm-${Date.now().toString(36)}`;
+                const res = await fetch("/api/vps/deploy-cloudinit", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        plan:          selectedPlan,
+                        templateId:    selectedOs,
+                        hostname:      finalHostname,
+                        username:      ciUsername.trim(),
+                        sshKeys:       sshKeys.trim(),
+                        password:      autoPassword ? "" : ciPassword,
+                        instanceCount: isFreeTrial ? 1 : instanceCount,
+                    }),
+                });
+                const d = await res.json();
+                if (!res.ok) { setDeployErr(d.error ?? "Deployment failed"); return; }
+                // Redirect to provisioning status for the first VM
+                const firstVmId = d.vmids?.[0];
+                if (firstVmId) {
+                    router.push(`/dashboard/vps/${firstVmId}`);
+                } else {
+                    router.push("/dashboard/vps");
+                }
+            }
         } catch { setDeployErr("Unexpected error during deployment"); }
         finally { setDeploying(false); }
     };
@@ -360,62 +415,241 @@ export default function ComputeNewPage() {
                         </div>
                     </div>
 
-                    {/* ── Software ── */}
+                    {/* ── Software / Template Selection ── */}
                     <div style={{ ...card, padding: 24 }}>
-                        <SectionHeader
-                            icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 21V9" /></svg>}
-                            title="Software"
-                            sub="Select the operating system or application stack"
-                        />
-                        {/* Tabs */}
-                        <div style={{ display: "flex", gap: 4, marginBottom: 18, borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
-                            {SW_TABS.map(tab => (
-                                <button key={tab} onClick={() => setSwTab(tab)} style={{
-                                    padding: "7px 14px", borderRadius: "8px 8px 0 0",
-                                    border: "none", cursor: "pointer", fontSize: "0.8rem", fontWeight: 600,
-                                    background: swTab === tab ? "rgba(59,130,246,0.12)" : "transparent",
-                                    color: swTab === tab ? "#3b82f6" : "#64748b",
-                                    borderBottom: swTab === tab ? "2px solid #3b82f6" : "2px solid transparent",
-                                    transition: "all 0.15s",
-                                }}>{tab}</button>
-                            ))}
-                        </div>
+                        {isAdmin ? (
+                            /* ═══ ADMIN: Full ISO selector with tabs ═══ */
+                            <>
+                                <SectionHeader
+                                    icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 21V9" /></svg>}
+                                    title="Software"
+                                    sub="Select the operating system or application stack"
+                                />
+                                {/* Tabs */}
+                                <div style={{ display: "flex", gap: 4, marginBottom: 18, borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+                                    {SW_TABS.map(tab => (
+                                        <button key={tab} onClick={() => setSwTab(tab)} style={{
+                                            padding: "7px 14px", borderRadius: "8px 8px 0 0",
+                                            border: "none", cursor: "pointer", fontSize: "0.8rem", fontWeight: 600,
+                                            background: swTab === tab ? "rgba(59,130,246,0.12)" : "transparent",
+                                            color: swTab === tab ? "#3b82f6" : "#64748b",
+                                            borderBottom: swTab === tab ? "2px solid #3b82f6" : "2px solid transparent",
+                                            transition: "all 0.15s",
+                                        }}>{tab}</button>
+                                    ))}
+                                </div>
 
-                        {swTab === "Operating System" ? (
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                                {OS_OPTIONS.map(o => {
-                                    const active = selectedOs === o.id;
+                                {swTab === "Operating System" ? (
+                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                                        {OS_OPTIONS.map(o => {
+                                            const active = selectedOs === o.id;
+                                            return (
+                                                <div key={o.id} onClick={() => setSelectedOs(o.id)}
+                                                    style={{ ...cardBase, ...(active ? cardActive : {}), display: "flex", alignItems: "center", gap: 12, padding: "12px 14px" }}>
+                                                    <div style={{ width: 32, height: 32, borderRadius: 7, overflow: "hidden", flexShrink: 0, background: "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                                        <Image src={o.iconPath} alt={o.label} width={26} height={26} style={{ objectFit: "contain" }} />
+                                                    </div>
+                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                        <p style={{ fontWeight: 700, color: "#e2e8f0", fontSize: "0.825rem" }}>{o.label}</p>
+                                                        <p style={{ color: "#64748b", fontSize: "0.72rem" }}>{o.version}</p>
+                                                    </div>
+                                                    {active ? <Check /> : (
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="2"><path d="m6 9 6 6 6-6" /></svg>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <div style={{ padding: "32px 0", textAlign: "center", color: "#334155", fontSize: "0.85rem" }}>
+                                        {swTab === "Applications" ? "Application marketplace coming soon." : swTab === "ISO" ? "Custom ISO upload coming soon." : "Snapshot restore coming soon."}
+                                    </div>
+                                )}
+                            </>
+                        ) : (
+                            /* ═══ GUEST: Cloud-Init template selector + config ═══ */
+                            <>
+                                <SectionHeader
+                                    icon={<Cloud style={{ width: 18, height: 18, color: "#3b82f6" }} />}
+                                    title="Operating System"
+                                    sub={`Select a pre-built Cloud-Init template${requiresGpu ? " (GPU-enabled)" : ""}`}
+                                />
+
+                                {/* Template grid */}
+                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
+                                    {availableTemplates.map(t => {
+                                        const active = selectedOs === t.id;
+                                        return (
+                                            <div key={t.id} onClick={() => setSelectedOs(t.id)}
+                                                style={{ ...cardBase, ...(active ? cardActive : {}), display: "flex", alignItems: "center", gap: 12, padding: "12px 14px" }}>
+                                                <div style={{ width: 32, height: 32, borderRadius: 7, overflow: "hidden", flexShrink: 0, background: "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                                    <Image src={t.iconPath} alt={t.label} width={26} height={26} style={{ objectFit: "contain" }} />
+                                                </div>
+                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                    <p style={{ fontWeight: 700, color: "#e2e8f0", fontSize: "0.825rem" }}>{t.label}</p>
+                                                    <p style={{ color: "#64748b", fontSize: "0.72rem" }}>{t.version}</p>
+                                                </div>
+                                                {active ? <Check /> : (
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="2"><path d="m6 9 6 6 6-6" /></svg>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Template badge — shows resolved Proxmox name */}
+                                {(() => {
+                                    const tpl = CLOUD_TEMPLATES.find(t => t.id === selectedOs);
+                                    if (!tpl) return null;
+                                    const gpuSuffix = requiresGpu ? "vGPU" : "NoGPU";
                                     return (
-                                        <div key={o.id} onClick={() => setSelectedOs(o.id)}
-                                            style={{ ...cardBase, ...(active ? cardActive : {}), display: "flex", alignItems: "center", gap: 12, padding: "12px 14px" }}>
-                                            <div style={{ width: 32, height: 32, borderRadius: 7, overflow: "hidden", flexShrink: 0, background: "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                                <Image src={o.iconPath} alt={o.label} width={26} height={26} style={{ objectFit: "contain" }} />
-                                            </div>
-                                            <div style={{ flex: 1, minWidth: 0 }}>
-                                                <p style={{ fontWeight: 700, color: "#e2e8f0", fontSize: "0.825rem" }}>{o.label}</p>
-                                                <p style={{ color: "#64748b", fontSize: "0.72rem" }}>{o.version}</p>
-                                            </div>
-                                            {active ? <Check /> : (
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="2"><path d="m6 9 6 6 6-6" /></svg>
-                                            )}
+                                        <div style={{ padding: "8px 14px", borderRadius: 8, background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.15)", marginBottom: 20, display: "flex", alignItems: "center", gap: 8 }}>
+                                            <Terminal style={{ width: 13, height: 13, color: "#64748b" }} />
+                                            <span style={{ fontSize: "0.75rem", color: "#94a3b8", fontFamily: "monospace" }}>Template: <span style={{ color: "#3b82f6", fontWeight: 700 }}>{tpl.proxmoxPrefix}-{gpuSuffix}</span></span>
                                         </div>
                                     );
-                                })}
-                            </div>
-                        ) : (
-                            <div style={{ padding: "32px 0", textAlign: "center", color: "#334155", fontSize: "0.85rem" }}>
-                                {swTab === "Applications" ? "Application marketplace coming soon." : swTab === "ISO" ? "Custom ISO upload coming soon." : "Snapshot restore coming soon."}
-                            </div>
-                        )}
+                                })()}
 
-                        {/* SSH Keys */}
-                        <div style={{ marginTop: 20 }}>
-                            <p style={{ fontSize: "0.78rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>SSH Keys</p>
-                            <div style={{ padding: "12px 16px", borderRadius: 9, background: "rgba(56,189,248,0.05)", border: "1px solid rgba(56,189,248,0.15)", fontSize: "0.825rem", color: "#7dd3fc", lineHeight: 1.6 }}>
-                                You do not have any SSH keys yet. You can add your SSH key{" "}
-                                <Link href="/dashboard/settings" style={{ color: "#38bdf8", fontWeight: 700 }}>here</Link>.
-                            </div>
-                        </div>
+                                {/* ── Hostname ── */}
+                                <div style={{ marginBottom: 18 }}>
+                                    <p style={{ fontSize: "0.78rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Hostname</p>
+                                    <input
+                                        value={hostname}
+                                        onChange={e => setHostname(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 63))}
+                                        placeholder={`vm-${Date.now().toString(36).slice(-6)}`}
+                                        style={{
+                                            width: "100%", padding: "10px 14px", boxSizing: "border-box",
+                                            background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)",
+                                            borderRadius: 9, color: "#e2e8f0", fontSize: "0.85rem", fontFamily: "monospace", outline: "none",
+                                        }}
+                                    />
+                                    <p style={{ fontSize: "0.68rem", color: "#475569", marginTop: 6 }}>Lowercase letters, numbers, and hyphens only. Max 63 characters.</p>
+                                </div>
+
+                                {/* ── Username (required) ── */}
+                                <div style={{ marginBottom: 18 }}>
+                                    <p style={{ fontSize: "0.78rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                                        <User style={{ width: 13, height: 13 }} /> Username <span style={{ color: "#ef4444", fontSize: "0.7rem" }}>*</span>
+                                    </p>
+                                    <input
+                                        value={ciUsername}
+                                        onChange={e => setCiUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 32))}
+                                        placeholder="ubuntu"
+                                        style={{
+                                            width: "100%", padding: "10px 14px", boxSizing: "border-box",
+                                            background: "rgba(255,255,255,0.04)",
+                                            border: ciUsername.trim() ? "1px solid rgba(255,255,255,0.09)" : "1px solid rgba(239,68,68,0.3)",
+                                            borderRadius: 9, color: "#e2e8f0", fontSize: "0.85rem", fontFamily: "monospace", outline: "none",
+                                        }}
+                                    />
+                                    <p style={{ fontSize: "0.68rem", color: "#475569", marginTop: 6 }}>Lowercase letters, numbers, underscores, and hyphens. This will be the SSH login user.</p>
+                                </div>
+
+                                {/* ── SSH Keys ── */}
+                                <div style={{ marginBottom: 18 }}>
+                                    <p style={{ fontSize: "0.78rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                                        <Key style={{ width: 13, height: 13 }} /> SSH Public Key
+                                    </p>
+
+                                    {/* Saved keys quick-select */}
+                                    {savedSshKeys.length > 0 && (
+                                        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 10 }}>
+                                            {savedSshKeys.map(k => (
+                                                <button key={k.id} onClick={() => setSshKeys(k.publicKey)}
+                                                    style={{
+                                                        padding: "5px 12px", borderRadius: 7, cursor: "pointer", fontSize: "0.75rem", fontWeight: 600,
+                                                        border: sshKeys === k.publicKey ? "1px solid #3b82f6" : "1px solid rgba(255,255,255,0.1)",
+                                                        background: sshKeys === k.publicKey ? "rgba(59,130,246,0.1)" : "rgba(255,255,255,0.03)",
+                                                        color: sshKeys === k.publicKey ? "#3b82f6" : "#94a3b8",
+                                                        transition: "all 0.15s",
+                                                    }}>
+                                                    {k.name}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    <textarea
+                                        value={sshKeys}
+                                        onChange={e => setSshKeys(e.target.value)}
+                                        placeholder="ssh-ed25519 AAAA... user@host"
+                                        rows={3}
+                                        style={{
+                                            width: "100%", padding: "10px 14px", boxSizing: "border-box",
+                                            background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)",
+                                            borderRadius: 9, color: "#e2e8f0", fontSize: "0.78rem", fontFamily: "monospace",
+                                            outline: "none", resize: "vertical", lineHeight: 1.5,
+                                        }}
+                                    />
+                                    {!sshKeys.trim() && (
+                                        <p style={{ fontSize: "0.68rem", color: "#f59e0b", marginTop: 6, display: "flex", alignItems: "center", gap: 4 }}>
+                                            <AlertTriangle style={{ width: 11, height: 11 }} /> Recommended: add an SSH key for secure access.
+                                            {savedSshKeys.length === 0 && <> Manage keys <Link href="/dashboard/ssh" style={{ color: "#38bdf8", fontWeight: 700, marginLeft: 4 }}>here</Link>.</>}
+                                        </p>
+                                    )}
+                                </div>
+
+                                {/* ── Password ── */}
+                                <div>
+                                    <p style={{ fontSize: "0.78rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>Password</p>
+
+                                    {/* Auto-generate toggle */}
+                                    <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
+                                        <button
+                                            onClick={() => setAutoPassword(true)}
+                                            style={{
+                                                flex: 1, padding: "10px 14px", borderRadius: 9, cursor: "pointer", fontSize: "0.78rem", fontWeight: 600,
+                                                border: autoPassword ? "1px solid #10b981" : "1px solid rgba(255,255,255,0.09)",
+                                                background: autoPassword ? "rgba(16,185,129,0.08)" : "rgba(255,255,255,0.03)",
+                                                color: autoPassword ? "#10b981" : "#64748b",
+                                                display: "flex", alignItems: "center", gap: 8, transition: "all 0.15s",
+                                            }}
+                                        >
+                                            <RefreshCw style={{ width: 13, height: 13 }} />
+                                            Auto-generate secure password
+                                        </button>
+                                        <button
+                                            onClick={() => setAutoPassword(false)}
+                                            style={{
+                                                flex: 1, padding: "10px 14px", borderRadius: 9, cursor: "pointer", fontSize: "0.78rem", fontWeight: 600,
+                                                border: !autoPassword ? "1px solid #3b82f6" : "1px solid rgba(255,255,255,0.09)",
+                                                background: !autoPassword ? "rgba(59,130,246,0.08)" : "rgba(255,255,255,0.03)",
+                                                color: !autoPassword ? "#3b82f6" : "#64748b",
+                                                display: "flex", alignItems: "center", gap: 8, transition: "all 0.15s",
+                                            }}
+                                        >
+                                            <Key style={{ width: 13, height: 13 }} />
+                                            Set custom password
+                                        </button>
+                                    </div>
+
+                                    {autoPassword ? (
+                                        <div style={{ padding: "10px 14px", borderRadius: 9, background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.15)", fontSize: "0.75rem", color: "#6ee7b7", lineHeight: 1.6 }}>
+                                            A 16-character password will be generated automatically. It meets Windows complexity requirements (uppercase, lowercase, digits, special characters). The password will be shown once after deployment.
+                                        </div>
+                                    ) : (
+                                        <>
+                                            <input
+                                                type="password"
+                                                value={ciPassword}
+                                                onChange={e => setCiPassword(e.target.value)}
+                                                placeholder="Minimum 8 characters, mixed case + digits + special"
+                                                style={{
+                                                    width: "100%", padding: "10px 14px", boxSizing: "border-box",
+                                                    background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)",
+                                                    borderRadius: 9, color: "#e2e8f0", fontSize: "0.85rem", outline: "none",
+                                                }}
+                                            />
+                                            {ciPassword && ciPassword.length < 8 && (
+                                                <p style={{ fontSize: "0.68rem", color: "#f59e0b", marginTop: 6, display: "flex", alignItems: "center", gap: 4 }}>
+                                                    <AlertTriangle style={{ width: 11, height: 11 }} /> Password must be at least 8 characters.
+                                                </p>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
+                            </>
+                        )}
                     </div>
 
                     {/* ── Prebuilt Packages Table ── */}

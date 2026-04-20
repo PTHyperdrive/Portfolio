@@ -791,3 +791,278 @@ export async function waitForTask(
     throw new Error(`Task ${upid} timed out after ${timeoutMs / 1000}s`);
 }
 
+// ── Cloud-Init Provisioning ──────────────────────────────────────────────────
+
+/**
+ * Clone a VM template to create a new VM.
+ *
+ * The template must already exist on the target node as a Proxmox template
+ * (created via `qm template <vmid>`). Templates follow the naming convention
+ * defined in `src/config/templates.ts`: '{OS}-{Version}-{GPUstate}'.
+ *
+ * Resolution priority:
+ *   1. If `knownTemplateVmid` is provided, use it directly (O(1), no API call)
+ *   2. Otherwise, search by name via `findTemplateVmid()` (API round-trip)
+ *
+ * @param node              - Target Proxmox node
+ * @param templateName      - Proxmox template name (e.g. "UBUNTU-2404-NoGPU")
+ * @param newVmid           - VMID for the new cloned VM
+ * @param newName           - Hostname / VM name
+ * @param targetStorage     - Storage pool for the cloned disk (e.g. "local-lvm")
+ * @param full              - true = full (independent) clone, false = linked clone
+ * @param knownTemplateVmid - Hardcoded VMID from template registry (optional)
+ * @returns UPID string from the clone task
+ */
+export async function cloneTemplate(
+    node: string,
+    templateName: string,
+    newVmid: number,
+    newName: string,
+    targetStorage: string,
+    full = true,
+    knownTemplateVmid?: number | null
+): Promise<string> {
+    // Step 1: Resolve the template VMID
+    //   Fast path: use hardcoded VMID from template registry
+    //   Slow path: search all VMs on the node by name
+    const templateVmid = knownTemplateVmid ?? await findTemplateVmid(node, templateName);
+    if (!templateVmid) {
+        throw new Error(
+            `Template "${templateName}" not found on node "${node}". ` +
+            `Ensure the template VM exists and has been converted via 'qm template'.`
+        );
+    }
+
+    // Step 2: Clone the template
+    const upid = await pveFetch(`/nodes/${node}/qemu/${templateVmid}/clone`, {
+        method: "POST",
+        body: JSON.stringify({
+            newid:   newVmid,
+            name:    newName,
+            target:  node,
+            storage: targetStorage,
+            full:    full ? 1 : 0,
+        }),
+    });
+
+    return upid as string;
+}
+
+/**
+ * Find a template VM's VMID by its name on a given node.
+ *
+ * Searches all QEMU VMs on the node for one matching the name
+ * and having `template: 1` set.
+ *
+ * @returns VMID number or null if not found
+ */
+export async function findTemplateVmid(
+    node: string,
+    templateName: string
+): Promise<number | null> {
+    const vms = await pveFetch(`/nodes/${node}/qemu`) as {
+        vmid: number;
+        name?: string;
+        template?: number;
+    }[];
+
+    const match = vms.find(
+        (vm) => vm.name === templateName && vm.template === 1
+    );
+
+    return match?.vmid ?? null;
+}
+
+/**
+ * Resize a VM's disk after cloning.
+ *
+ * Cloud-Init template images are typically small (2–10 GB). After cloning,
+ * the disk must be expanded to match the plan's allocated disk size.
+ *
+ * @param node   - Proxmox node
+ * @param vmId   - VMID string
+ * @param disk   - Disk slot to resize (e.g. "scsi0")
+ * @param sizeGb - Target size in GB (absolute, not delta)
+ */
+export async function resizeDisk(
+    node: string,
+    vmId: string,
+    disk: string,
+    sizeGb: number
+): Promise<void> {
+    await pveFetch(`/nodes/${node}/qemu/${vmId}/resize`, {
+        method: "PUT",
+        body: JSON.stringify({ disk, size: `${sizeGb}G` }),
+    });
+}
+
+/**
+ * Configure Cloud-Init parameters on a VM.
+ *
+ * Sets user account, SSH keys, IP config, DNS, and hostname via
+ * the Proxmox Cloud-Init API. Changes are written to the Cloud-Init
+ * drive and applied on next boot.
+ *
+ * For Windows VMs (Cloudbase-Init), use citype=configdrive2 and set
+ * the ostype to the appropriate Windows version beforehand.
+ *
+ * @param node   - Proxmox node
+ * @param vmId   - VMID string
+ * @param config - Cloud-Init configuration parameters
+ */
+export async function setCloudInitConfig(
+    node: string,
+    vmId: string,
+    config: {
+        /** Default SSH user (e.g. "ubuntu", "Admin") */
+        ciuser?: string;
+        /** Password for the CI user (hashed; optional) */
+        cipassword?: string;
+        /** SSH public keys (newline-separated, URL-encoded) */
+        sshkeys?: string;
+        /** IP config for net0 (e.g. "ip=dhcp" or "ip=10.0.10.5/24,gw=10.0.10.1") */
+        ipconfig0?: string;
+        /** DNS nameserver(s), space-separated */
+        nameserver?: string;
+        /** DNS search domain */
+        searchdomain?: string;
+    }
+): Promise<void> {
+    // Build only the defined fields — Proxmox ignores undefined/null
+    const payload: Record<string, string> = {};
+    if (config.ciuser)        payload.ciuser       = config.ciuser;
+    if (config.cipassword)    payload.cipassword   = config.cipassword;
+    if (config.sshkeys)       payload.sshkeys      = config.sshkeys;
+    if (config.ipconfig0)     payload.ipconfig0    = config.ipconfig0;
+    if (config.nameserver)    payload.nameserver   = config.nameserver;
+    if (config.searchdomain)  payload.searchdomain = config.searchdomain;
+
+    if (Object.keys(payload).length === 0) return;
+
+    await pveFetch(`/nodes/${node}/qemu/${vmId}/config`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+    });
+}
+
+/**
+ * Adjust VM hardware specs (CPU, memory, bandwidth) after cloning.
+ *
+ * Templates are created with minimal resources. After cloning, the VM's
+ * hardware must be scaled to match the selected plan configuration.
+ *
+ * @param node   - Proxmox node
+ * @param vmId   - VMID string
+ * @param specs  - Hardware specifications from PlanConfig
+ */
+export async function applyPlanHardware(
+    node: string,
+    vmId: string,
+    specs: {
+        cores: number;
+        memory: number;   // in MB
+        net0Rate?: number; // MB/s bandwidth limit (0 = unlimited)
+    }
+): Promise<void> {
+    const payload: Record<string, string | number> = {
+        cores:   specs.cores,
+        sockets: 1,
+        memory:  specs.memory,
+        cpu:     "host",
+    };
+
+    // Update net0 rate limit if specified — preserve existing bridge/mac
+    if (specs.net0Rate && specs.net0Rate > 0) {
+        // Read current net0 config to preserve mac/bridge
+        const config = await pveFetch(
+            `/nodes/${node}/qemu/${vmId}/config`
+        ) as Record<string, string>;
+
+        const currentNet0 = config.net0 || "";
+        // Strip existing rate= parameter and append the new one
+        const netBase = currentNet0.replace(/,?rate=[\d.]+/g, "");
+        payload.net0 = `${netBase},rate=${specs.net0Rate}`;
+    }
+
+    await pveFetch(`/nodes/${node}/qemu/${vmId}/config`, {
+        method: "PUT",
+        body: JSON.stringify(payload),
+    });
+}
+
+/**
+ * Regenerate the Cloud-Init ISO image on a VM.
+ *
+ * Must be called after modifying Cloud-Init config (setCloudInitConfig)
+ * for changes to take effect on the next boot.
+ */
+export async function regenerateCloudInitImage(
+    node: string,
+    vmId: string
+): Promise<void> {
+    await pveFetch(`/nodes/${node}/qemu/${vmId}/cloudinit`, {
+        method: "PUT",
+    });
+}
+
+/**
+ * Query the QEMU Guest Agent for network interface information.
+ *
+ * Used to discover the VM's IP address after Cloud-Init provisioning.
+ * Requires `qemu-guest-agent` installed and running inside the VM.
+ *
+ * @returns Array of network interfaces with IP addresses, or null
+ *          if the guest agent is not responding.
+ */
+export async function getGuestAgentNetworkInfo(
+    node: string,
+    vmId: string
+): Promise<GuestNetworkInterface[] | null> {
+    try {
+        const data = await pveFetch(
+            `/nodes/${node}/qemu/${vmId}/agent/network-get-interfaces`
+        );
+        const result = data as { result?: GuestNetworkInterface[] };
+        return result?.result ?? null;
+    } catch {
+        // Guest agent not ready or not installed — non-fatal
+        return null;
+    }
+}
+
+export interface GuestNetworkInterface {
+    name: string;
+    "hardware-address"?: string;
+    "ip-addresses"?: {
+        "ip-address": string;
+        "ip-address-type": "ipv4" | "ipv6";
+        prefix: number;
+    }[];
+}
+
+/**
+ * Extract the primary IPv4 address from guest agent network info.
+ *
+ * Skips loopback (127.x.x.x) and link-local (169.254.x.x) addresses.
+ * Returns the first non-local IPv4 address, or null if unavailable.
+ */
+export function extractPrimaryIPv4(
+    interfaces: GuestNetworkInterface[] | null
+): string | null {
+    if (!interfaces) return null;
+
+    for (const iface of interfaces) {
+        if (iface.name === "lo") continue;
+        for (const addr of iface["ip-addresses"] ?? []) {
+            if (
+                addr["ip-address-type"] === "ipv4" &&
+                !addr["ip-address"].startsWith("127.") &&
+                !addr["ip-address"].startsWith("169.254.")
+            ) {
+                return addr["ip-address"];
+            }
+        }
+    }
+    return null;
+}
+
