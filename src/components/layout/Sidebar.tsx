@@ -8,7 +8,7 @@ import { useSession, signOut } from "next-auth/react";
 import {
     LayoutGrid, Server, Gamepad2, Cloud, Key, Globe, Settings as SettingsIcon,
     Users, History, BarChart2, Wallet, User, Sliders, MessageSquare,
-    ChevronDown, ChevronRight, LogOut, Shield
+    ChevronDown, ChevronRight, LogOut, Shield, ShoppingBag
 } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useThemeTokens } from "@/lib/useThemeTokens";
@@ -52,6 +52,12 @@ const SIDEBAR_STRUCTURE: NavGroup[] = [
                     { label: "ISOs",      href: "/dashboard/orchestration/isos"      },
                 ]
             },
+        ],
+    },
+    {
+        title: "SERVICES",
+        items: [
+            { label: "MMO Market", icon: ShoppingBag, href: "/dashboard/mmo" },
         ],
     },
     {

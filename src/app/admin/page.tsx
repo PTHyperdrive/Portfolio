@@ -21,7 +21,7 @@ const ADMIN_LINKS: { title: string; description: string; href: string; Icon: Luc
     { title: "Service Management", description: "Add, edit, or remove service listings", href: "/admin/services", Icon: Wrench },
     { title: "Order Management", description: "Process orders and update statuses", href: "/admin/orders", Icon: ClipboardList },
     { title: "Blog Management", description: "Create, edit, and publish blog posts", href: "/admin/blog", Icon: PenSquare },
-    { title: "Proxy Inventory", description: "Manage proxy stock and locations", href: "/admin/proxy", Icon: Globe },
+    { title: "MMO Inventory", description: "Manage MMO digital asset stock and categories", href: "/admin/mmo", Icon: Globe },
     { title: "VPN Servers", description: "Configure VPN server endpoints", href: "/admin/vpn", Icon: Lock },
     { title: "System Settings", description: "Configure system parameters", href: "/admin/settings", Icon: Settings },
 ];

@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import Image from "next/image";
-import { Gift, Ticket, Tag, AlertTriangle, Sparkles, Key, Terminal, Cloud, User, RefreshCw } from "lucide-react";
+import { Gift, Ticket, Tag, AlertTriangle, Sparkles, Key, Terminal, Cloud, User, RefreshCw, Settings } from "lucide-react";
 import { CLOUD_TEMPLATES, getTemplatesForPlan } from "@/config/templates";
 import type { CloudTemplate } from "@/config/templates";
+import { useThemeTokens } from "@/lib/useThemeTokens";
 
 // ── Data ─────────────────────────────────────────────────────────────────────
 
@@ -87,24 +88,24 @@ interface Ticket {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function SectionHeader({ icon, title, sub }: { icon: React.ReactNode; title: string; sub: string }) {
+function SectionHeader({ icon, title, sub, t }: { icon: React.ReactNode; title: string; sub: string; t: ReturnType<typeof useThemeTokens> }) {
     return (
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 9, background: "rgba(59,130,246,0.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <div style={{ width: 36, height: 36, borderRadius: t.isMono ? 8 : 9, background: t.accentPrimaryMuted, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 {icon}
             </div>
             <div>
-                <p style={{ fontWeight: 800, color: "#f1f5f9", fontSize: "0.975rem" }}>{title}</p>
-                <p style={{ color: "#475569", fontSize: "0.78rem" }}>{sub}</p>
+                <p style={{ fontWeight: 800, color: t.textPrimary, fontSize: "0.975rem", fontFamily: t.fontFamily }}>{title}</p>
+                <p style={{ color: t.textMuted, fontSize: "0.78rem", fontFamily: t.fontFamily }}>{sub}</p>
             </div>
         </div>
     );
 }
 
-function Check() {
+function Check({ t }: { t: ReturnType<typeof useThemeTokens> }) {
     return (
-        <div style={{ width: 20, height: 20, borderRadius: "50%", background: "#3b82f6", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3"><path d="M20 6 9 17l-5-5" /></svg>
+        <div style={{ width: 20, height: 20, borderRadius: "50%", background: t.accentPrimary, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={t.isMono ? t.bgPrimary : "#fff"} strokeWidth="3"><path d="M20 6 9 17l-5-5" /></svg>
         </div>
     );
 }
@@ -114,7 +115,16 @@ function Check() {
 export default function ComputeNewPage() {
     const router = useRouter();
     const { data: session } = useSession();
+    const t = useThemeTokens();
     const isAdmin = (session?.user as { role?: string } | undefined)?.role === "ADMIN";
+
+    // Admin provisioning mode toggle:
+    // When true, admin uses Cloud-Init flow; when false, uses legacy ISO flow.
+    const [adminUseCloudInit, setAdminUseCloudInit] = useState(false);
+
+    // Effective provisioning mode: guests always use Cloud-Init,
+    // admins respect their toggle preference.
+    const useCloudInit = isAdmin ? adminUseCloudInit : true;
 
     const [selectedPlan,  setSelectedPlan]  = useState("Dev-Standard");
     const [selectedLoc,   setSelectedLoc]   = useState("hcm1");
@@ -196,19 +206,22 @@ export default function ComputeNewPage() {
 
     const isSplitOrder = !isFreeTrial && instancesCoveredByTickets > 0 && instancesToPayFor > 0;
 
+    // ── Theme-aware style tokens ──────────────────────────────
     const card: React.CSSProperties = {
-        background: "#161b22", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 14,
+        background: t.bgCard, border: `1px solid ${t.borderPrimary}`, borderRadius: t.cardRadius,
     };
     const cardBase: React.CSSProperties = {
-        borderRadius: 12, border: "2px solid rgba(255,255,255,0.07)",
-        background: "rgba(255,255,255,0.02)", padding: "16px 18px",
+        borderRadius: t.cardRadius - 2, border: `2px solid ${t.borderPrimary}`,
+        background: t.bgSecondary, padding: "16px 18px",
         cursor: "pointer", transition: "all 0.15s", position: "relative",
     };
     const cardActive: React.CSSProperties = {
-        border: "2px solid #3b82f6", background: "rgba(59,130,246,0.08)",
+        border: `2px solid ${t.accentPrimary}`, background: t.accentPrimaryMuted,
     };
+    const trialAccent = t.isMono ? t.accentPrimary : "#8b5cf6";
+    const trialAccentMuted = t.isMono ? t.accentPrimaryMuted : "rgba(139,92,246,0.08)";
     const cardFreeTrial: React.CSSProperties = {
-        border: "2px solid #8b5cf6", background: "rgba(139,92,246,0.08)",
+        border: `2px solid ${trialAccent}`, background: trialAccentMuted,
     };
 
     // ── Handlers ─────────────────────────────────────────────────────
@@ -232,8 +245,8 @@ export default function ComputeNewPage() {
         setDeploying(true);
         setDeployErr("");
         try {
-            if (isAdmin) {
-                // ── Admin: Legacy ISO-based deploy ───────────────
+            if (!useCloudInit) {
+                // ── Legacy ISO-based deploy (Admin only) ─────────
                 const res = await fetch("/api/vps/deploy", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
@@ -248,7 +261,7 @@ export default function ComputeNewPage() {
                 if (!res.ok) { setDeployErr(d.error ?? "Deployment failed"); return; }
                 router.push("/dashboard/vps");
             } else {
-                // ── Guest: Cloud-Init template deploy ────────────
+                // ── Cloud-Init template deploy ───────────────────
                 const finalHostname = hostname.trim() || `vm-${Date.now().toString(36)}`;
                 const res = await fetch("/api/vps/deploy-cloudinit", {
                     method: "POST",
@@ -265,7 +278,6 @@ export default function ComputeNewPage() {
                 });
                 const d = await res.json();
                 if (!res.ok) { setDeployErr(d.error ?? "Deployment failed"); return; }
-                // Redirect to provisioning status for the first VM
                 const firstVmId = d.vmids?.[0];
                 if (firstVmId) {
                     router.push(`/dashboard/vps/${firstVmId}`);
@@ -279,16 +291,55 @@ export default function ComputeNewPage() {
 
     // ── Render ────────────────────────────────────────────────────────
     return (
-        <div style={{ padding: "28px 36px", minHeight: "100vh", backgroundColor: "#0d1117" }}>
+        <div style={{ padding: "28px 36px", minHeight: "100vh", backgroundColor: t.bgPrimary, fontFamily: t.fontFamily }}>
             {/* Header */}
             <div style={{ marginBottom: 28 }}>
-                <p style={{ fontSize: "0.78rem", color: "#475569", marginBottom: 6 }}>
+                <p style={{ fontSize: "0.78rem", color: t.textMuted, marginBottom: 6 }}>
                     Dashboard &nbsp;•&nbsp;
-                    <Link href="/dashboard/vps" style={{ color: "#475569", textDecoration: "none" }}>Virtual Machine</Link>
+                    <Link href="/dashboard/vps" style={{ color: t.textMuted, textDecoration: "none" }}>Virtual Machine</Link>
                     &nbsp;•&nbsp; Deploy New Server
                 </p>
-                <h1 style={{ fontSize: "1.55rem", fontWeight: 800, color: "#f1f5f9" }}>Deploy New Server</h1>
+                <h1 style={{ fontSize: "1.55rem", fontWeight: 800, color: t.textPrimary }}>Deploy New Server</h1>
             </div>
+
+            {/* ── Admin Provisioning Mode Toggle ── */}
+            {isAdmin && (
+                <div style={{
+                    marginBottom: 20, padding: "12px 20px", borderRadius: t.cardRadius,
+                    background: t.bgCard, border: `1px solid ${t.borderPrimary}`,
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <Settings style={{ width: 18, height: 18, color: t.accentPrimary }} />
+                        <div>
+                            <p style={{ fontWeight: 700, color: t.textPrimary, fontSize: "0.85rem" }}>Provisioning Mode</p>
+                            <p style={{ color: t.textMuted, fontSize: "0.72rem", marginTop: 2 }}>
+                                {useCloudInit ? "Cloud-Init (automated template clone)" : "Legacy (manual ISO installation)"}
+                            </p>
+                        </div>
+                    </div>
+                    <div style={{ display: "flex", borderRadius: t.buttonRadius, overflow: "hidden", border: `1px solid ${t.borderPrimary}` }}>
+                        <button
+                            onClick={() => setAdminUseCloudInit(false)}
+                            style={{
+                                padding: "6px 16px", border: "none", cursor: "pointer",
+                                fontSize: "0.75rem", fontWeight: 700, transition: "all 0.15s",
+                                background: !adminUseCloudInit ? t.accentPrimary : "transparent",
+                                color: !adminUseCloudInit ? (t.isMono ? t.bgPrimary : "#fff") : t.textMuted,
+                            }}
+                        >Legacy</button>
+                        <button
+                            onClick={() => setAdminUseCloudInit(true)}
+                            style={{
+                                padding: "6px 16px", border: "none", cursor: "pointer",
+                                fontSize: "0.75rem", fontWeight: 700, transition: "all 0.15s",
+                                background: adminUseCloudInit ? t.accentPrimary : "transparent",
+                                color: adminUseCloudInit ? (t.isMono ? t.bgPrimary : "#fff") : t.textMuted,
+                            }}
+                        >Cloud-Init</button>
+                    </div>
+                </div>
+            )}
 
             {/* ── Free Trial Eligibility Banner ── */}
             {hasUsedTrial === false && (
@@ -336,9 +387,10 @@ export default function ComputeNewPage() {
                     {/* ── Server Plan ── */}
                     <div style={{ ...card, padding: 24 }}>
                         <SectionHeader
-                            icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2"><rect x="2" y="2" width="20" height="8" rx="2" /><rect x="2" y="14" width="20" height="8" rx="2" /><line x1="6" y1="6" x2="6.01" y2="6" /><line x1="6" y1="18" x2="6.01" y2="18" /></svg>}
+                            icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={t.accentPrimary} strokeWidth="2"><rect x="2" y="2" width="20" height="8" rx="2" /><rect x="2" y="14" width="20" height="8" rx="2" /><line x1="6" y1="6" x2="6.01" y2="6" /><line x1="6" y1="18" x2="6.01" y2="18" /></svg>}
                             title="Server Plan"
                             sub="Choose the hardware configuration for your instance"
+                            t={t}
                         />
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                             {PLANS.map(p => {
@@ -350,37 +402,37 @@ export default function ComputeNewPage() {
                                         style={{ ...cardBase, ...(active ? (isTrial ? cardFreeTrial : cardActive) : {}) }}>
                                         {/* Trial badge */}
                                         {isTrial && (
-                                            <div style={{ position: "absolute", top: -10, left: 12, padding: "2px 10px", borderRadius: 20, fontSize: "0.62rem", fontWeight: 800, background: "linear-gradient(90deg,#8b5cf6,#6d28d9)", color: "#fff", display: "flex", alignItems: "center", gap: 4 }}>
+                                            <div style={{ position: "absolute", top: -10, left: 12, padding: "2px 10px", borderRadius: 20, fontSize: "0.62rem", fontWeight: 800, background: t.isMono ? t.accentPrimary : "linear-gradient(90deg,#8b5cf6,#6d28d9)", color: t.isMono ? t.bgPrimary : "#fff", display: "flex", alignItems: "center", gap: 4 }}>
                                                 <Gift style={{ width: 10, height: 10 }} /> FREE TRIAL
                                             </div>
                                         )}
                                         {/* Ticket badge */}
                                         {hasTicket && (
-                                            <div style={{ position: "absolute", top: -10, left: 12, padding: "2px 10px", borderRadius: 20, fontSize: "0.62rem", fontWeight: 800, background: "#10b981", color: "#fff" }}>
+                                            <div style={{ position: "absolute", top: -10, left: 12, padding: "2px 10px", borderRadius: 20, fontSize: "0.62rem", fontWeight: 800, background: t.statusSuccess, color: t.isMono ? t.bgPrimary : "#fff" }}>
                                                 <Ticket style={{ width: 10, height: 10 }} /> TICKET AVAILABLE
                                             </div>
                                         )}
                                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                                            <p style={{ fontWeight: 800, color: isTrial ? "#c4b5fd" : "#f1f5f9", fontSize: "0.925rem" }}>{p.label}</p>
+                                            <p style={{ fontWeight: 800, color: isTrial ? trialAccent : t.textPrimary, fontSize: "0.925rem" }}>{p.label}</p>
                                             <span style={{ padding: "2px 8px", borderRadius: 20, fontSize: "0.65rem", fontWeight: 800, background: `${p.badgeColor}22`, color: p.badgeColor, whiteSpace: "nowrap" }}>{p.badge}</span>
                                         </div>
-                                        <p style={{ fontSize: "0.75rem", color: "#64748b", lineHeight: 1.5, marginBottom: 10 }}>{p.desc}</p>
+                                        <p style={{ fontSize: "0.75rem", color: t.textMuted, lineHeight: 1.5, marginBottom: 10 }}>{p.desc}</p>
                                         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 10 }}>
                                             {[`${p.vcpu} vCPU`, `${p.ram} GB RAM`, `${p.disk} GB`, p.bw].map(s => (
-                                                <span key={s} style={{ fontSize: "0.68rem", color: "#94a3b8", background: "rgba(255,255,255,0.05)", padding: "2px 8px", borderRadius: 6 }}>{s}</span>
+                                                <span key={s} style={{ fontSize: "0.68rem", color: t.textSecondary, background: t.bgTertiary, padding: "2px 8px", borderRadius: 6 }}>{s}</span>
                                             ))}
                                         </div>
                                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                             {isTrial ? (
-                                                <span style={{ fontWeight: 800, color: "#a78bfa", fontSize: "0.875rem" }}>FREE <span style={{ fontSize: "0.65rem", color: "#475569", fontWeight: 400 }}>(30 days)</span></span>
+                                                <span style={{ fontWeight: 800, color: trialAccent, fontSize: "0.875rem" }}>FREE <span style={{ fontSize: "0.65rem", color: t.textMuted, fontWeight: 400 }}>(30 days)</span></span>
                                             ) : hasTicket ? (
-                                                <span style={{ fontWeight: 800, color: "#10b981", fontSize: "0.875rem" }}>0 Credits <span style={{ fontSize: "0.65rem", color: "#475569", fontWeight: 400 }}>(ticket)</span></span>
+                                                <span style={{ fontWeight: 800, color: t.statusSuccess, fontSize: "0.875rem" }}>0 Credits <span style={{ fontSize: "0.65rem", color: t.textMuted, fontWeight: 400 }}>(ticket)</span></span>
                                             ) : (
-                                                <span style={{ fontWeight: 800, color: "#f1f5f9", fontSize: "0.875rem" }}>
-                                                    {p.price.toLocaleString()} <span style={{ fontSize: "0.65rem", color: "#475569", fontWeight: 400 }}>Credits/mo</span>
+                                                <span style={{ fontWeight: 800, color: t.textPrimary, fontSize: "0.875rem" }}>
+                                                    {p.price.toLocaleString()} <span style={{ fontSize: "0.65rem", color: t.textMuted, fontWeight: 400 }}>Credits/mo</span>
                                                 </span>
                                             )}
-                                            {active && <Check />}
+                                            {active && <Check t={t} />}
                                         </div>
                                     </div>
                                 );
@@ -391,9 +443,10 @@ export default function ComputeNewPage() {
                     {/* ── Location ── */}
                     <div style={{ ...card, padding: 24 }}>
                         <SectionHeader
-                            icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>}
+                            icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={t.accentPrimary} strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>}
                             title="Location"
                             sub="Choose the datacenter closest to your users"
+                            t={t}
                         />
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                             {LOCATIONS.map(loc => {
@@ -405,10 +458,10 @@ export default function ComputeNewPage() {
                                             <Image src={loc.iconPath} alt={loc.sub} width={38} height={28} style={{ objectFit: "cover", width: "100%", height: "100%" }} />
                                         </div>
                                         <div style={{ flex: 1 }}>
-                                            <p style={{ fontWeight: 700, color: "#e2e8f0", fontSize: "0.875rem" }}>{loc.label}</p>
-                                            <p style={{ color: "#64748b", fontSize: "0.75rem" }}>{loc.sub}</p>
+                                            <p style={{ fontWeight: 700, color: t.textPrimary, fontSize: "0.875rem" }}>{loc.label}</p>
+                                            <p style={{ color: t.textMuted, fontSize: "0.75rem" }}>{loc.sub}</p>
                                         </div>
-                                        {active && <Check />}
+                                        {active && <Check t={t} />}
                                     </div>
                                 );
                             })}
@@ -417,23 +470,24 @@ export default function ComputeNewPage() {
 
                     {/* ── Software / Template Selection ── */}
                     <div style={{ ...card, padding: 24 }}>
-                        {isAdmin ? (
+                        {!useCloudInit ? (
                             /* ═══ ADMIN: Full ISO selector with tabs ═══ */
                             <>
                                 <SectionHeader
-                                    icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 21V9" /></svg>}
+                                    icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={t.accentPrimary} strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18M9 21V9" /></svg>}
                                     title="Software"
                                     sub="Select the operating system or application stack"
+                                    t={t}
                                 />
                                 {/* Tabs */}
-                                <div style={{ display: "flex", gap: 4, marginBottom: 18, borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+                                <div style={{ display: "flex", gap: 4, marginBottom: 18, borderBottom: `1px solid ${t.borderPrimary}` }}>
                                     {SW_TABS.map(tab => (
                                         <button key={tab} onClick={() => setSwTab(tab)} style={{
                                             padding: "7px 14px", borderRadius: "8px 8px 0 0",
                                             border: "none", cursor: "pointer", fontSize: "0.8rem", fontWeight: 600,
-                                            background: swTab === tab ? "rgba(59,130,246,0.12)" : "transparent",
-                                            color: swTab === tab ? "#3b82f6" : "#64748b",
-                                            borderBottom: swTab === tab ? "2px solid #3b82f6" : "2px solid transparent",
+                                            background: swTab === tab ? t.accentPrimaryMuted : "transparent",
+                                            color: swTab === tab ? t.accentPrimary : t.textMuted,
+                                            borderBottom: swTab === tab ? `2px solid ${t.accentPrimary}` : "2px solid transparent",
                                             transition: "all 0.15s",
                                         }}>{tab}</button>
                                     ))}
@@ -446,22 +500,22 @@ export default function ComputeNewPage() {
                                             return (
                                                 <div key={o.id} onClick={() => setSelectedOs(o.id)}
                                                     style={{ ...cardBase, ...(active ? cardActive : {}), display: "flex", alignItems: "center", gap: 12, padding: "12px 14px" }}>
-                                                    <div style={{ width: 32, height: 32, borderRadius: 7, overflow: "hidden", flexShrink: 0, background: "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                                    <div style={{ width: 32, height: 32, borderRadius: 7, overflow: "hidden", flexShrink: 0, background: t.bgTertiary, display: "flex", alignItems: "center", justifyContent: "center" }}>
                                                         <Image src={o.iconPath} alt={o.label} width={26} height={26} style={{ objectFit: "contain" }} />
                                                     </div>
                                                     <div style={{ flex: 1, minWidth: 0 }}>
-                                                        <p style={{ fontWeight: 700, color: "#e2e8f0", fontSize: "0.825rem" }}>{o.label}</p>
-                                                        <p style={{ color: "#64748b", fontSize: "0.72rem" }}>{o.version}</p>
+                                                        <p style={{ fontWeight: 700, color: t.textPrimary, fontSize: "0.825rem" }}>{o.label}</p>
+                                                        <p style={{ color: t.textMuted, fontSize: "0.72rem" }}>{o.version}</p>
                                                     </div>
-                                                    {active ? <Check /> : (
-                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="2"><path d="m6 9 6 6 6-6" /></svg>
+                                                    {active ? <Check t={t} /> : (
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.textMuted} strokeWidth="2"><path d="m6 9 6 6 6-6" /></svg>
                                                     )}
                                                 </div>
                                             );
                                         })}
                                     </div>
                                 ) : (
-                                    <div style={{ padding: "32px 0", textAlign: "center", color: "#334155", fontSize: "0.85rem" }}>
+                                    <div style={{ padding: "32px 0", textAlign: "center", color: t.textMuted, fontSize: "0.85rem" }}>
                                         {swTab === "Applications" ? "Application marketplace coming soon." : swTab === "ISO" ? "Custom ISO upload coming soon." : "Snapshot restore coming soon."}
                                     </div>
                                 )}
@@ -470,27 +524,28 @@ export default function ComputeNewPage() {
                             /* ═══ GUEST: Cloud-Init template selector + config ═══ */
                             <>
                                 <SectionHeader
-                                    icon={<Cloud style={{ width: 18, height: 18, color: "#3b82f6" }} />}
+                                    icon={<Cloud style={{ width: 18, height: 18, color: t.accentPrimary }} />}
                                     title="Operating System"
                                     sub={`Select a pre-built Cloud-Init template${requiresGpu ? " (GPU-enabled)" : ""}`}
+                                    t={t}
                                 />
 
                                 {/* Template grid */}
                                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
-                                    {availableTemplates.map(t => {
-                                        const active = selectedOs === t.id;
+                                    {availableTemplates.map(tpl => {
+                                        const active = selectedOs === tpl.id;
                                         return (
-                                            <div key={t.id} onClick={() => setSelectedOs(t.id)}
+                                            <div key={tpl.id} onClick={() => setSelectedOs(tpl.id)}
                                                 style={{ ...cardBase, ...(active ? cardActive : {}), display: "flex", alignItems: "center", gap: 12, padding: "12px 14px" }}>
-                                                <div style={{ width: 32, height: 32, borderRadius: 7, overflow: "hidden", flexShrink: 0, background: "rgba(255,255,255,0.04)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                                    <Image src={t.iconPath} alt={t.label} width={26} height={26} style={{ objectFit: "contain" }} />
+                                                <div style={{ width: 32, height: 32, borderRadius: 7, overflow: "hidden", flexShrink: 0, background: t.bgTertiary, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                                    <Image src={tpl.iconPath} alt={tpl.label} width={26} height={26} style={{ objectFit: "contain" }} />
                                                 </div>
                                                 <div style={{ flex: 1, minWidth: 0 }}>
-                                                    <p style={{ fontWeight: 700, color: "#e2e8f0", fontSize: "0.825rem" }}>{t.label}</p>
-                                                    <p style={{ color: "#64748b", fontSize: "0.72rem" }}>{t.version}</p>
+                                                    <p style={{ fontWeight: 700, color: t.textPrimary, fontSize: "0.825rem" }}>{tpl.label}</p>
+                                                    <p style={{ color: t.textMuted, fontSize: "0.72rem" }}>{tpl.version}</p>
                                                 </div>
-                                                {active ? <Check /> : (
-                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="2"><path d="m6 9 6 6 6-6" /></svg>
+                                                {active ? <Check t={t} /> : (
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.textMuted} strokeWidth="2"><path d="m6 9 6 6 6-6" /></svg>
                                                 )}
                                             </div>
                                         );
@@ -499,37 +554,37 @@ export default function ComputeNewPage() {
 
                                 {/* Template badge — shows resolved Proxmox name */}
                                 {(() => {
-                                    const tpl = CLOUD_TEMPLATES.find(t => t.id === selectedOs);
-                                    if (!tpl) return null;
+                                    const tplRef = CLOUD_TEMPLATES.find(ct => ct.id === selectedOs);
+                                    if (!tplRef) return null;
                                     const gpuSuffix = requiresGpu ? "vGPU" : "NoGPU";
                                     return (
-                                        <div style={{ padding: "8px 14px", borderRadius: 8, background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.15)", marginBottom: 20, display: "flex", alignItems: "center", gap: 8 }}>
-                                            <Terminal style={{ width: 13, height: 13, color: "#64748b" }} />
-                                            <span style={{ fontSize: "0.75rem", color: "#94a3b8", fontFamily: "monospace" }}>Template: <span style={{ color: "#3b82f6", fontWeight: 700 }}>{tpl.proxmoxPrefix}-{gpuSuffix}</span></span>
+                                        <div style={{ padding: "8px 14px", borderRadius: t.cardRadius - 2, background: t.accentPrimaryMuted, border: `1px solid ${t.borderPrimary}`, marginBottom: 20, display: "flex", alignItems: "center", gap: 8 }}>
+                                            <Terminal style={{ width: 13, height: 13, color: t.textMuted }} />
+                                            <span style={{ fontSize: "0.75rem", color: t.textSecondary, fontFamily: t.fontMono }}>Template: <span style={{ color: t.accentPrimary, fontWeight: 700 }}>{tplRef.proxmoxPrefix}-{gpuSuffix}</span></span>
                                         </div>
                                     );
                                 })()}
 
                                 {/* ── Hostname ── */}
                                 <div style={{ marginBottom: 18 }}>
-                                    <p style={{ fontSize: "0.78rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Hostname</p>
+                                    <p style={{ fontSize: "0.78rem", fontWeight: 700, color: t.textSecondary, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8 }}>Hostname</p>
                                     <input
                                         value={hostname}
                                         onChange={e => setHostname(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 63))}
                                         placeholder={`vm-${Date.now().toString(36).slice(-6)}`}
                                         style={{
                                             width: "100%", padding: "10px 14px", boxSizing: "border-box",
-                                            background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)",
-                                            borderRadius: 9, color: "#e2e8f0", fontSize: "0.85rem", fontFamily: "monospace", outline: "none",
+                                            background: t.bgInput, border: `1px solid ${t.borderPrimary}`,
+                                            borderRadius: t.buttonRadius, color: t.textPrimary, fontSize: "0.85rem", fontFamily: t.fontMono, outline: "none",
                                         }}
                                     />
-                                    <p style={{ fontSize: "0.68rem", color: "#475569", marginTop: 6 }}>Lowercase letters, numbers, and hyphens only. Max 63 characters.</p>
+                                    <p style={{ fontSize: "0.68rem", color: t.textMuted, marginTop: 6 }}>Lowercase letters, numbers, and hyphens only. Max 63 characters.</p>
                                 </div>
 
                                 {/* ── Username (required) ── */}
                                 <div style={{ marginBottom: 18 }}>
-                                    <p style={{ fontSize: "0.78rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-                                        <User style={{ width: 13, height: 13 }} /> Username <span style={{ color: "#ef4444", fontSize: "0.7rem" }}>*</span>
+                                    <p style={{ fontSize: "0.78rem", fontWeight: 700, color: t.textSecondary, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                                        <User style={{ width: 13, height: 13 }} /> Username <span style={{ color: t.statusError, fontSize: "0.7rem" }}>*</span>
                                     </p>
                                     <input
                                         value={ciUsername}
@@ -537,17 +592,17 @@ export default function ComputeNewPage() {
                                         placeholder="ubuntu"
                                         style={{
                                             width: "100%", padding: "10px 14px", boxSizing: "border-box",
-                                            background: "rgba(255,255,255,0.04)",
-                                            border: ciUsername.trim() ? "1px solid rgba(255,255,255,0.09)" : "1px solid rgba(239,68,68,0.3)",
-                                            borderRadius: 9, color: "#e2e8f0", fontSize: "0.85rem", fontFamily: "monospace", outline: "none",
+                                            background: t.bgInput,
+                                            border: ciUsername.trim() ? `1px solid ${t.borderPrimary}` : `1px solid ${t.statusError}44`,
+                                            borderRadius: t.buttonRadius, color: t.textPrimary, fontSize: "0.85rem", fontFamily: t.fontMono, outline: "none",
                                         }}
                                     />
-                                    <p style={{ fontSize: "0.68rem", color: "#475569", marginTop: 6 }}>Lowercase letters, numbers, underscores, and hyphens. This will be the SSH login user.</p>
+                                    <p style={{ fontSize: "0.68rem", color: t.textMuted, marginTop: 6 }}>Lowercase letters, numbers, underscores, and hyphens. This will be the SSH login user.</p>
                                 </div>
 
                                 {/* ── SSH Keys ── */}
                                 <div style={{ marginBottom: 18 }}>
-                                    <p style={{ fontSize: "0.78rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                                    <p style={{ fontSize: "0.78rem", fontWeight: 700, color: t.textSecondary, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
                                         <Key style={{ width: 13, height: 13 }} /> SSH Public Key
                                     </p>
 
@@ -557,10 +612,10 @@ export default function ComputeNewPage() {
                                             {savedSshKeys.map(k => (
                                                 <button key={k.id} onClick={() => setSshKeys(k.publicKey)}
                                                     style={{
-                                                        padding: "5px 12px", borderRadius: 7, cursor: "pointer", fontSize: "0.75rem", fontWeight: 600,
-                                                        border: sshKeys === k.publicKey ? "1px solid #3b82f6" : "1px solid rgba(255,255,255,0.1)",
-                                                        background: sshKeys === k.publicKey ? "rgba(59,130,246,0.1)" : "rgba(255,255,255,0.03)",
-                                                        color: sshKeys === k.publicKey ? "#3b82f6" : "#94a3b8",
+                                                        padding: "5px 12px", borderRadius: t.buttonRadius, cursor: "pointer", fontSize: "0.75rem", fontWeight: 600,
+                                                        border: sshKeys === k.publicKey ? `1px solid ${t.accentPrimary}` : `1px solid ${t.borderPrimary}`,
+                                                        background: sshKeys === k.publicKey ? t.accentPrimaryMuted : t.bgSecondary,
+                                                        color: sshKeys === k.publicKey ? t.accentPrimary : t.textSecondary,
                                                         transition: "all 0.15s",
                                                     }}>
                                                     {k.name}
@@ -576,32 +631,32 @@ export default function ComputeNewPage() {
                                         rows={3}
                                         style={{
                                             width: "100%", padding: "10px 14px", boxSizing: "border-box",
-                                            background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)",
-                                            borderRadius: 9, color: "#e2e8f0", fontSize: "0.78rem", fontFamily: "monospace",
+                                            background: t.bgInput, border: `1px solid ${t.borderPrimary}`,
+                                            borderRadius: t.buttonRadius, color: t.textPrimary, fontSize: "0.78rem", fontFamily: t.fontMono,
                                             outline: "none", resize: "vertical", lineHeight: 1.5,
                                         }}
                                     />
                                     {!sshKeys.trim() && (
-                                        <p style={{ fontSize: "0.68rem", color: "#f59e0b", marginTop: 6, display: "flex", alignItems: "center", gap: 4 }}>
+                                        <p style={{ fontSize: "0.68rem", color: t.statusWarning, marginTop: 6, display: "flex", alignItems: "center", gap: 4 }}>
                                             <AlertTriangle style={{ width: 11, height: 11 }} /> Recommended: add an SSH key for secure access.
-                                            {savedSshKeys.length === 0 && <> Manage keys <Link href="/dashboard/ssh" style={{ color: "#38bdf8", fontWeight: 700, marginLeft: 4 }}>here</Link>.</>}
+                                            {savedSshKeys.length === 0 && <> Manage keys <Link href="/dashboard/ssh" style={{ color: t.accentPrimary, fontWeight: 700, marginLeft: 4 }}>here</Link>.</>}
                                         </p>
                                     )}
                                 </div>
 
                                 {/* ── Password ── */}
                                 <div>
-                                    <p style={{ fontSize: "0.78rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>Password</p>
+                                    <p style={{ fontSize: "0.78rem", fontWeight: 700, color: t.textSecondary, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>Password</p>
 
                                     {/* Auto-generate toggle */}
                                     <div style={{ display: "flex", gap: 10, marginBottom: 12 }}>
                                         <button
                                             onClick={() => setAutoPassword(true)}
                                             style={{
-                                                flex: 1, padding: "10px 14px", borderRadius: 9, cursor: "pointer", fontSize: "0.78rem", fontWeight: 600,
-                                                border: autoPassword ? "1px solid #10b981" : "1px solid rgba(255,255,255,0.09)",
-                                                background: autoPassword ? "rgba(16,185,129,0.08)" : "rgba(255,255,255,0.03)",
-                                                color: autoPassword ? "#10b981" : "#64748b",
+                                                flex: 1, padding: "10px 14px", borderRadius: t.buttonRadius, cursor: "pointer", fontSize: "0.78rem", fontWeight: 600,
+                                                border: autoPassword ? `1px solid ${t.statusSuccess}` : `1px solid ${t.borderPrimary}`,
+                                                background: autoPassword ? t.statusSuccessBg : t.bgSecondary,
+                                                color: autoPassword ? t.statusSuccess : t.textMuted,
                                                 display: "flex", alignItems: "center", gap: 8, transition: "all 0.15s",
                                             }}
                                         >
@@ -611,10 +666,10 @@ export default function ComputeNewPage() {
                                         <button
                                             onClick={() => setAutoPassword(false)}
                                             style={{
-                                                flex: 1, padding: "10px 14px", borderRadius: 9, cursor: "pointer", fontSize: "0.78rem", fontWeight: 600,
-                                                border: !autoPassword ? "1px solid #3b82f6" : "1px solid rgba(255,255,255,0.09)",
-                                                background: !autoPassword ? "rgba(59,130,246,0.08)" : "rgba(255,255,255,0.03)",
-                                                color: !autoPassword ? "#3b82f6" : "#64748b",
+                                                flex: 1, padding: "10px 14px", borderRadius: t.buttonRadius, cursor: "pointer", fontSize: "0.78rem", fontWeight: 600,
+                                                border: !autoPassword ? `1px solid ${t.accentPrimary}` : `1px solid ${t.borderPrimary}`,
+                                                background: !autoPassword ? t.accentPrimaryMuted : t.bgSecondary,
+                                                color: !autoPassword ? t.accentPrimary : t.textMuted,
                                                 display: "flex", alignItems: "center", gap: 8, transition: "all 0.15s",
                                             }}
                                         >
@@ -624,7 +679,7 @@ export default function ComputeNewPage() {
                                     </div>
 
                                     {autoPassword ? (
-                                        <div style={{ padding: "10px 14px", borderRadius: 9, background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.15)", fontSize: "0.75rem", color: "#6ee7b7", lineHeight: 1.6 }}>
+                                        <div style={{ padding: "10px 14px", borderRadius: t.buttonRadius, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}22`, fontSize: "0.75rem", color: t.statusSuccess, lineHeight: 1.6 }}>
                                             A 16-character password will be generated automatically. It meets Windows complexity requirements (uppercase, lowercase, digits, special characters). The password will be shown once after deployment.
                                         </div>
                                     ) : (
@@ -636,12 +691,12 @@ export default function ComputeNewPage() {
                                                 placeholder="Minimum 8 characters, mixed case + digits + special"
                                                 style={{
                                                     width: "100%", padding: "10px 14px", boxSizing: "border-box",
-                                                    background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.09)",
-                                                    borderRadius: 9, color: "#e2e8f0", fontSize: "0.85rem", outline: "none",
+                                                    background: t.bgInput, border: `1px solid ${t.borderPrimary}`,
+                                                    borderRadius: t.buttonRadius, color: t.textPrimary, fontSize: "0.85rem", outline: "none",
                                                 }}
                                             />
                                             {ciPassword && ciPassword.length < 8 && (
-                                                <p style={{ fontSize: "0.68rem", color: "#f59e0b", marginTop: 6, display: "flex", alignItems: "center", gap: 4 }}>
+                                                <p style={{ fontSize: "0.68rem", color: t.statusWarning, marginTop: 6, display: "flex", alignItems: "center", gap: 4 }}>
                                                     <AlertTriangle style={{ width: 11, height: 11 }} /> Password must be at least 8 characters.
                                                 </p>
                                             )}
@@ -655,46 +710,47 @@ export default function ComputeNewPage() {
                     {/* ── Prebuilt Packages Table ── */}
                     <div style={{ ...card, padding: 24 }}>
                         <SectionHeader
-                            icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2"><polyline points="21 8 21 21 3 21 3 8" /><rect x="1" y="3" width="22" height="5" /><line x1="10" y1="12" x2="14" y2="12" /></svg>}
+                            icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={t.accentPrimary} strokeWidth="2"><polyline points="21 8 21 21 3 21 3 8" /><rect x="1" y="3" width="22" height="5" /><line x1="10" y1="12" x2="14" y2="12" /></svg>}
                             title="Prebuilt Packages"
                             sub="Select a pre-configured resource package"
+                            t={t}
                         />
-                        <div style={{ border: "1px solid rgba(255,255,255,0.07)", borderRadius: 10, overflow: "hidden" }}>
-                            <div style={{ display: "grid", gridTemplateColumns: "1.4fr .8fr .8fr .8fr 1fr 1.1fr 28px", padding: "8px 16px", background: "rgba(255,255,255,0.02)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                        <div style={{ border: `1px solid ${t.borderPrimary}`, borderRadius: 10, overflow: "hidden" }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "1.4fr .8fr .8fr .8fr 1fr 1.1fr 28px", padding: "8px 16px", background: t.bgSecondary, borderBottom: `1px solid ${t.borderSecondary}` }}>
                                 {["Package", "vCPU", "RAM", "Disk", "Bandwidth", "Price", ""].map(h => (
-                                    <span key={h} style={{ fontSize: "0.68rem", fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.07em" }}>{h}</span>
+                                    <span key={h} style={{ fontSize: "0.68rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.07em" }}>{h}</span>
                                 ))}
                             </div>
                             {PLANS.map((p, i) => {
                                 const active    = selectedPlan === p.id;
                                 const isTrial   = p.id === "free-trial";
-                                const hasTicket = !isTrial && tickets.some(t => t.planId === p.id);
+                                const hasTicket = !isTrial && tickets.some(tk => tk.planId === p.id);
                                 return (
                                     <div key={p.id} onClick={() => setSelectedPlan(p.id)}
                                         style={{
                                             display: "grid", gridTemplateColumns: "1.4fr .8fr .8fr .8fr 1fr 1.1fr 28px",
                                             alignItems: "center", padding: "12px 16px", cursor: "pointer",
-                                            borderBottom: i < PLANS.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
-                                            background:   active ? (isTrial ? "rgba(139,92,246,0.07)" : "rgba(59,130,246,0.07)") : "transparent",
-                                            borderLeft:   active ? `2px solid ${isTrial ? "#8b5cf6" : "#3b82f6"}` : "2px solid transparent",
+                                            borderBottom: i < PLANS.length - 1 ? `1px solid ${t.borderSecondary}` : "none",
+                                            background:   active ? (isTrial ? trialAccentMuted : t.accentPrimaryMuted) : "transparent",
+                                            borderLeft:   active ? `2px solid ${isTrial ? trialAccent : t.accentPrimary}` : "2px solid transparent",
                                             transition: "all 0.12s",
                                         }}
-                                        onMouseEnter={e => { if (!active) (e.currentTarget as HTMLDivElement).style.background = "rgba(255,255,255,0.02)"; }}
+                                        onMouseEnter={e => { if (!active) (e.currentTarget as HTMLDivElement).style.background = t.bgCardHover; }}
                                         onMouseLeave={e => { if (!active) (e.currentTarget as HTMLDivElement).style.background = "transparent"; }}
                                     >
                                         <div>
-                                            <span style={{ fontWeight: 700, color: isTrial ? "#a78bfa" : "#e2e8f0", fontSize: "0.875rem" }}>{p.label}</span>
-                                            {isTrial && <span style={{ marginLeft: 6, fontSize: "0.62rem", color: "#8b5cf6", display: "inline-flex", verticalAlign: "middle" }}><Gift style={{ width: 11, height: 11 }} /></span>}
-                                            {hasTicket && <span style={{ marginLeft: 6, fontSize: "0.62rem", color: "#10b981", display: "inline-flex", verticalAlign: "middle" }}><Ticket style={{ width: 11, height: 11 }} /></span>}
+                                            <span style={{ fontWeight: 700, color: isTrial ? trialAccent : t.textPrimary, fontSize: "0.875rem" }}>{p.label}</span>
+                                            {isTrial && <span style={{ marginLeft: 6, fontSize: "0.62rem", color: trialAccent, display: "inline-flex", verticalAlign: "middle" }}><Gift style={{ width: 11, height: 11 }} /></span>}
+                                            {hasTicket && <span style={{ marginLeft: 6, fontSize: "0.62rem", color: t.statusSuccess, display: "inline-flex", verticalAlign: "middle" }}><Ticket style={{ width: 11, height: 11 }} /></span>}
                                         </div>
-                                        <span style={{ fontSize: "0.82rem", color: "#94a3b8", fontFamily: "monospace" }}>{p.vcpu}</span>
-                                        <span style={{ fontSize: "0.82rem", color: "#94a3b8", fontFamily: "monospace" }}>{p.ram} GB</span>
-                                        <span style={{ fontSize: "0.82rem", color: "#94a3b8", fontFamily: "monospace" }}>{p.disk} GB</span>
-                                        <span style={{ fontSize: "0.82rem", color: "#94a3b8" }}>{p.bw}</span>
-                                        <span style={{ fontSize: "0.82rem", fontWeight: 700, color: isTrial ? "#a78bfa" : hasTicket ? "#10b981" : "#f1f5f9" }}>
+                                        <span style={{ fontSize: "0.82rem", color: t.textSecondary, fontFamily: t.fontMono }}>{p.vcpu}</span>
+                                        <span style={{ fontSize: "0.82rem", color: t.textSecondary, fontFamily: t.fontMono }}>{p.ram} GB</span>
+                                        <span style={{ fontSize: "0.82rem", color: t.textSecondary, fontFamily: t.fontMono }}>{p.disk} GB</span>
+                                        <span style={{ fontSize: "0.82rem", color: t.textSecondary }}>{p.bw}</span>
+                                        <span style={{ fontSize: "0.82rem", fontWeight: 700, color: isTrial ? trialAccent : hasTicket ? t.statusSuccess : t.textPrimary }}>
                                             {isTrial ? "FREE" : hasTicket ? "0 Credits" : `${p.price.toLocaleString()} Cr`}
                                         </span>
-                                        {active ? <Check /> : <div />}
+                                        {active ? <Check t={t} /> : <div />}
                                     </div>
                                 );
                             })}
@@ -705,9 +761,10 @@ export default function ComputeNewPage() {
                     {!isFreeTrial && (
                         <div style={{ ...card, padding: 24 }}>
                             <SectionHeader
-                                icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>}
+                                icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={t.accentPrimary} strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>}
                                 title="Payment Cycle"
                                 sub={activeTicket ? "Cycle N/A — using existing ticket" : "Save more with longer commitments"}
+                                t={t}
                             />
                             <div style={{ display: "flex", flexWrap: "wrap", gap: 10, opacity: activeTicket ? 0.4 : 1, pointerEvents: activeTicket ? "none" : "auto" }}>
                                 {BILLING_CYCLES.map(c => {
@@ -715,10 +772,10 @@ export default function ComputeNewPage() {
                                     return (
                                         <button key={c.id} onClick={() => setSelectedCycle(c.id)} style={{
                                             display: "flex", alignItems: "center", gap: 8,
-                                            padding: "9px 16px", borderRadius: 9, cursor: "pointer",
-                                            border: active ? "2px solid #3b82f6" : "2px solid rgba(255,255,255,0.08)",
-                                            background: active ? "rgba(59,130,246,0.1)" : "rgba(255,255,255,0.02)",
-                                            color: active ? "#e2e8f0" : "#64748b",
+                                            padding: "9px 16px", borderRadius: t.buttonRadius, cursor: "pointer",
+                                            border: active ? `2px solid ${t.accentPrimary}` : `2px solid ${t.borderPrimary}`,
+                                            background: active ? t.accentPrimaryMuted : t.bgSecondary,
+                                            color: active ? t.textPrimary : t.textMuted,
                                             fontWeight: active ? 700 : 500, fontSize: "0.85rem", transition: "all 0.15s",
                                         }}>
                                             {c.label}
@@ -738,28 +795,29 @@ export default function ComputeNewPage() {
                     {!isFreeTrial && (
                         <div style={{ ...card, padding: 24 }}>
                             <SectionHeader
-                                icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" /></svg>}
+                                icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={t.accentPrimary} strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" /></svg>}
                                 title="Additional Features"
                                 sub="Optional add-ons for your instance"
+                                t={t}
                             />
                             <div onClick={() => setBackupEnabled(b => !b)} style={{
                                 display: "flex", alignItems: "center", gap: 16, padding: "16px 18px", borderRadius: 10, cursor: "pointer",
-                                border: backupEnabled ? "2px solid #10b981" : "2px solid rgba(255,255,255,0.07)",
-                                background: backupEnabled ? "rgba(16,185,129,0.06)" : "rgba(255,255,255,0.02)",
+                                border: backupEnabled ? `2px solid ${t.statusSuccess}` : `2px solid ${t.borderPrimary}`,
+                                background: backupEnabled ? t.statusSuccessBg : t.bgSecondary,
                                 transition: "all 0.15s",
                             }}>
-                                <div style={{ width: 40, height: 40, borderRadius: 9, background: "rgba(16,185,129,0.12)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2"><polyline points="8 17 12 21 16 17" /><line x1="12" y1="12" x2="12" y2="21" /><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29" /></svg>
+                                <div style={{ width: 40, height: 40, borderRadius: t.buttonRadius, background: t.statusSuccessBg, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={t.statusSuccess} strokeWidth="2"><polyline points="8 17 12 21 16 17" /><line x1="12" y1="12" x2="12" y2="21" /><path d="M20.88 18.09A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29" /></svg>
                                 </div>
                                 <div style={{ flex: 1 }}>
-                                    <p style={{ fontWeight: 700, color: "#e2e8f0", fontSize: "0.9rem", marginBottom: 3 }}>Automatic Backup</p>
-                                    <p style={{ color: "#64748b", fontSize: "0.78rem" }}>Daily encrypted snapshots. Restore in one click.</p>
+                                    <p style={{ fontWeight: 700, color: t.textPrimary, fontSize: "0.9rem", marginBottom: 3 }}>Automatic Backup</p>
+                                    <p style={{ color: t.textMuted, fontSize: "0.78rem" }}>Daily encrypted snapshots. Restore in one click.</p>
                                 </div>
                                 <div style={{ textAlign: "right", flexShrink: 0 }}>
-                                    <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "#10b981" }}>+500 Credits/GB</span>
-                                    <p style={{ color: "#475569", fontSize: "0.72rem", marginTop: 2 }}>≈ +{(500 * plan.disk).toLocaleString()} Credits/mo</p>
+                                    <span style={{ fontSize: "0.8rem", fontWeight: 700, color: t.statusSuccess }}>+500 Credits/GB</span>
+                                    <p style={{ color: t.textMuted, fontSize: "0.72rem", marginTop: 2 }}>≈ +{(500 * plan.disk).toLocaleString()} Credits/mo</p>
                                 </div>
-                                {backupEnabled ? <Check /> : <div style={{ width: 20, height: 20, borderRadius: "50%", border: "2px solid rgba(255,255,255,0.1)" }} />}
+                                {backupEnabled ? <Check t={t} /> : <div style={{ width: 20, height: 20, borderRadius: "50%", border: `2px solid ${t.borderPrimary}` }} />}
                             </div>
                         </div>
                     )}
@@ -769,29 +827,29 @@ export default function ComputeNewPage() {
                     RIGHT COLUMN — Sticky Order Summary
                 ════════════════════════════════════════════ */}
                 <div style={{ ...card, padding: 24, position: "sticky", top: 24 }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20, paddingBottom: 16, borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2" /></svg>
-                        <p style={{ fontWeight: 800, color: "#f1f5f9", fontSize: "1rem" }}>Order Summary</p>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20, paddingBottom: 16, borderBottom: `1px solid ${t.borderSecondary}` }}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={t.accentPrimary} strokeWidth="2"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2" /></svg>
+                        <p style={{ fontWeight: 800, color: t.textPrimary, fontSize: "1rem" }}>Order Summary</p>
                     </div>
 
                     {/* Free Trial notice */}
                     {isFreeTrial && (
-                        <div style={{ padding: "10px 14px", borderRadius: 9, background: "rgba(139,92,246,0.08)", border: "1px solid rgba(139,92,246,0.25)", marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
-                            <Gift style={{ width: 16, height: 16, color: "#a78bfa" }} />
+                        <div style={{ padding: "10px 14px", borderRadius: t.buttonRadius, background: trialAccentMuted, border: `1px solid ${trialAccent}44`, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+                            <Gift style={{ width: 16, height: 16, color: trialAccent }} />
                             <div>
-                                <p style={{ fontSize: "0.78rem", fontWeight: 700, color: "#a78bfa" }}>Free Trial Selected</p>
-                                <p style={{ fontSize: "0.7rem", color: "#475569", marginTop: 2 }}>30-day trial · No credits deducted</p>
+                                <p style={{ fontSize: "0.78rem", fontWeight: 700, color: trialAccent }}>Free Trial Selected</p>
+                                <p style={{ fontSize: "0.7rem", color: t.textMuted, marginTop: 2 }}>30-day trial · No credits deducted</p>
                             </div>
                         </div>
                     )}
 
                     {/* Ticket notice */}
                     {!isFreeTrial && activeTicket && (
-                        <div style={{ padding: "10px 14px", borderRadius: 9, background: "rgba(16,185,129,0.08)", border: "1px solid rgba(16,185,129,0.2)", marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
-                            <Ticket style={{ width: 16, height: 16, color: "#10b981" }} />
+                        <div style={{ padding: "10px 14px", borderRadius: t.buttonRadius, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}33`, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+                            <Ticket style={{ width: 16, height: 16, color: t.statusSuccess }} />
                             <div>
-                                <p style={{ fontSize: "0.78rem", fontWeight: 700, color: "#10b981" }}>Deployment Ticket Available</p>
-                                <p style={{ fontSize: "0.7rem", color: "#475569", marginTop: 2 }}>
+                                <p style={{ fontSize: "0.78rem", fontWeight: 700, color: t.statusSuccess }}>Deployment Ticket Available</p>
+                                <p style={{ fontSize: "0.7rem", color: t.textMuted, marginTop: 2 }}>
                                     Valid until {new Date(activeTicket.validUntil).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
                                 </p>
                             </div>
@@ -799,21 +857,21 @@ export default function ComputeNewPage() {
                     )}
 
                     {/* Selected config block */}
-                    <div style={{ padding: "14px 16px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)", marginBottom: 18 }}>
+                    <div style={{ padding: "14px 16px", borderRadius: 10, background: t.bgSecondary, border: `1px solid ${t.borderSecondary}`, marginBottom: 18 }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-                            <div style={{ width: 30, height: 30, borderRadius: 7, background: isFreeTrial ? "rgba(139,92,246,0.15)" : "rgba(59,130,246,0.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={isFreeTrial ? "#8b5cf6" : "#3b82f6"} strokeWidth="2"><rect x="2" y="2" width="20" height="8" rx="2" /><rect x="2" y="14" width="20" height="8" rx="2" /></svg>
+                            <div style={{ width: 30, height: 30, borderRadius: 7, background: isFreeTrial ? trialAccentMuted : t.accentPrimaryMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={isFreeTrial ? trialAccent : t.accentPrimary} strokeWidth="2"><rect x="2" y="2" width="20" height="8" rx="2" /><rect x="2" y="14" width="20" height="8" rx="2" /></svg>
                             </div>
                             <div>
-                                <p style={{ fontWeight: 800, color: isFreeTrial ? "#c4b5fd" : "#f1f5f9", fontSize: "0.875rem" }}>{plan.label}</p>
-                                <p style={{ color: "#64748b", fontSize: "0.72rem" }}>{plan.vcpu} vCPU · {plan.ram} GB RAM · {plan.disk} GB · {plan.bw}</p>
+                                <p style={{ fontWeight: 800, color: isFreeTrial ? trialAccent : t.textPrimary, fontSize: "0.875rem" }}>{plan.label}</p>
+                                <p style={{ color: t.textMuted, fontSize: "0.72rem" }}>{plan.vcpu} vCPU · {plan.ram} GB RAM · {plan.disk} GB · {plan.bw}</p>
                             </div>
                         </div>
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                            <span style={{ padding: "2px 8px", borderRadius: 6, fontSize: "0.68rem", background: "rgba(255,255,255,0.05)", color: "#94a3b8" }}>{location.label}</span>
-                            <span style={{ padding: "2px 8px", borderRadius: 6, fontSize: "0.68rem", background: "rgba(255,255,255,0.05)", color: "#94a3b8" }}>{os.label} {os.version}</span>
-                            <span style={{ padding: "2px 8px", borderRadius: 6, fontSize: "0.68rem", background: "rgba(16,185,129,0.1)", color: "#10b981" }}>IPv4: Yes</span>
-                            {isFreeTrial && <span style={{ padding: "2px 8px", borderRadius: 6, fontSize: "0.68rem", background: "rgba(139,92,246,0.12)", color: "#a78bfa" }}>30-Day Trial</span>}
+                            <span style={{ padding: "2px 8px", borderRadius: 6, fontSize: "0.68rem", background: t.bgTertiary, color: t.textSecondary }}>{location.label}</span>
+                            <span style={{ padding: "2px 8px", borderRadius: 6, fontSize: "0.68rem", background: t.bgTertiary, color: t.textSecondary }}>{os.label} {os.version}</span>
+                            <span style={{ padding: "2px 8px", borderRadius: 6, fontSize: "0.68rem", background: t.statusSuccessBg, color: t.statusSuccess }}>IPv4: Yes</span>
+                            {isFreeTrial && <span style={{ padding: "2px 8px", borderRadius: 6, fontSize: "0.68rem", background: trialAccentMuted, color: trialAccent }}>30-Day Trial</span>}
                         </div>
                     </div>
 
@@ -821,39 +879,39 @@ export default function ComputeNewPage() {
                     <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 18 }}>
                         {isFreeTrial ? (
                             <div style={{ display: "flex", justifyContent: "space-between" }}>
-                                <span style={{ fontSize: "0.8rem", color: "#64748b", display: "flex", alignItems: "center", gap: 4 }}><Gift style={{ width: 12, height: 12 }} /> Free Trial (1× {plan.label})</span>
-                                <span style={{ fontSize: "0.8rem", color: "#a78bfa", fontWeight: 700 }}>FREE</span>
+                                <span style={{ fontSize: "0.8rem", color: t.textMuted, display: "flex", alignItems: "center", gap: 4 }}><Gift style={{ width: 12, height: 12 }} /> Free Trial (1× {plan.label})</span>
+                                <span style={{ fontSize: "0.8rem", color: trialAccent, fontWeight: 700 }}>FREE</span>
                             </div>
                         ) : (
                             <>
                                 {instancesCoveredByTickets > 0 && (
                                     <div style={{ display: "flex", justifyContent: "space-between" }}>
-                                        <span style={{ fontSize: "0.8rem", color: "#64748b", display: "flex", alignItems: "center", gap: 4 }}><Ticket style={{ width: 12, height: 12 }} /> {instancesCoveredByTickets}× {plan.label} (ticket)</span>
-                                        <span style={{ fontSize: "0.8rem", color: "#10b981", fontWeight: 700 }}>FREE</span>
+                                        <span style={{ fontSize: "0.8rem", color: t.textMuted, display: "flex", alignItems: "center", gap: 4 }}><Ticket style={{ width: 12, height: 12 }} /> {instancesCoveredByTickets}× {plan.label} (ticket)</span>
+                                        <span style={{ fontSize: "0.8rem", color: t.statusSuccess, fontWeight: 700 }}>FREE</span>
                                     </div>
                                 )}
                                 {instancesToPayFor > 0 && (
                                     <div style={{ display: "flex", justifyContent: "space-between" }}>
-                                        <span style={{ fontSize: "0.8rem", color: "#64748b" }}>{instancesToPayFor}× {plan.label} ({cycle.label})</span>
-                                        <span style={{ fontSize: "0.8rem", color: "#94a3b8", fontWeight: 600 }}>{(instancesToPayFor * unitPrice).toLocaleString()} Cr</span>
+                                        <span style={{ fontSize: "0.8rem", color: t.textMuted }}>{instancesToPayFor}× {plan.label} ({cycle.label})</span>
+                                        <span style={{ fontSize: "0.8rem", color: t.textSecondary, fontWeight: 600 }}>{(instancesToPayFor * unitPrice).toLocaleString()} Cr</span>
                                     </div>
                                 )}
                                 {instancesCoveredByTickets === 0 && instancesToPayFor === 0 && (
                                     <div style={{ display: "flex", justifyContent: "space-between" }}>
-                                        <span style={{ fontSize: "0.8rem", color: "#64748b" }}>Base price ({cycle.label})</span>
-                                        <span style={{ fontSize: "0.8rem", color: "#94a3b8", fontWeight: 600 }}>{unitPrice.toLocaleString()} Cr</span>
+                                        <span style={{ fontSize: "0.8rem", color: t.textMuted }}>Base price ({cycle.label})</span>
+                                        <span style={{ fontSize: "0.8rem", color: t.textSecondary, fontWeight: 600 }}>{unitPrice.toLocaleString()} Cr</span>
                                     </div>
                                 )}
                                 {backupEnabled && (
                                     <div style={{ display: "flex", justifyContent: "space-between" }}>
-                                        <span style={{ fontSize: "0.8rem", color: "#64748b" }}>Backup (×{instanceCount})</span>
-                                        <span style={{ fontSize: "0.8rem", color: "#10b981", fontWeight: 600 }}>+{(backupPrice * instanceCount).toLocaleString()} Cr</span>
+                                        <span style={{ fontSize: "0.8rem", color: t.textMuted }}>Backup (×{instanceCount})</span>
+                                        <span style={{ fontSize: "0.8rem", color: t.statusSuccess, fontWeight: 600 }}>+{(backupPrice * instanceCount).toLocaleString()} Cr</span>
                                     </div>
                                 )}
                                 {promoApplied && !activeTicket && (
                                     <div style={{ display: "flex", justifyContent: "space-between" }}>
-                                        <span style={{ fontSize: "0.8rem", color: "#10b981", display: "flex", alignItems: "center", gap: 4 }}><Sparkles style={{ width: 12, height: 12 }} /> Promo bonus</span>
-                                        <span style={{ fontSize: "0.8rem", color: "#10b981", fontWeight: 700 }}>-{promoBonus.toLocaleString()} Cr</span>
+                                        <span style={{ fontSize: "0.8rem", color: t.statusSuccess, display: "flex", alignItems: "center", gap: 4 }}><Sparkles style={{ width: 12, height: 12 }} /> Promo bonus</span>
+                                        <span style={{ fontSize: "0.8rem", color: t.statusSuccess, fontWeight: 700 }}>-{promoBonus.toLocaleString()} Cr</span>
                                     </div>
                                 )}
                             </>
@@ -861,32 +919,32 @@ export default function ComputeNewPage() {
                     </div>
 
                     {/* Total */}
-                    <div style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 16, marginBottom: 18 }}>
+                    <div style={{ borderTop: `1px solid ${t.borderSecondary}`, paddingTop: 16, marginBottom: 18 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 4 }}>
-                            <span style={{ fontSize: "0.72rem", color: "#475569", textTransform: "uppercase", letterSpacing: "0.08em" }}>Total</span>
-                            <span style={{ fontWeight: 900, fontSize: "1.45rem", color: isFreeTrial ? "#a78bfa" : total === 0 ? "#10b981" : "#f1f5f9" }}>
+                            <span style={{ fontSize: "0.72rem", color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.08em" }}>Total</span>
+                            <span style={{ fontWeight: 900, fontSize: "1.45rem", color: isFreeTrial ? trialAccent : total === 0 ? t.statusSuccess : t.textPrimary }}>
                                 {isFreeTrial ? "FREE" : total.toLocaleString()}
                             </span>
                         </div>
                         {isFreeTrial ? (
-                            <p style={{ fontSize: "0.72rem", color: "#a78bfa", textAlign: "right", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 4 }}>
+                            <p style={{ fontSize: "0.72rem", color: trialAccent, textAlign: "right", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 4 }}>
                                 <Gift style={{ width: 11, height: 11 }} /> 30-day free trial · No credits required
                             </p>
                         ) : (
                             <>
                                 {total === 0 && instancesCoveredByTickets > 0 && (
-                                    <p style={{ fontSize: "0.72rem", color: "#10b981", textAlign: "right", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 4 }}>
+                                    <p style={{ fontSize: "0.72rem", color: t.statusSuccess, textAlign: "right", display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 4 }}>
                                         <Ticket style={{ width: 11, height: 11 }} /> {instancesCoveredByTickets} ticket(s) applied · valid until{" "}
                                         {new Date(activeTicket!.validUntil).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
                                     </p>
                                 )}
                                 {isSplitOrder && (
-                                    <p style={{ fontSize: "0.72rem", color: "#f59e0b", textAlign: "right", marginTop: 4, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 4 }}>
+                                    <p style={{ fontSize: "0.72rem", color: t.statusWarning, textAlign: "right", marginTop: 4, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 4 }}>
                                         <Ticket style={{ width: 11, height: 11 }} /> {instancesCoveredByTickets} ticket applied · {instancesToPayFor} billed at standard rate
                                     </p>
                                 )}
                                 {!activeTicket && !isSplitOrder && (
-                                    <p style={{ fontSize: "0.72rem", color: "#475569", textAlign: "right" }}>
+                                    <p style={{ fontSize: "0.72rem", color: t.textMuted, textAlign: "right" }}>
                                         Credits / {cycle.id === "hourly" ? "hour" : cycle.id === "monthly" ? "month" : cycle.label.toLowerCase()}
                                     </p>
                                 )}
@@ -897,71 +955,73 @@ export default function ComputeNewPage() {
                     {/* Promo Code — hidden for free trial and when using ticket */}
                     {!isFreeTrial && !activeTicket && (
                         <div style={{ marginBottom: 18 }}>
-                            <p style={{ fontSize: "0.75rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
-                                <Tag style={{ width: 13, height: 13, color: "#f59e0b" }} /> Promo Code
+                            <p style={{ fontSize: "0.75rem", fontWeight: 700, color: t.textSecondary, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                                <Tag style={{ width: 13, height: 13, color: t.statusWarning }} /> Promo Code
                             </p>
                             <div style={{ display: "flex", gap: 8 }}>
                                 <input value={promoCode} onChange={e => { setPromoCode(e.target.value.toUpperCase()); setPromoErr(""); }} disabled={promoApplied}
                                     placeholder="Enter promo code"
                                     style={{
                                         flex: 1, padding: "8px 12px",
-                                        background: promoApplied ? "rgba(16,185,129,0.08)" : "rgba(255,255,255,0.04)",
-                                        border: `1px solid ${promoApplied ? "rgba(16,185,129,0.3)" : "rgba(255,255,255,0.09)"}`,
-                                        borderRadius: 8, color: "#e2e8f0", fontSize: "0.8rem", outline: "none", fontFamily: "monospace",
+                                        background: promoApplied ? t.statusSuccessBg : t.bgInput,
+                                        border: `1px solid ${promoApplied ? t.statusSuccess + "4D" : t.borderPrimary}`,
+                                        borderRadius: t.buttonRadius, color: t.textPrimary, fontSize: "0.8rem", outline: "none", fontFamily: t.fontMono,
                                     }}
                                 />
                                 <button onClick={applyPromo} disabled={promoApplied || !promoCode.trim()} style={{
-                                    width: 36, height: 36, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center",
-                                    background: promoApplied ? "#10b981" : "#3b82f6", border: "none", cursor: "pointer", flexShrink: 0,
+                                    width: 36, height: 36, borderRadius: t.buttonRadius, display: "flex", alignItems: "center", justifyContent: "center",
+                                    background: promoApplied ? t.statusSuccess : t.accentPrimary, border: "none", cursor: "pointer", flexShrink: 0,
                                     opacity: !promoCode.trim() ? 0.5 : 1,
                                 }}>
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5"><path d="M20 6 9 17l-5-5" /></svg>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.isMono ? t.bgPrimary : "#fff"} strokeWidth="2.5"><path d="M20 6 9 17l-5-5" /></svg>
                                 </button>
                             </div>
-                            {promoErr && <p style={{ fontSize: "0.72rem", color: "#ef4444", marginTop: 6, display: "flex", alignItems: "center", gap: 4 }}><AlertTriangle style={{ width: 11, height: 11 }} /> {promoErr}</p>}
-                            {promoApplied && <p style={{ fontSize: "0.72rem", color: "#10b981", marginTop: 6, display: "flex", alignItems: "center", gap: 4 }}><Sparkles style={{ width: 11, height: 11 }} /> +{promoBonus.toLocaleString()} credits applied</p>}
+                            {promoErr && <p style={{ fontSize: "0.72rem", color: t.statusError, marginTop: 6, display: "flex", alignItems: "center", gap: 4 }}><AlertTriangle style={{ width: 11, height: 11 }} /> {promoErr}</p>}
+                            {promoApplied && <p style={{ fontSize: "0.72rem", color: t.statusSuccess, marginTop: 6, display: "flex", alignItems: "center", gap: 4 }}><Sparkles style={{ width: 11, height: 11 }} /> +{promoBonus.toLocaleString()} credits applied</p>}
                         </div>
                     )}
 
                     {/* Instance count — hidden for free trial */}
                     {!isFreeTrial && (
-                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, padding: "10px 14px", borderRadius: 9, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 18, padding: "10px 14px", borderRadius: t.buttonRadius, background: t.bgSecondary, border: `1px solid ${t.borderSecondary}` }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" /></svg>
-                                <span style={{ fontSize: "0.8rem", color: "#94a3b8", fontWeight: 600 }}>Instance Count</span>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={t.textMuted} strokeWidth="2"><rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" /></svg>
+                                <span style={{ fontSize: "0.8rem", color: t.textSecondary, fontWeight: 600 }}>Instance Count</span>
                             </div>
                             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                <button onClick={() => setInstanceCount(c => Math.max(1, c - 1))} style={{ width: 28, height: 28, borderRadius: 7, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#94a3b8", cursor: "pointer", fontSize: "1rem", display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
-                                <span style={{ fontWeight: 800, color: "#f1f5f9", minWidth: 20, textAlign: "center" }}>{instanceCount}</span>
-                                <button onClick={() => setInstanceCount(c => Math.min(10, c + 1))} style={{ width: 28, height: 28, borderRadius: 7, border: "1px solid rgba(255,255,255,0.1)", background: "transparent", color: "#94a3b8", cursor: "pointer", fontSize: "1rem", display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
+                                <button onClick={() => setInstanceCount(c => Math.max(1, c - 1))} style={{ width: 28, height: 28, borderRadius: 7, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textSecondary, cursor: "pointer", fontSize: "1rem", display: "flex", alignItems: "center", justifyContent: "center" }}>−</button>
+                                <span style={{ fontWeight: 800, color: t.textPrimary, minWidth: 20, textAlign: "center" }}>{instanceCount}</span>
+                                <button onClick={() => setInstanceCount(c => Math.min(10, c + 1))} style={{ width: 28, height: 28, borderRadius: 7, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textSecondary, cursor: "pointer", fontSize: "1rem", display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
                             </div>
                         </div>
                     )}
 
                     {deployErr && (
-                        <div style={{ padding: "10px 14px", borderRadius: 8, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.2)", color: "#ef4444", fontSize: "0.8rem", marginBottom: 14, display: "flex", alignItems: "center", gap: 6 }}>
+                        <div style={{ padding: "10px 14px", borderRadius: t.buttonRadius, background: t.statusErrorBg, border: `1px solid ${t.statusError}33`, color: t.statusError, fontSize: "0.8rem", marginBottom: 14, display: "flex", alignItems: "center", gap: 6 }}>
                             <AlertTriangle style={{ width: 13, height: 13, flexShrink: 0 }} /> {deployErr}
                         </div>
                     )}
 
                     {/* Deploy Button */}
                     <button onClick={handleDeploy} disabled={deploying} style={{
-                        width: "100%", padding: "13px 0", borderRadius: 10,
+                        width: "100%", padding: "13px 0", borderRadius: t.cardRadius,
                         background: deploying
-                            ? "#1d4ed8"
+                            ? t.accentPrimary
                             : isFreeTrial
-                                ? "linear-gradient(135deg,#8b5cf6,#6d28d9)"
+                                ? (t.isMono ? t.accentPrimary : "linear-gradient(135deg,#8b5cf6,#6d28d9)")
                                 : activeTicket
-                                    ? "linear-gradient(135deg,#10b981,#059669)"
-                                    : "linear-gradient(135deg,#3b82f6,#2563eb)",
-                        color: "#fff", fontWeight: 800, fontSize: "0.95rem",
+                                    ? (t.isMono ? t.statusSuccess : "linear-gradient(135deg,#10b981,#059669)")
+                                    : (t.isMono ? t.accentPrimary : "linear-gradient(135deg,#3b82f6,#2563eb)"),
+                        color: t.isMono ? t.bgPrimary : "#fff", fontWeight: 800, fontSize: "0.95rem",
                         border: "none", cursor: deploying ? "not-allowed" : "pointer",
                         display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                        boxShadow: isFreeTrial
-                            ? "0 4px 20px rgba(139,92,246,0.4)"
-                            : activeTicket
-                                ? "0 4px 20px rgba(16,185,129,0.35)"
-                                : "0 4px 20px rgba(59,130,246,0.35)",
+                        boxShadow: t.isMono ? "none" : (
+                            isFreeTrial
+                                ? "0 4px 20px rgba(139,92,246,0.4)"
+                                : activeTicket
+                                    ? "0 4px 20px rgba(16,185,129,0.35)"
+                                    : "0 4px 20px rgba(59,130,246,0.35)"
+                        ),
                         transition: "all 0.15s",
                     }}>
                         {deploying ? (
@@ -974,7 +1034,7 @@ export default function ComputeNewPage() {
                             <><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg>Deploy Now</>
                         )}
                     </button>
-                    <p style={{ fontSize: "0.68rem", color: "#334155", textAlign: "center", marginTop: 10, lineHeight: 1.5 }}>
+                    <p style={{ fontSize: "0.68rem", color: t.textMuted, textAlign: "center", marginTop: 10, lineHeight: 1.5 }}>
                         {isFreeTrial
                             ? "No credits deducted — this is a free 30-day trial deployment."
                             : total === 0 && instancesCoveredByTickets > 0
