@@ -36,13 +36,13 @@ const SERVICES: { title: string; subtitle: string; description: string; Icon: Lu
     features: ["Config Generator", "Multi-Protocol", "Global Locations", "Kill Switch"],
   },
   {
-    title: "Proxy Network",
-    subtitle: "HTTP • SOCKS5 • Residential",
-    description: "Premium proxy accounts with locations worldwide. Residential IPs, datacenter proxies, and rotating endpoints for any use case.",
+    title: "MMO Market",
+    subtitle: "Accounts • Emails • Digital Assets",
+    description: "Digital asset marketplace with instant delivery. Buy game accounts, emails, and premium subscriptions in bulk with pipe-delimited data format.",
     Icon: Globe,
-    href: "/services/proxy",
+    href: "/services/mmo",
     color: "var(--accent-magenta)",
-    features: ["100+ Locations", "Rotating IPs", "API Access", "Bulk Pricing"],
+    features: ["Instant Delivery", "Bulk Orders", "Credit System", "30-Day Retention"],
   },
 ];
 

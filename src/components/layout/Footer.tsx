@@ -11,7 +11,7 @@ const FOOTER_LINKS = {
         { href: "/services/vps", label: "VPS Hosting" },
         { href: "/services/email", label: "Email Solutions" },
         { href: "/services/vpn", label: "VPN Access" },
-        { href: "/services/proxy", label: "Proxy Accounts" },
+        { href: "/services/mmo", label: "MMO Market" },
     ],
     Company: [
         { href: "/about", label: "About" },
@@ -71,7 +71,7 @@ export default function Footer() {
                             </span>
                         </Link>
                         <p style={{ color: t.textMuted, fontSize: "0.88rem", lineHeight: 1.7, maxWidth: "320px" }}>
-                            Premium cloud infrastructure services. High-performance VPS, secure email, encrypted VPN, and reliable proxy solutions for professionals.
+                            Premium cloud infrastructure services. High-performance VPS, secure email, encrypted VPN, and digital asset marketplace for professionals.
                         </p>
                         {/* Social Icons */}
                         <div style={{ display: "flex", gap: "12px", marginTop: "20px" }}>
