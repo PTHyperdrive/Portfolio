@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useThemeTokens } from "@/lib/useThemeTokens";
+import { useCredits } from "@/components/CreditProvider";
 import {
     Clock, DollarSign, ClipboardList, Shield, Gift,
     AlertTriangle, Check, X
@@ -24,6 +25,7 @@ type PromoState = "idle" | "checking" | "applied" | "error";
 
 export default function TopUpPage() {
     const t = useThemeTokens();
+    const { credits: globalCredits, refresh: refreshCredits, adjust: adjustCredits } = useCredits();
     const [balance, setBalance] = useState(0);
     const [selected, setSelected] = useState<number | null>(120_000);
     const [custom, setCustom] = useState("");
@@ -35,10 +37,8 @@ export default function TopUpPage() {
     const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
 
     useEffect(() => {
-        fetch("/api/overview").then(r => r.json()).then(d => {
-            if (d.user) setBalance(d.user.credits ?? 0);
-        });
-    }, []);
+        setBalance(globalCredits);
+    }, [globalCredits]);
 
     // Determine active credit amount
     const customAmt = parseInt(custom.replace(/\D/g, ""), 10) || 0;
@@ -68,7 +68,8 @@ export default function TopUpPage() {
                 setPromoState("applied");
                 setPromoBonus(data.creditsAdded);
                 setPromoMsg(`+${data.creditsAdded.toLocaleString()} credits added`);
-                setBalance(b => b + data.creditsAdded);
+                adjustCredits(data.creditsAdded);
+                refreshCredits();
                 showToast(data.message, "success");
             }
         } catch {

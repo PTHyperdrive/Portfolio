@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useThemeTokens } from "@/lib/useThemeTokens";
+import { useCredits } from "@/components/CreditProvider";
 import {
     Zap, CreditCard, KeyRound, MessageSquare, Monitor,
     FileText, BookOpen, HelpCircle, Cloud, ChevronRight,
@@ -42,6 +43,7 @@ export default function OverviewPage() {
     const [data, setData] = useState<OverviewData | null>(null);
     const [loading, setLoading] = useState(true);
     const t = useThemeTokens();
+    const { credits: globalCredits } = useCredits();
 
     useEffect(() => {
         fetch("/api/overview")
@@ -215,7 +217,7 @@ export default function OverviewPage() {
                         </p>
                         <p style={{ fontSize: "0.75rem", color: t.textMuted, marginBottom: 20 }}>Cloud Credit</p>
                         <p style={{ fontSize: "2rem", fontWeight: 900, color: t.textPrimary, marginBottom: 20 }}>
-                            {(user?.credits ?? 0).toLocaleString()} <span style={{ fontSize: "1rem", color: t.textMuted }}>Credits</span>
+                            {globalCredits.toLocaleString()} <span style={{ fontSize: "1rem", color: t.textMuted }}>Credits</span>
                         </p>
                         <Link href="/dashboard/billing/topup" style={{
                             display: "block", padding: "10px 0", borderRadius: t.buttonRadius, textDecoration: "none",

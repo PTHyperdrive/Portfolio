@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useThemeTokens } from "@/lib/useThemeTokens";
+import { useCredits } from "@/components/CreditProvider";
 import { Monitor, CreditCard, Rocket, FileText } from "lucide-react";
 
 interface Transaction {
@@ -28,6 +29,7 @@ export default function BillingPage() {
     const t = useThemeTokens();
     const [data, setData] = useState<BillingData | null>(null);
     const [loading, setLoading] = useState(true);
+    const { credits: globalCredits } = useCredits();
     const [error, setError] = useState("");
 
     useEffect(() => {
@@ -172,7 +174,7 @@ export default function BillingPage() {
                             <p style={{ fontSize: "0.78rem", color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "6px" }}>Current Balance</p>
                             <div style={{ display: "flex", alignItems: "baseline", gap: "6px" }}>
                                 <p style={{ fontSize: "1.8rem", fontWeight: 800, color: t.textPrimary }}>
-                                    {(data?.credits ?? 0).toLocaleString()}
+                                    {globalCredits.toLocaleString()}
                                 </p>
                                 <span style={{ fontSize: "0.85rem", color: t.textSecondary, fontWeight: 600 }}>VND</span>
                             </div>

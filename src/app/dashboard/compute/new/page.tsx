@@ -9,6 +9,7 @@ import { Gift, Ticket, Tag, AlertTriangle, Sparkles, Key, Terminal, Cloud, User,
 import { CLOUD_TEMPLATES, getTemplatesForPlan } from "@/config/templates";
 import type { CloudTemplate } from "@/config/templates";
 import { useThemeTokens } from "@/lib/useThemeTokens";
+import { useCredits } from "@/components/CreditProvider";
 
 // ── Data ─────────────────────────────────────────────────────────────────────
 
@@ -116,6 +117,7 @@ export default function ComputeNewPage() {
     const router = useRouter();
     const { data: session } = useSession();
     const t = useThemeTokens();
+    const { adjust: adjustCredits, refresh: refreshCredits } = useCredits();
     const isAdmin = (session?.user as { role?: string } | undefined)?.role === "ADMIN";
 
     // Admin provisioning mode toggle:
@@ -237,6 +239,8 @@ export default function ComputeNewPage() {
             if (!res.ok) { setPromoErr(d.error ?? "Invalid code"); return; }
             setPromoApplied(true);
             setPromoBonus(d.creditsAdded);
+            adjustCredits(d.creditsAdded);
+            refreshCredits();
             setPromoErr("");
         } catch { setPromoErr("Failed to apply code"); }
     };
@@ -286,7 +290,7 @@ export default function ComputeNewPage() {
                 }
             }
         } catch { setDeployErr("Unexpected error during deployment"); }
-        finally { setDeploying(false); }
+        finally { setDeploying(false); refreshCredits(); }
     };
 
     // ── Render ────────────────────────────────────────────────────────

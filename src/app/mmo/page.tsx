@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import Image from "next/image";
 import { useThemeTokens } from "@/lib/useThemeTokens";
+import { useCredits } from "@/components/CreditProvider";
 import {
     ShoppingBag, Package, Search, Grid3X3,
     ShoppingCart, LogIn, X, Minus, Plus, Copy, Check,
@@ -86,6 +87,7 @@ export default function MmoStorePage() {
     const { data: session, status: authStatus } = useSession();
     const isAuthenticated = authStatus === "authenticated";
     const isLoading = authStatus === "loading";
+    const { credits: globalCredits, adjust: adjustCredits, refresh: refreshCredits } = useCredits();
 
     const [categories, setCategories] = useState<Category[]>([]);
     const [loading, setLoading] = useState(true);
@@ -187,7 +189,12 @@ export default function MmoStorePage() {
             });
             const data = await res.json();
             if (!res.ok) setPurchaseErr(data.error || "Purchase failed");
-            else { setPurchaseResult(data); fetchCategories(); }
+            else {
+                setPurchaseResult(data);
+                adjustCredits(-data.totalCost);   // optimistic UI update
+                refreshCredits();                  // sync with server
+                fetchCategories();
+            }
         } catch { setPurchaseErr("Network error"); }
         finally { setPurchasing(false); }
     };

@@ -7,6 +7,8 @@ import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useThemeTokens } from "@/lib/useThemeTokens";
+import { useCredits } from "@/components/CreditProvider";
+import { Wallet } from "lucide-react";
 
 function NavLink({ href, label, pathname, t }: {
     href: string; label: string; pathname: string;
@@ -58,6 +60,7 @@ export default function Navbar() {
     const pathname = usePathname();
     const { data: session, status } = useSession();
     const t = useThemeTokens();
+    const { credits, loading: creditsLoading } = useCredits();
 
     useEffect(() => {
         const onScroll = () => setScrolled(window.scrollY > 20);
@@ -131,16 +134,49 @@ export default function Navbar() {
                     <NavLink href="/mmo" label="MMO" pathname={pathname} t={t} />
                     <NavLink href="/blog" label="Blog" pathname={pathname} t={t} />
                     {loggedIn && <NavLink href="/dashboard/vps" label="Dashboard" pathname={pathname} t={t} />}
-                    {loggedIn && <NavLink href="/settings" label="Settings" pathname={pathname} t={t} />}
-                    {loggedIn && <NavLink href="/dashboard/billing" label="Billing" pathname={pathname} t={t} />}
                 </div>
 
-                {/* Auth Area + Theme Toggle */}
+                {/* Auth Area + Credits + Theme Toggle */}
                 <div style={{ display: "flex", alignItems: "center", gap: "10px" }} className="nav-auth">
                     <ThemeToggle variant="navbar" />
 
                     {loggedIn ? (
                         <>
+                            {/* ── Credit Display ── */}
+                            <Link
+                                href="/dashboard/billing"
+                                style={{
+                                    display: "flex", alignItems: "center", gap: "7px",
+                                    padding: "6px 14px", borderRadius: t.isMono ? 6 : 20,
+                                    background: t.isMono
+                                        ? t.bgTertiary
+                                        : "linear-gradient(135deg, rgba(251,191,36,0.12), rgba(245,158,11,0.08))",
+                                    border: `1px solid ${t.isMono ? t.borderPrimary : "rgba(251,191,36,0.25)"}`,
+                                    textDecoration: "none",
+                                    transition: "all 0.15s",
+                                }}
+                            >
+                                <Wallet style={{
+                                    width: 15, height: 15,
+                                    color: t.isMono ? t.accentPrimary : "#f59e0b",
+                                }} />
+                                <span style={{
+                                    fontSize: "0.82rem", fontWeight: 700,
+                                    fontFamily: "var(--font-mono, monospace)",
+                                    color: t.isMono ? t.textPrimary : "#fbbf24",
+                                    letterSpacing: "-0.01em",
+                                }}>
+                                    {creditsLoading ? "---" : credits.toLocaleString()}
+                                </span>
+                                <span style={{
+                                    fontSize: "0.68rem", fontWeight: 600,
+                                    color: t.textMuted,
+                                }}>
+                                    Credits
+                                </span>
+                            </Link>
+
+                            {/* User avatar + name */}
                             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                                 <div style={{
                                     width: 32, height: 32, borderRadius: t.isMono ? 6 : 10,
@@ -201,8 +237,24 @@ export default function Navbar() {
                     <MobileLink href="/mmo" label="MMO" pathname={pathname} t={t} />
                     <MobileLink href="/blog" label="Blog" pathname={pathname} t={t} />
                     {loggedIn && <MobileLink href="/dashboard/vps" label="Dashboard" pathname={pathname} t={t} />}
-                    {loggedIn && <MobileLink href="/settings" label="Settings" pathname={pathname} t={t} />}
-                    {loggedIn && <MobileLink href="/dashboard/billing" label="Billing" pathname={pathname} t={t} />}
+
+                    {/* Mobile Credit Display */}
+                    {loggedIn && (
+                        <Link
+                            href="/dashboard/billing"
+                            style={{
+                                display: "flex", alignItems: "center", gap: 8,
+                                padding: "12px 16px", borderRadius: t.isMono ? 4 : 8,
+                                textDecoration: "none", color: t.textSecondary,
+                            }}
+                        >
+                            <Wallet style={{ width: 16, height: 16, color: t.isMono ? t.accentPrimary : "#f59e0b" }} />
+                            <span style={{ fontWeight: 700, fontFamily: "var(--font-mono, monospace)", color: t.isMono ? t.textPrimary : "#fbbf24" }}>
+                                {creditsLoading ? "---" : credits.toLocaleString()}
+                            </span>
+                            <span style={{ fontSize: "0.82rem", color: t.textMuted }}>Credits</span>
+                        </Link>
+                    )}
 
                     <div style={{ borderTop: `1px solid ${t.borderPrimary}`, margin: "8px 0", paddingTop: "12px", display: "flex", gap: "10px" }}>
                         {loggedIn ? (

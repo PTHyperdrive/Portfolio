@@ -6,6 +6,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useThemeTokens } from "@/lib/useThemeTokens";
+import { useCredits } from "@/components/CreditProvider";
 import ThemeToggle from "@/components/ThemeToggle";
 import {
     ShoppingBag, SlidersHorizontal, Tag, ArrowLeft, ChevronDown,
@@ -24,6 +25,7 @@ export default function MmoLayout({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const { data: session } = useSession();
     const isAdmin = (session?.user as { role?: string })?.role === "ADMIN";
+    const { credits: globalCredits } = useCredits();
 
     /* ─── Filter Sidebar State ─── */
     const [sortBy, setSortBy] = useState("default");
@@ -174,7 +176,7 @@ export default function MmoLayout({ children }: { children: React.ReactNode }) {
                             <Wallet style={{ width: 12, height: 12, color: t.statusWarning }} />
                             <span style={{ color: t.textSecondary, fontWeight: 600 }}>Credits: </span>
                             <span style={{ color: t.accentPrimary, fontWeight: 800, fontFamily: t.fontMono }}>
-                                {(session.user as { credits?: number }).credits?.toLocaleString?.() ?? "0"}
+                                {globalCredits.toLocaleString()}
                             </span>
                         </div>
                     </div>
