@@ -12,6 +12,7 @@ type InventoryCategory = {
     slug: string;
     name: string;
     description: string | null;
+    imageUrl: string | null;
     schema: string;
     pricePerUnit: number;
     active: boolean;
@@ -30,6 +31,7 @@ export default function AdminMmoPage() {
     const [newName, setNewName] = useState("");
     const [newSlug, setNewSlug] = useState("");
     const [newDesc, setNewDesc] = useState("");
+    const [newImageUrl, setNewImageUrl] = useState("");
     const [newPrice, setNewPrice] = useState("");
     const [schemaFields, setSchemaFields] = useState<string[]>([]);
     const [fieldInput, setFieldInput] = useState("");
@@ -122,6 +124,7 @@ export default function AdminMmoPage() {
                     name: newName.trim(),
                     slug: newSlug,
                     description: newDesc.trim() || null,
+                    imageUrl: newImageUrl.trim() || null,
                     schema: schemaFields.join("|"),
                     pricePerUnit: Number(newPrice),
                 }),
@@ -129,7 +132,7 @@ export default function AdminMmoPage() {
             const data = await res.json();
             if (!res.ok) { setCreateErr(data.error || "Failed to create"); return; }
             setCreateOk(`Category "${data.name}" created!`);
-            setNewName(""); setNewDesc(""); setNewPrice(""); setSchemaFields([]); setFieldInput("");
+            setNewName(""); setNewDesc(""); setNewImageUrl(""); setNewPrice(""); setSchemaFields([]); setFieldInput("");
             fetchCategories();
             setTimeout(() => setCreateOk(""), 3000);
         } catch {
@@ -253,6 +256,11 @@ export default function AdminMmoPage() {
                         <label style={labelStyle}>Price (Credits/unit)</label>
                         <input type="number" min={1} value={newPrice} onChange={(e) => setNewPrice(e.target.value)} placeholder="500" style={{ ...inputStyle, fontFamily: t.fontMono }} />
                     </div>
+                </div>
+
+                <div style={{ marginBottom: 16 }}>
+                    <label style={labelStyle}>Image URL</label>
+                    <input value={newImageUrl} onChange={(e) => setNewImageUrl(e.target.value)} placeholder="https://example.com/product-image.png" style={{ ...inputStyle, fontFamily: t.fontMono }} />
                 </div>
 
                 {/* ─── Schema Tag Input ─── */}

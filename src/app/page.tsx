@@ -40,7 +40,7 @@ const SERVICES: { title: string; subtitle: string; description: string; Icon: Lu
     subtitle: "Accounts • Emails • Digital Assets",
     description: "Digital asset marketplace with instant delivery. Buy game accounts, emails, and premium subscriptions in bulk with pipe-delimited data format.",
     Icon: Globe,
-    href: "/services/mmo",
+    href: "/mmo",
     color: "var(--accent-magenta)",
     features: ["Instant Delivery", "Bulk Orders", "Credit System", "30-Day Retention"],
   },

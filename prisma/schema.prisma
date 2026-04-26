@@ -43,6 +43,7 @@ model User {
   deviceSessions    DeviceSession[]
   sshKeys           SshKey[]
   nextcloudStorage  UserNextcloudStorage?
+  supportChats      SupportChat[]
 }
 
 model Account {
@@ -495,6 +496,7 @@ model MmoProductCategory {
   slug         String   @unique          // URL-safe: "netflix-premium"
   name         String                    // Display: "Netflix Premium Accounts"
   description  String?  @db.Text
+  imageUrl     String?                   // Product card image URL
   schema       String   @db.Text         // "email|password|recovery|2fa"
   pricePerUnit Int                       // price in Credits per unit
   active       Boolean  @default(true)
@@ -525,4 +527,42 @@ model MmoInventoryItem {
   @@index([categoryId, sold])
   @@index([soldToId])
   @@index([expiresAt])
+}
+
+// ─── Secure E2EE Support Chat ────────────────────────────────────
+
+/// Per-user chat thread for admin support on MMO items.
+/// `publicKey` stores the user's exported JWK public key for E2EE key agreement.
+/// `pinHash` is bcrypt-hashed PIN that gates access to chat history client-side.
+model SupportChat {
+  id         String   @id @default(cuid())
+  userId     String
+  publicKey  String   @db.Text        // User's exported ECDH public key (JWK)
+  pinHash    String                    // bcrypt hash of user-chosen PIN
+  closed     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages SupportMessage[]
+
+  @@unique([userId])                   // one active chat per user
+  @@index([userId])
+}
+
+/// Individual encrypted messages within a support chat.
+/// `ciphertext` is AES-GCM encrypted payload (base64).
+/// `iv` is the initialization vector used for AES-GCM (base64).
+/// `senderType` distinguishes USER vs ADMIN messages.
+model SupportMessage {
+  id         String   @id @default(cuid())
+  chatId     String
+  senderType String                    // "USER" | "ADMIN"
+  ciphertext String   @db.Text        // AES-GCM encrypted message (base64)
+  iv         String                    // AES-GCM IV (base64)
+  createdAt  DateTime @default(now())
+
+  chat SupportChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
+  @@index([chatId, createdAt])
 }

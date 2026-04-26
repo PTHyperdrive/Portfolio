@@ -94,7 +94,7 @@ export default function Navbar() {
 
     const loggedIn = !!session;
 
-    if (pathname.startsWith("/dashboard")) return null;
+    if (pathname.startsWith("/dashboard") || pathname.startsWith("/mmo")) return null;
 
     const navBg = scrolled
         ? (t.isMono
@@ -128,7 +128,7 @@ export default function Navbar() {
                     {!loggedIn && <NavLink href="/services/vps" label="VPS" pathname={pathname} t={t} />}
                     {!loggedIn && <NavLink href="/services/email" label="Email" pathname={pathname} t={t} />}
                     {!loggedIn && <NavLink href="/services/vpn" label="VPN" pathname={pathname} t={t} />}
-                    {!loggedIn && <NavLink href="/services/mmo" label="MMO" pathname={pathname} t={t} />}
+                    <NavLink href="/mmo" label="MMO" pathname={pathname} t={t} />
                     <NavLink href="/blog" label="Blog" pathname={pathname} t={t} />
                     {loggedIn && <NavLink href="/dashboard/vps" label="Dashboard" pathname={pathname} t={t} />}
                     {loggedIn && <NavLink href="/settings" label="Settings" pathname={pathname} t={t} />}
@@ -198,7 +198,7 @@ export default function Navbar() {
                     {!loggedIn && <MobileLink href="/services/vps" label="VPS" pathname={pathname} t={t} />}
                     {!loggedIn && <MobileLink href="/services/email" label="Email" pathname={pathname} t={t} />}
                     {!loggedIn && <MobileLink href="/services/vpn" label="VPN" pathname={pathname} t={t} />}
-                    {!loggedIn && <MobileLink href="/services/mmo" label="MMO" pathname={pathname} t={t} />}
+                    <MobileLink href="/mmo" label="MMO" pathname={pathname} t={t} />
                     <MobileLink href="/blog" label="Blog" pathname={pathname} t={t} />
                     {loggedIn && <MobileLink href="/dashboard/vps" label="Dashboard" pathname={pathname} t={t} />}
                     {loggedIn && <MobileLink href="/settings" label="Settings" pathname={pathname} t={t} />}

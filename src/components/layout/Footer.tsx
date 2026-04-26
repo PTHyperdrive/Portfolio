@@ -11,7 +11,7 @@ const FOOTER_LINKS = {
         { href: "/services/vps", label: "VPS Hosting" },
         { href: "/services/email", label: "Email Solutions" },
         { href: "/services/vpn", label: "VPN Access" },
-        { href: "/services/mmo", label: "MMO Market" },
+        { href: "/mmo", label: "MMO Market" },
     ],
     Company: [
         { href: "/about", label: "About" },
@@ -31,7 +31,7 @@ const FOOTER_LINKS = {
 export default function Footer() {
     const pathname = usePathname();
     const t = useThemeTokens();
-    if (pathname.startsWith("/dashboard")) return null;
+    if (pathname.startsWith("/dashboard") || pathname.startsWith("/mmo")) return null;
 
     return (
         <footer

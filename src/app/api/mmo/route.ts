@@ -12,6 +12,7 @@ export async function GET() {
                 slug: true,
                 name: true,
                 description: true,
+                imageUrl: true,
                 schema: true,
                 pricePerUnit: true,
                 _count: {
@@ -22,11 +23,12 @@ export async function GET() {
             },
         });
 
-        const result = categories.map((c: { id: string; slug: string; name: string; description: string | null; schema: string; pricePerUnit: number; _count: { items: number } }) => ({
+        const result = categories.map((c: { id: string; slug: string; name: string; description: string | null; imageUrl: string | null; schema: string; pricePerUnit: number; _count: { items: number } }) => ({
             id: c.id,
             slug: c.slug,
             name: c.name,
             description: c.description,
+            imageUrl: c.imageUrl,
             fields: c.schema.split("|"),
             pricePerUnit: c.pricePerUnit,
             availableStock: c._count.items,

@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Admin access required" }, { status: 403 });
         }
 
-        const { name, slug, description, schema, pricePerUnit } = await req.json();
+        const { name, slug, description, imageUrl, schema, pricePerUnit } = await req.json();
 
         if (!name || !slug || !schema || !pricePerUnit) {
             return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
@@ -27,6 +27,7 @@ export async function POST(req: NextRequest) {
                 name,
                 slug: (slug as string).toLowerCase().replace(/[^a-z0-9-]/g, ""),
                 description: description || null,
+                imageUrl: imageUrl || null,
                 schema: fields.join("|"),
                 pricePerUnit: Number(pricePerUnit),
             },

@@ -57,7 +57,7 @@ const SIDEBAR_STRUCTURE: NavGroup[] = [
     {
         title: "SERVICES",
         items: [
-            { label: "MMO Market", icon: ShoppingBag, href: "/dashboard/mmo" },
+            { label: "MMO Market", icon: ShoppingBag, href: "/mmo" },
         ],
     },
     {
