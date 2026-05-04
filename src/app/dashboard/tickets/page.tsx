@@ -75,7 +75,20 @@ export default function TicketsPage() {
                 const fd = new FormData();
                 files.forEach(f => fd.append("files", f));
                 const uploadRes = await fetch("/api/tickets/upload", { method: "POST", body: fd });
-                if (!uploadRes.ok) { const j = await uploadRes.json(); throw new Error(j.error || "Upload failed"); }
+                if (!uploadRes.ok) {
+                    // The server may return HTML (e.g. 413 from Next.js before handler runs),
+                    // so we try JSON first and fall back to a status-code message.
+                    let errMsg = `Upload failed (HTTP ${uploadRes.status})`;
+                    if (uploadRes.status === 413) {
+                        errMsg = "File too large. Maximum total upload size is 25 MB.";
+                    } else {
+                        try {
+                            const j = await uploadRes.json();
+                            errMsg = j.error || errMsg;
+                        } catch { /* response was not JSON — use status-code message */ }
+                    }
+                    throw new Error(errMsg);
+                }
                 const uploadData = await uploadRes.json();
                 imageUrls = uploadData.files;
             }

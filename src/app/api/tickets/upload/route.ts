@@ -10,8 +10,14 @@ import crypto from "crypto";
  * Only accessible via a separate authenticated download endpoint.
  */
 
+// Force Node.js runtime — edge runtime has no `fs` module.
+// Also instructs Next.js to treat this route as fully dynamic so its
+// own body-size enforcement respects the `bodySizeLimit` in next.config.ts.
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 const UPLOAD_DIR = path.join(process.cwd(), "data", "uploads", "tickets");
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB per file
 const ALLOWED_TYPES = ["image/png", "image/jpeg", "image/webp", "image/gif"];
 
 export async function POST(req: Request) {
