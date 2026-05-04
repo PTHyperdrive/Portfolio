@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Fragment } from "react";
 import { useThemeTokens } from "@/lib/useThemeTokens";
 import { Users, Search, RefreshCw, ChevronDown, ChevronRight, Monitor, ShoppingBag, X } from "lucide-react";
 
@@ -100,8 +100,8 @@ export default function AdminAccountsPage() {
                         </thead>
                         <tbody>
                             {filtered.map(user => (
-                                <>
-                                    <tr key={user.id}
+                                <Fragment key={user.id}>
+                                    <tr
                                         onClick={() => setExpanded(expanded === user.id ? null : user.id)}
                                         style={{ borderBottom: `1px solid ${t.borderSecondary}`, cursor: "pointer" }}
                                         onMouseEnter={e => (e.currentTarget.style.background = t.bgCardHover)}
@@ -160,7 +160,7 @@ export default function AdminAccountsPage() {
                                             </td>
                                         </tr>
                                     )}
-                                </>
+                                </Fragment>
                             ))}
                         </tbody>
                     </table>

@@ -3,28 +3,31 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useThemeTokens } from "@/lib/useThemeTokens";
 import {
-    MessagesSquare, RefreshCw, User, Lock, Shield, Unlock,
+    MessagesSquare, RefreshCw, User, Lock, Shield, Unlock, Send,
     X, MessageCircle, ChevronRight, Loader2, ToggleLeft, ToggleRight, KeyRound, Eye, EyeOff
 } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ECDH / AES-GCM crypto helpers
+// Symmetric AES-GCM crypto — same salt as user side for shared key derivation
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Must match the user-side CHAT_SALT exactly. */
+const CHAT_SALT = new TextEncoder().encode("notrespond-chat-salt-v1");
+
 /** Derive a 256-bit AES-GCM key from a PIN string via PBKDF2. */
-async function pinToKey(pin: string, salt: Uint8Array): Promise<CryptoKey> {
+async function pinToKey(pin: string): Promise<CryptoKey> {
     const enc = new TextEncoder();
     const baseKey = await crypto.subtle.importKey("raw", enc.encode(pin), "PBKDF2", false, ["deriveKey"]);
     return crypto.subtle.deriveKey(
-        { name: "PBKDF2", salt, iterations: 200_000, hash: "SHA-256" },
+        { name: "PBKDF2", salt: CHAT_SALT, iterations: 200_000, hash: "SHA-256" },
         baseKey,
         { name: "AES-GCM", length: 256 },
         false,
-        ["decrypt"]
+        ["encrypt", "decrypt"]
     );
 }
 
-/** Try to decrypt a base64 ciphertext with AES-GCM key + base64 IV. Returns plaintext or null on failure. */
+/** Decrypt a base64 ciphertext with AES-GCM key + base64 IV. Returns plaintext or null. */
 async function decryptMsg(ciphertextB64: string, ivB64: string, key: CryptoKey): Promise<string | null> {
     try {
         const ct = Uint8Array.from(atob(ciphertextB64), c => c.charCodeAt(0));
@@ -36,10 +39,16 @@ async function decryptMsg(ciphertextB64: string, ivB64: string, key: CryptoKey):
     }
 }
 
-// Fixed salt derived from the admin domain — matches the salt used on the client side.
-// In production this should be stored alongside the key. Here we use a deterministic
-// site-specific constant so no extra storage is required.
-const ADMIN_SALT = new TextEncoder().encode("notrespond-admin-salt-v1");
+/** Encrypt plaintext to base64 ciphertext + iv. */
+async function encryptMsg(plaintext: string, key: CryptoKey): Promise<{ ciphertext: string; iv: string }> {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const encoded = new TextEncoder().encode(plaintext);
+    const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, encoded);
+    return {
+        ciphertext: btoa(String.fromCharCode(...new Uint8Array(encrypted))),
+        iv: btoa(String.fromCharCode(...iv)),
+    };
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -86,7 +95,7 @@ function PinGate({ onUnlock, t }: { onUnlock: (key: CryptoKey) => void; t: Retur
         if (!pin) return;
         setWorking(true); setError("");
         try {
-            const key = await pinToKey(pin, ADMIN_SALT);
+            const key = await pinToKey(pin);
             onUnlock(key);
         } catch {
             setError("Failed to derive key. Try again.");
@@ -278,6 +287,11 @@ export default function AdminChatsPage() {
     const [decryptedMsgs, setDecryptedMsgs] = useState<Record<string, string | null>>({});
     const [decrypting, setDecrypting] = useState(false);
 
+    // Admin reply state
+    const [replyInput, setReplyInput] = useState("");
+    const [replySending, setReplySending] = useState(false);
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+
     const loadChats = useCallback(async () => {
         setLoading(true);
         try {
@@ -342,6 +356,33 @@ export default function AdminChatsPage() {
     const handleLock = () => {
         setDecryptKey(null);
         setDecryptedMsgs({});
+    };
+
+    /** Admin sends an encrypted reply to the currently selected user's chat. */
+    const sendAdminReply = async () => {
+        if (!replyInput.trim() || !decryptKey || !detail || replySending) return;
+        setReplySending(true);
+        try {
+            const encrypted = await encryptMsg(replyInput.trim(), decryptKey);
+            // Use the chat message endpoint — admin role is detected server-side
+            const res = await fetch("/api/mmo/chat/message", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ...encrypted, chatId: detail.id }),
+            });
+            if (res.ok) {
+                const msg = await res.json();
+                // Add to detail messages + decryptedMsgs locally
+                setDetail(prev => prev ? {
+                    ...prev,
+                    messages: [...prev.messages, msg],
+                } : null);
+                setDecryptedMsgs(prev => ({ ...prev, [msg.id]: replyInput.trim() }));
+                setReplyInput("");
+                setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+            }
+        } catch { /* silent */ }
+        finally { setReplySending(false); }
     };
 
     const card: React.CSSProperties = { background: t.bgCard, border: `1px solid ${t.borderPrimary}`, borderRadius: t.cardRadius, boxShadow: t.shadow };
@@ -524,6 +565,40 @@ export default function AdminChatsPage() {
                                     })
                                 )}
                             </div>
+
+                            {/* Admin Reply Input */}
+                            {decryptKey && !detail.closed && (
+                                <div style={{ padding: "12px 20px", borderTop: `1px solid ${t.borderSecondary}`, display: "flex", alignItems: "center", gap: 8 }}>
+                                    <input
+                                        value={replyInput}
+                                        onChange={e => setReplyInput(e.target.value)}
+                                        onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendAdminReply(); } }}
+                                        placeholder="Type a reply…"
+                                        style={{
+                                            flex: 1, padding: "10px 14px", borderRadius: 20,
+                                            background: t.bgInput, border: `1px solid ${t.borderPrimary}`,
+                                            color: t.textPrimary, fontSize: "0.85rem", fontFamily: t.fontFamily,
+                                            outline: "none",
+                                        }}
+                                    />
+                                    <button
+                                        onClick={sendAdminReply}
+                                        disabled={!replyInput.trim() || replySending}
+                                        style={{
+                                            width: 38, height: 38, borderRadius: "50%", border: "none",
+                                            background: replyInput.trim() ? t.accentPrimary : t.bgTertiary,
+                                            color: replyInput.trim() ? (t.isMono ? t.bgPrimary : "#fff") : t.textMuted,
+                                            cursor: replyInput.trim() ? "pointer" : "not-allowed",
+                                            display: "flex", alignItems: "center", justifyContent: "center",
+                                            transition: "all 0.15s",
+                                        }}
+                                    >
+                                        {replySending
+                                            ? <Loader2 style={{ width: 16, height: 16, animation: "spin 1s linear infinite" }} />
+                                            : <Send style={{ width: 16, height: 16 }} />}
+                                    </button>
+                                </div>
+                            )}
 
                             {/* Footer status */}
                             <div style={{ padding: "10px 20px", borderTop: `1px solid ${t.borderSecondary}`, display: "flex", alignItems: "center", gap: 8 }}>

@@ -13,25 +13,30 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Authentication required" }, { status: 401 });
         }
 
-        const { ciphertext, iv } = await req.json();
+        const { ciphertext, iv, chatId } = await req.json();
         if (!ciphertext || !iv) {
             return NextResponse.json({ error: "Encrypted message payload required" }, { status: 400 });
         }
 
-        // Find user's chat
-        const chat = await prisma.supportChat.findUnique({
-            where: { userId: session.user.id },
-        });
+        const isAdmin = (session.user as { role?: string }).role === "ADMIN";
+
+        // Admin can specify a chatId to reply to any user's thread
+        // Regular users always use their own chat
+        let chat;
+        if (isAdmin && chatId) {
+            chat = await prisma.supportChat.findUnique({ where: { id: chatId } });
+        } else {
+            chat = await prisma.supportChat.findUnique({ where: { userId: session.user.id } });
+        }
 
         if (!chat) {
             return NextResponse.json({ error: "No active chat. Initialize first." }, { status: 404 });
         }
 
-        if (chat.closed) {
+        // Only block non-admins from sending to closed chats
+        if (chat.closed && !isAdmin) {
             return NextResponse.json({ error: "Chat is closed" }, { status: 403 });
         }
-
-        const isAdmin = (session.user as { role?: string }).role === "ADMIN";
 
         const message = await prisma.supportMessage.create({
             data: {

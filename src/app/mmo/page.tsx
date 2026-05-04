@@ -37,30 +37,18 @@ const GRID_OPTIONS = [
     { label: "5", cols: 5 }, { label: "6", cols: 6 },
 ] as const;
 
-/* ═══ E2EE Crypto Helpers (Web Crypto API) ═══ */
-async function generateKeyPair(): Promise<CryptoKeyPair> {
-    return crypto.subtle.generateKey(
-        { name: "ECDH", namedCurve: "P-256" },
-        false, // non-extractable private key
-        ["deriveKey", "deriveBits"]
-    );
-}
+/* ═══ E2EE Crypto Helpers — PIN-based symmetric AES-256-GCM ═══ */
+const CHAT_SALT = new TextEncoder().encode("notrespond-chat-salt-v1");
 
-async function exportPublicKey(key: CryptoKey): Promise<string> {
-    const exported = await crypto.subtle.exportKey("jwk", key);
-    return JSON.stringify(exported);
-}
-
-async function deriveAESKey(privateKey: CryptoKey, publicKeyJwk: string): Promise<CryptoKey> {
-    const pubKey = await crypto.subtle.importKey(
-        "jwk", JSON.parse(publicKeyJwk),
-        { name: "ECDH", namedCurve: "P-256" }, false, []
-    );
+async function pinToAESKey(pin: string): Promise<CryptoKey> {
+    const enc = new TextEncoder();
+    const baseKey = await crypto.subtle.importKey("raw", enc.encode(pin), "PBKDF2", false, ["deriveKey"]);
     return crypto.subtle.deriveKey(
-        { name: "ECDH", public: pubKey },
-        privateKey,
+        { name: "PBKDF2", salt: CHAT_SALT, iterations: 200_000, hash: "SHA-256" },
+        baseKey,
         { name: "AES-GCM", length: 256 },
-        false, ["encrypt", "decrypt"]
+        false,
+        ["encrypt", "decrypt"]
     );
 }
 
@@ -120,7 +108,6 @@ export default function MmoStorePage() {
     const [chatLoading, setChatLoading] = useState(false);
     const [chatSending, setChatSending] = useState(false);
     const [aesKey, setAesKey] = useState<CryptoKey | null>(null);
-    const [keyPair, setKeyPair] = useState<CryptoKeyPair | null>(null);
     const chatEndRef = useRef<HTMLDivElement>(null);
 
     // ── Chat PIN Reset State ──
@@ -142,7 +129,7 @@ export default function MmoStorePage() {
             // Success — reset local state, go back to setup so user creates new PIN
             setChatResetStep("idle");
             setChatPin(""); setChatPinConfirm(""); setChatPinErr("");
-            setAesKey(null); setKeyPair(null); setChatMessages([]);
+            setAesKey(null); setChatMessages([]);
             setChatPhase("pin-setup");
         } catch (e) {
             setChatPinErr(e instanceof Error ? e.message : "Reset failed. Try again.");
@@ -252,11 +239,8 @@ export default function MmoStorePage() {
         try {
             const res = await fetch("/api/mmo/chat");
             const data = await res.json();
-            if (data.exists) {
+            if (data.exists && !data.closed) {
                 setChatPhase("pin-unlock");
-                // Store server public key for later derivation
-                sessionStorage.setItem("mmo_chat_pub", data.publicKey);
-                sessionStorage.setItem("mmo_chat_pinHash", data.pinHash);
             } else {
                 setChatPhase("pin-setup");
             }
@@ -270,24 +254,17 @@ export default function MmoStorePage() {
         if (chatPin !== chatPinConfirm) { setChatPinErr("PINs do not match"); return; }
         setChatLoading(true);
         try {
-            // Generate ECDH keypair (private key is non-extractable)
-            const kp = await generateKeyPair();
-            setKeyPair(kp);
-            const pubJwk = await exportPublicKey(kp.publicKey);
+            // Derive AES key from PIN via PBKDF2
+            const aes = await pinToAESKey(chatPin);
 
-            // Initialize chat on server
+            // Initialize chat on server (publicKey field kept for compat, stores a placeholder)
             const res = await fetch("/api/mmo/chat", {
                 method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ publicKey: pubJwk, pin: chatPin }),
+                body: JSON.stringify({ publicKey: "pin-symmetric", pin: chatPin }),
             });
             if (!res.ok) { setChatPinErr("Failed to create chat"); return; }
 
-            // Derive AES key from own public+private (self-encryption for stored messages)
-            const aes = await deriveAESKey(kp.privateKey, pubJwk);
             setAesKey(aes);
-
-            // Store private key reference in sessionStorage (ephemeral, non-extractable)
-            sessionStorage.setItem("mmo_chat_pub", pubJwk);
             setChatPhase("chat");
             setChatMessages([]);
         } catch (err) {
@@ -313,13 +290,8 @@ export default function MmoStorePage() {
             const match = await bcrypt.compare(chatPin, data.pinHash);
             if (!match) { setChatPinErr("Incorrect PIN"); setChatLoading(false); return; }
 
-            // Regenerate keypair for this session (re-derive AES)
-            const kp = await generateKeyPair();
-            setKeyPair(kp);
-            const pubJwk = await exportPublicKey(kp.publicKey);
-
-            // Use server's stored public key for AES derivation
-            const aes = await deriveAESKey(kp.privateKey, data.publicKey);
+            // Derive AES key from PIN (same derivation as admin uses)
+            const aes = await pinToAESKey(chatPin);
             setAesKey(aes);
 
             // Decrypt messages
