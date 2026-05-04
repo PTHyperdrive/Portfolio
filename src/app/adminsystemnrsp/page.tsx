@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useThemeTokens } from "@/lib/useThemeTokens";
 import {
-    Shield, DollarSign, Users, Package,
+    Shield, DollarSign, Users, Package, Monitor, Ticket,
     Settings, ChevronRight, AlertTriangle, RefreshCw,
     Server, Activity, MessageSquare, MessagesSquare,
 } from "lucide-react";
