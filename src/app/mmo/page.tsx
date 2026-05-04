@@ -83,7 +83,9 @@ export default function MmoStorePage() {
     const [chatSending, setChatSending] = useState(false);
     const [sharedKey, setSharedKey] = useState<CryptoKey | null>(null); // ECDH-derived AES key
     const [chatClosed, setChatClosed] = useState(false);
+    const [adminTyping, setAdminTyping] = useState(false);
     const chatEndRef = useRef<HTMLDivElement>(null);
+    const typingTimeout = useRef<ReturnType<typeof setTimeout>>(null);
 
     // ── Chat PIN Reset State ──
     const [chatResetStep, setChatResetStep] = useState<"idle" | "warn" | "confirm">("idle");
@@ -315,6 +317,8 @@ export default function MmoStorePage() {
     const sendChatMessage = async () => {
         if (!chatInput.trim() || !sharedKey || chatSending) return;
         setChatSending(true);
+        // Stop typing indicator
+        fetch("/api/mmo/chat/typing", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ typing: false }) }).catch(() => {});
         try {
             const encrypted = await encryptMessage(sharedKey, chatInput.trim());
             const res = await fetch("/api/mmo/chat/message", {
@@ -330,6 +334,50 @@ export default function MmoStorePage() {
         } catch { /* silent */ }
         finally { setChatSending(false); }
     };
+
+    // Typing signal — debounced
+    const signalTyping = (val: string) => {
+        setChatInput(val);
+        if (!sharedKey || chatPhase !== "chat") return;
+        if (typingTimeout.current) clearTimeout(typingTimeout.current);
+        if (val.trim()) {
+            fetch("/api/mmo/chat/typing", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ typing: true }) }).catch(() => {});
+            typingTimeout.current = setTimeout(() => {
+                fetch("/api/mmo/chat/typing", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ typing: false }) }).catch(() => {});
+            }, 3000);
+        } else {
+            fetch("/api/mmo/chat/typing", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ typing: false }) }).catch(() => {});
+        }
+    };
+
+    // Auto-refresh: poll for new messages + typing indicator every 3s
+    useEffect(() => {
+        if (chatPhase !== "chat" || !sharedKey || !chatOpen) return;
+        const iv = setInterval(async () => {
+            try {
+                // Poll messages
+                const res = await fetch("/api/mmo/chat");
+                const data = await res.json();
+                if (data.exists && data.messages) {
+                    const knownIds = new Set(chatMessages.map(m => m.id));
+                    const newMsgs = data.messages.filter((m: ChatMessage) => !knownIds.has(m.id));
+                    if (newMsgs.length > 0) {
+                        const decrypted = await Promise.all(newMsgs.map(async (msg: ChatMessage) => {
+                            try { return { ...msg, decrypted: await decryptMessage(sharedKey, msg.ciphertext, msg.iv) ?? "[Unable to decrypt]" }; }
+                            catch { return { ...msg, decrypted: "[Unable to decrypt]" }; }
+                        }));
+                        setChatMessages(prev => [...prev, ...decrypted]);
+                        setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+                    }
+                }
+                // Poll typing
+                const tr = await fetch("/api/mmo/chat/typing");
+                const td = await tr.json();
+                setAdminTyping(td.typing === true);
+            } catch { /* silent */ }
+        }, 3000);
+        return () => clearInterval(iv);
+    }, [chatPhase, sharedKey, chatOpen, chatMessages]);
 
     const card: React.CSSProperties = {
         background: t.bgCard, border: `1px solid ${t.borderPrimary}`,
@@ -781,6 +829,14 @@ export default function MmoStorePage() {
                                                 </div>
                                             ))}
                                             <div ref={chatEndRef} />
+                                            {adminTyping && (
+                                                <div style={{ alignSelf: "flex-start", maxWidth: "80%" }}>
+                                                    <div style={{ padding: "8px 14px", borderRadius: 14, background: t.bgSecondary, border: `1px solid ${t.borderSecondary}`, display: "flex", alignItems: "center", gap: 4 }}>
+                                                        <span style={{ fontSize: "0.78rem", color: t.textMuted, fontStyle: "italic" }}>Admin is typing</span>
+                                                        <span style={{ animation: "pulse 1.4s infinite", fontSize: "0.9rem", color: t.textMuted }}>...</span>
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
 
                                         {/* Input */}
@@ -789,7 +845,7 @@ export default function MmoStorePage() {
                                             display: "flex", alignItems: "center", gap: 8,
                                         }}>
                                             <input
-                                                value={chatInput} onChange={e => setChatInput(e.target.value)}
+                                                value={chatInput} onChange={e => signalTyping(e.target.value)}
                                                 onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendChatMessage(); } }}
                                                 placeholder="Type a message..."
                                                 style={{
@@ -825,7 +881,7 @@ export default function MmoStorePage() {
             )}
 
             {/* Spin animation for loader */}
-            <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+            <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } } @keyframes pulse { 0%,100% { opacity: 0.3; } 50% { opacity: 1; } }`}</style>
         </div>
     );
 }

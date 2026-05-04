@@ -59,7 +59,8 @@ function PinGate({ onUnlock, t }: { onUnlock: (pk: CryptoKey) => void; t: Return
         setErr(""); if (pin.length < 4) { setErr("Enter PIN"); return; }
         setBusy(true);
         try {
-            const r = await fetch("/api/admin/settings"); const d = await r.json();
+            const r = await fetch("/api/admin/settings"); const raw = await r.json();
+            const d = raw.settings || raw;
             const ep = d["admin_chat_enc_priv_key"], iv = d["admin_chat_key_iv"], ph = d["admin_chat_pin_hash"];
             if (!ep || !iv || !ph) { setErr("Keys incomplete"); setBusy(false); return; }
             if (!(await bcrypt.compare(pin, ph))) { setErr("Incorrect PIN"); setBusy(false); return; }
@@ -114,7 +115,9 @@ export default function AdminChatsPage() {
 
     const [replyInput, setReplyInput] = useState("");
     const [replySending, setReplySending] = useState(false);
+    const [userTyping, setUserTyping] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
+    const typingTimeout = useRef<ReturnType<typeof setTimeout>>(null);
 
     const loadChats = useCallback(async () => {
         setLoading(true);
@@ -164,6 +167,7 @@ export default function AdminChatsPage() {
     const sendAdminReply = async () => {
         if (!replyInput.trim() || !chatSharedKey || !detail || replySending) return;
         setReplySending(true);
+        fetch("/api/mmo/chat/typing", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chatId: detail.id, typing: false }) }).catch(() => {});
         try {
             const encrypted = await encryptMessage(chatSharedKey, replyInput.trim());
             const r = await fetch("/api/mmo/chat/message", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...encrypted, chatId: detail.id }) });
@@ -176,6 +180,46 @@ export default function AdminChatsPage() {
             }
         } catch {} finally { setReplySending(false); }
     };
+
+    const signalAdminTyping = (val: string) => {
+        setReplyInput(val);
+        if (!chatSharedKey || !detail) return;
+        if (typingTimeout.current) clearTimeout(typingTimeout.current);
+        if (val.trim()) {
+            fetch("/api/mmo/chat/typing", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chatId: detail.id, typing: true }) }).catch(() => {});
+            typingTimeout.current = setTimeout(() => {
+                fetch("/api/mmo/chat/typing", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chatId: detail.id, typing: false }) }).catch(() => {});
+            }, 3000);
+        } else {
+            fetch("/api/mmo/chat/typing", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chatId: detail.id, typing: false }) }).catch(() => {});
+        }
+    };
+
+    // Auto-refresh: poll for new messages + typing every 3s
+    useEffect(() => {
+        if (!adminPrivKey || !detail || !chatSharedKey) return;
+        const iv = setInterval(async () => {
+            try {
+                const r = await fetch(`/api/admin/chats/${detail.id}`);
+                if (!r.ok) return;
+                const data: ChatDetail = await r.json();
+                const knownIds = new Set(detail.messages.map(m => m.id));
+                const newMsgs = data.messages.filter(m => !knownIds.has(m.id));
+                if (newMsgs.length > 0) {
+                    const results: Record<string, string | null> = {};
+                    await Promise.all(newMsgs.map(async msg => { results[msg.id] = await decryptMessage(chatSharedKey, msg.ciphertext, msg.iv); }));
+                    setDetail(prev => prev ? { ...prev, messages: [...prev.messages, ...newMsgs] } : null);
+                    setDecryptedMsgs(prev => ({ ...prev, ...results }));
+                    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+                }
+                // Typing
+                const tr = await fetch(`/api/mmo/chat/typing?chatId=${detail.id}`);
+                const td = await tr.json();
+                setUserTyping(td.typing === true);
+            } catch {}
+        }, 3000);
+        return () => clearInterval(iv);
+    }, [adminPrivKey, detail, chatSharedKey]);
 
     const card: React.CSSProperties = { background: t.bgCard, border: `1px solid ${t.borderPrimary}`, borderRadius: t.cardRadius, boxShadow: t.shadow };
 
@@ -305,12 +349,20 @@ export default function AdminChatsPage() {
                                     );
                                 })}
                                 <div ref={messagesEndRef} />
+                                {userTyping && (
+                                    <div style={{ alignSelf: "flex-start", maxWidth: "75%" }}>
+                                        <div style={{ padding: "8px 14px", borderRadius: 14, background: t.bgSecondary, border: `1px solid ${t.borderSecondary}`, display: "flex", alignItems: "center", gap: 4 }}>
+                                            <span style={{ fontSize: "0.78rem", color: t.textMuted, fontStyle: "italic" }}>User is typing</span>
+                                            <span style={{ animation: "pulse 1.4s infinite", fontSize: "0.9rem", color: t.textMuted }}>...</span>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Reply Input */}
                             {adminPrivKey && !detail.closed && (
                                 <div style={{ padding: "12px 20px", borderTop: `1px solid ${t.borderSecondary}`, display: "flex", alignItems: "center", gap: 8 }}>
-                                    <input value={replyInput} onChange={e => setReplyInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendAdminReply(); } }} placeholder="Type a reply..." style={{ flex: 1, padding: "10px 14px", borderRadius: 20, background: t.bgInput, border: `1px solid ${t.borderPrimary}`, color: t.textPrimary, fontSize: "0.85rem", fontFamily: t.fontFamily, outline: "none" }} />
+                                    <input value={replyInput} onChange={e => signalAdminTyping(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendAdminReply(); } }} placeholder="Type a reply..." style={{ flex: 1, padding: "10px 14px", borderRadius: 20, background: t.bgInput, border: `1px solid ${t.borderPrimary}`, color: t.textPrimary, fontSize: "0.85rem", fontFamily: t.fontFamily, outline: "none" }} />
                                     <button onClick={sendAdminReply} disabled={!replyInput.trim() || replySending} style={{ width: 38, height: 38, borderRadius: "50%", border: "none", background: replyInput.trim() ? t.accentPrimary : t.bgTertiary, color: replyInput.trim() ? (t.isMono ? t.bgPrimary : "#fff") : t.textMuted, cursor: replyInput.trim() ? "pointer" : "not-allowed", display: "flex", alignItems: "center", justifyContent: "center" }}>
                                         {replySending ? <Loader2 style={{ width: 16, height: 16, animation: "spin 1s linear infinite" }} /> : <Send style={{ width: 16, height: 16 }} />}
                                     </button>
@@ -328,7 +380,7 @@ export default function AdminChatsPage() {
                 </div>
             </div>
 
-            <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
+            <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } } @keyframes pulse { 0%,100% { opacity: 0.3; } 50% { opacity: 1; } }`}</style>
         </div>
     );
 }

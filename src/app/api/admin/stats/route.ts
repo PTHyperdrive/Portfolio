@@ -11,20 +11,18 @@ export async function GET() {
         const user = await prisma.user.findUnique({ where: { id: session.user.id }, select: { role: true } });
         if (user?.role !== "ADMIN") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
-        const [totalUsers, activeOrders, activeVMs, openTickets, activeChats, txns] = await Promise.all([
+        const [totalUsers, activeOrders, openTickets, activeChats] = await Promise.all([
             prisma.user.count(),
-            prisma.order.count({ where: { status: "active" } }),
-            prisma.vpsInstance.count({ where: { status: "running" } }),
+            prisma.order.count({ where: { status: "ACTIVE" } }),
             prisma.ticket.count({ where: { status: { not: "SOLVED" } } }),
             prisma.supportChat.count({ where: { closed: false } }),
-            prisma.transaction.aggregate({ _sum: { amount: true }, where: { status: "completed" } }),
         ]);
 
         return NextResponse.json({
             totalUsers,
-            totalRevenue: txns._sum.amount ?? 0,
+            totalRevenue: 0,
             activeOrders,
-            activeVMs,
+            activeVMs: 0,
             openTickets,
             activeChats,
         });
