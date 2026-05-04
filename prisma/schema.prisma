@@ -614,3 +614,12 @@ model TicketNotification {
   @@index([userId, read])
   @@index([ticketId])
 }
+
+/// Global platform configuration key-value store.
+/// Used by the admin System Settings panel.
+model SystemConfig {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String   @db.Text
+  updatedAt DateTime @updatedAt
+}
