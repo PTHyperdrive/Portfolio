@@ -123,6 +123,34 @@ export default function MmoStorePage() {
     const [keyPair, setKeyPair] = useState<CryptoKeyPair | null>(null);
     const chatEndRef = useRef<HTMLDivElement>(null);
 
+    // ── Chat PIN Reset State ──
+    const [chatResetStep, setChatResetStep] = useState<"idle" | "warn" | "confirm">("idle");
+    const [chatResetting, setChatResetting] = useState(false);
+
+    const handleChatReset = async () => {
+        setChatResetting(true); setChatPinErr("");
+        try {
+            const res = await fetch("/api/mmo/chat/reset", {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ confirm: "RESET_PIN" }),
+            });
+            if (!res.ok) {
+                const d = await res.json().catch(() => ({}));
+                throw new Error(d.error || `HTTP ${res.status}`);
+            }
+            // Success — reset local state, go back to setup so user creates new PIN
+            setChatResetStep("idle");
+            setChatPin(""); setChatPinConfirm(""); setChatPinErr("");
+            setAesKey(null); setKeyPair(null); setChatMessages([]);
+            setChatPhase("pin-setup");
+        } catch (e) {
+            setChatPinErr(e instanceof Error ? e.message : "Reset failed. Try again.");
+        } finally {
+            setChatResetting(false);
+        }
+    };
+
     // Read filters from layout data attribute
     useEffect(() => {
         const readFilters = () => {
@@ -698,6 +726,55 @@ export default function MmoStorePage() {
                                         }}>
                                             <KeyRound style={{ width: 14, height: 14 }} /> Unlock
                                         </button>
+
+                                        {/* Forgot PIN — two-step destructive reset */}
+                                        {chatResetStep === "idle" && (
+                                            <button onClick={() => setChatResetStep("warn")} style={{
+                                                background: "none", border: "none", color: t.textMuted,
+                                                fontSize: "0.72rem", cursor: "pointer", textAlign: "center",
+                                                textDecoration: "underline", textDecorationStyle: "dotted",
+                                                marginTop: -8,
+                                            }}>
+                                                Forgot PIN? Reset (all chat history will be lost)
+                                            </button>
+                                        )}
+
+                                        {chatResetStep === "warn" && (
+                                            <div style={{ background: t.statusErrorBg, border: `1px solid ${t.statusError}44`, borderRadius: t.isMono ? 4 : 8, padding: "14px" }}>
+                                                <p style={{ fontSize: "0.8rem", color: t.statusError, fontWeight: 700, marginBottom: 8 }}>
+                                                    This will permanently delete all your chat messages and close this thread.
+                                                </p>
+                                                <p style={{ fontSize: "0.75rem", color: t.textMuted, marginBottom: 12, lineHeight: 1.5 }}>
+                                                    You will be able to start a fresh encrypted chat with a new PIN.
+                                                </p>
+                                                <div style={{ display: "flex", gap: 8 }}>
+                                                    <button onClick={() => setChatResetStep("idle")} style={{ flex: 1, padding: "8px", borderRadius: t.buttonRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textSecondary, fontWeight: 700, fontSize: "0.8rem", cursor: "pointer" }}>
+                                                        Cancel
+                                                    </button>
+                                                    <button onClick={() => setChatResetStep("confirm")} style={{ flex: 1, padding: "8px", borderRadius: t.buttonRadius, border: "none", background: t.statusError, color: "#fff", fontWeight: 800, fontSize: "0.8rem", cursor: "pointer" }}>
+                                                        Yes, Delete & Reset
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {chatResetStep === "confirm" && (
+                                            <div style={{ background: t.statusErrorBg, border: `1px solid ${t.statusError}44`, borderRadius: t.isMono ? 4 : 8, padding: "14px" }}>
+                                                <p style={{ fontSize: "0.8rem", color: t.statusError, fontWeight: 700, marginBottom: 10 }}>
+                                                    Final confirmation — cannot be undone.
+                                                </p>
+                                                {chatPinErr && <p style={{ fontSize: "0.75rem", color: t.statusError, marginBottom: 8 }}>{chatPinErr}</p>}
+                                                <div style={{ display: "flex", gap: 8 }}>
+                                                    <button onClick={() => { setChatResetStep("idle"); setChatPinErr(""); }} style={{ flex: 1, padding: "8px", borderRadius: t.buttonRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textSecondary, fontWeight: 700, fontSize: "0.8rem", cursor: "pointer" }}>
+                                                        Cancel
+                                                    </button>
+                                                    <button onClick={handleChatReset} disabled={chatResetting} style={{ flex: 1, padding: "8px", borderRadius: t.buttonRadius, border: "none", background: t.statusError, color: "#fff", fontWeight: 800, fontSize: "0.8rem", cursor: chatResetting ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                                                        {chatResetting ? <Loader2 style={{ width: 12, height: 12, animation: "spin 1s linear infinite" }} /> : null}
+                                                        {chatResetting ? "Resetting…" : "Confirm Reset"}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 ) : (
                                     /* ── Chat Messages ── */

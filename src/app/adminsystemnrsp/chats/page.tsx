@@ -251,18 +251,7 @@ function PinGate({ onUnlock, t }: { onUnlock: (key: CryptoKey) => void; t: Retur
                     </button>
                 </form>
 
-                {/* Reset PIN trigger — only show if not already in post-reset state */}
-                {resetStep !== "done" && (
-                    <button onClick={() => setResetStep("warn")} style={{
-                        marginTop: 18, background: "none", border: "none",
-                        color: t.textMuted, fontSize: "0.72rem", cursor: "pointer",
-                        textDecoration: "underline", textDecorationStyle: "dotted",
-                    }}>
-                        Forgot PIN? Reset (deletes all chat history)
-                    </button>
-                )}
-
-                <p style={{ marginTop: 12, fontSize: "0.68rem", color: t.textMuted, lineHeight: 1.5 }}>
+                <p style={{ marginTop: 16, fontSize: "0.68rem", color: t.textMuted, lineHeight: 1.5 }}>
                     The PIN never leaves your browser. Decryption happens locally.
                 </p>
             </div>

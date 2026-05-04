@@ -26,7 +26,7 @@ export async function DELETE(req: Request) {
             return NextResponse.json({ error: "Confirmation required" }, { status: 400 });
 
         // Delete all messages — threads survive (users can start fresh)
-        const { count } = await prisma.supportChatMessage.deleteMany({});
+        const { count } = await prisma.supportMessage.deleteMany({});
 
         // Audit the destructive action
         await prisma.auditLog.create({
