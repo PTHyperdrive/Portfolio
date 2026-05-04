@@ -197,20 +197,33 @@ export default function AdminChatsPage() {
 
     // Auto-refresh: poll for new messages + typing every 3s
     useEffect(() => {
-        if (!adminPrivKey || !detail || !chatSharedKey) return;
+        if (!adminPrivKey || !detail) return;
         const iv = setInterval(async () => {
             try {
                 const r = await fetch(`/api/admin/chats/${detail.id}`);
                 if (!r.ok) return;
                 const data: ChatDetail = await r.json();
-                const knownIds = new Set(detail.messages.map(m => m.id));
-                const newMsgs = data.messages.filter(m => !knownIds.has(m.id));
-                if (newMsgs.length > 0) {
-                    const results: Record<string, string | null> = {};
-                    await Promise.all(newMsgs.map(async msg => { results[msg.id] = await decryptMessage(chatSharedKey, msg.ciphertext, msg.iv); }));
-                    setDetail(prev => prev ? { ...prev, messages: [...prev.messages, ...newMsgs] } : null);
-                    setDecryptedMsgs(prev => ({ ...prev, ...results }));
-                    setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+
+                // If userPubKey or closed status changed, replace entire detail
+                // This triggers re-derivation of shared key via the other useEffect
+                if (data.userPubKey !== detail.userPubKey || data.closed !== detail.closed) {
+                    setDetail(data);
+                    setDecryptedMsgs({});
+                    setChatSharedKey(null);
+                    return;
+                }
+
+                // Otherwise just append new messages
+                if (chatSharedKey) {
+                    const knownIds = new Set(detail.messages.map(m => m.id));
+                    const newMsgs = data.messages.filter(m => !knownIds.has(m.id));
+                    if (newMsgs.length > 0) {
+                        const results: Record<string, string | null> = {};
+                        await Promise.all(newMsgs.map(async msg => { results[msg.id] = await decryptMessage(chatSharedKey, msg.ciphertext, msg.iv); }));
+                        setDetail(prev => prev ? { ...prev, messages: [...prev.messages, ...newMsgs] } : null);
+                        setDecryptedMsgs(prev => ({ ...prev, ...results }));
+                        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+                    }
                 }
                 // Typing
                 const tr = await fetch(`/api/mmo/chat/typing?chatId=${detail.id}`);
