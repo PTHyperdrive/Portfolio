@@ -33,7 +33,7 @@ export async function DELETE(req: Request) {
         // Delete all messages in this thread, then close it
         const [{ count }] = await Promise.all([
             prisma.supportMessage.deleteMany({ where: { chatId: chat.id } }),
-            prisma.supportChat.update({ where: { id: chat.id }, data: { closed: true } }),
+            prisma.supportChat.update({ where: { id: chat.id }, data: { closed: true, closedAt: new Date() } }),
         ]);
 
         // Audit log

@@ -37,37 +37,11 @@ const GRID_OPTIONS = [
     { label: "5", cols: 5 }, { label: "6", cols: 6 },
 ] as const;
 
-/* ═══ E2EE Crypto Helpers — PIN-based symmetric AES-256-GCM ═══ */
-const CHAT_SALT = new TextEncoder().encode("notrespond-chat-salt-v1");
-
-async function pinToAESKey(pin: string): Promise<CryptoKey> {
-    const enc = new TextEncoder();
-    const baseKey = await crypto.subtle.importKey("raw", enc.encode(pin), "PBKDF2", false, ["deriveKey"]);
-    return crypto.subtle.deriveKey(
-        { name: "PBKDF2", salt: CHAT_SALT, iterations: 200_000, hash: "SHA-256" },
-        baseKey,
-        { name: "AES-GCM", length: 256 },
-        false,
-        ["encrypt", "decrypt"]
-    );
-}
-
-async function encryptMessage(key: CryptoKey, plaintext: string): Promise<{ ciphertext: string; iv: string }> {
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const encoded = new TextEncoder().encode(plaintext);
-    const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, encoded);
-    return {
-        ciphertext: btoa(String.fromCharCode(...new Uint8Array(encrypted))),
-        iv: btoa(String.fromCharCode(...iv)),
-    };
-}
-
-async function decryptMessage(key: CryptoKey, ciphertextB64: string, ivB64: string): Promise<string> {
-    const ciphertext = Uint8Array.from(atob(ciphertextB64), c => c.charCodeAt(0));
-    const iv = Uint8Array.from(atob(ivB64), c => c.charCodeAt(0));
-    const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext);
-    return new TextDecoder().decode(decrypted);
-}
+import {
+    pinToWrappingKey, generateECDHKeypair, exportPubKey, exportPrivKey,
+    encryptPrivateKey, decryptPrivateKey, deriveSharedKey,
+    encryptMessage, decryptMessage,
+} from "@/lib/chatCrypto";
 
 /* ═══ Component ═══ */
 export default function MmoStorePage() {
@@ -107,7 +81,8 @@ export default function MmoStorePage() {
     const [chatInput, setChatInput] = useState("");
     const [chatLoading, setChatLoading] = useState(false);
     const [chatSending, setChatSending] = useState(false);
-    const [aesKey, setAesKey] = useState<CryptoKey | null>(null);
+    const [sharedKey, setSharedKey] = useState<CryptoKey | null>(null); // ECDH-derived AES key
+    const [chatClosed, setChatClosed] = useState(false);
     const chatEndRef = useRef<HTMLDivElement>(null);
 
     // ── Chat PIN Reset State ──
@@ -126,10 +101,9 @@ export default function MmoStorePage() {
                 const d = await res.json().catch(() => ({}));
                 throw new Error(d.error || `HTTP ${res.status}`);
             }
-            // Success — reset local state, go back to setup so user creates new PIN
             setChatResetStep("idle");
             setChatPin(""); setChatPinConfirm(""); setChatPinErr("");
-            setAesKey(null); setChatMessages([]);
+            setSharedKey(null); setChatMessages([]); setChatClosed(false);
             setChatPhase("pin-setup");
         } catch (e) {
             setChatPinErr(e instanceof Error ? e.message : "Reset failed. Try again.");
@@ -241,6 +215,9 @@ export default function MmoStorePage() {
             const data = await res.json();
             if (data.exists && !data.closed) {
                 setChatPhase("pin-unlock");
+            } else if (data.exists && data.closed) {
+                setChatClosed(true);
+                setChatPhase("pin-setup"); // closed chat — user can create new one
             } else {
                 setChatPhase("pin-setup");
             }
@@ -254,17 +231,31 @@ export default function MmoStorePage() {
         if (chatPin !== chatPinConfirm) { setChatPinErr("PINs do not match"); return; }
         setChatLoading(true);
         try {
-            // Derive AES key from PIN via PBKDF2
-            const aes = await pinToAESKey(chatPin);
+            // 1. Generate ECDH keypair (extractable so we can encrypt the private key)
+            const kp = await generateECDHKeypair();
+            const pubJwk = await exportPubKey(kp.publicKey);
+            const privJwk = await exportPrivKey(kp.privateKey);
 
-            // Initialize chat on server (publicKey field kept for compat, stores a placeholder)
+            // 2. Encrypt the private key with PIN-derived wrapping key
+            const wrappingKey = await pinToWrappingKey(chatPin);
+            const { encPrivKey, keyIv } = await encryptPrivateKey(privJwk, wrappingKey);
+
+            // 3. Initialize chat on server — get admin public key back
             const res = await fetch("/api/mmo/chat", {
                 method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ publicKey: "pin-symmetric", pin: chatPin }),
+                body: JSON.stringify({ pin: chatPin, userPubKey: pubJwk, userEncPrivKey: encPrivKey, userKeyIv: keyIv }),
             });
-            if (!res.ok) { setChatPinErr("Failed to create chat"); return; }
+            if (!res.ok) {
+                const d = await res.json().catch(() => ({}));
+                setChatPinErr(d.error || "Failed to create chat");
+                return;
+            }
+            const { adminPubKey } = await res.json();
 
-            setAesKey(aes);
+            // 4. Derive shared AES key from ECDH(userPrivate, adminPublic)
+            const shared = await deriveSharedKey(kp.privateKey, adminPubKey);
+            setSharedKey(shared);
+            setChatClosed(false);
             setChatPhase("chat");
             setChatMessages([]);
         } catch (err) {
@@ -280,26 +271,32 @@ export default function MmoStorePage() {
         if (chatPin.length < 4) { setChatPinErr("Enter your PIN"); return; }
         setChatLoading(true);
         try {
-            // Verify PIN against server hash
+            // 1. Fetch chat data (encrypted keys + messages)
             const res = await fetch("/api/mmo/chat");
             const data = await res.json();
             if (!data.exists) { setChatPhase("pin-setup"); return; }
+            if (data.closed) { setChatClosed(true); setChatPhase("pin-setup"); return; }
 
-            // Client-side PIN verification using bcryptjs
+            // 2. Verify PIN client-side (bcrypt)
             const bcrypt = await import("bcryptjs");
             const match = await bcrypt.compare(chatPin, data.pinHash);
             if (!match) { setChatPinErr("Incorrect PIN"); setChatLoading(false); return; }
 
-            // Derive AES key from PIN (same derivation as admin uses)
-            const aes = await pinToAESKey(chatPin);
-            setAesKey(aes);
+            // 3. Decrypt the stored private key using PIN-derived wrapping key
+            const wrappingKey = await pinToWrappingKey(chatPin);
+            const userPrivKey = await decryptPrivateKey(data.userEncPrivKey, data.userKeyIv, wrappingKey);
 
-            // Decrypt messages
+            // 4. Derive shared AES key from ECDH(userPrivate, adminPublic)
+            if (!data.adminPubKey) { setChatPinErr("Admin chat not configured yet"); setChatLoading(false); return; }
+            const shared = await deriveSharedKey(userPrivKey, data.adminPubKey);
+            setSharedKey(shared);
+
+            // 5. Decrypt messages
             const decrypted = await Promise.all(
                 data.messages.map(async (msg: ChatMessage) => {
                     try {
-                        const plaintext = await decryptMessage(aes, msg.ciphertext, msg.iv);
-                        return { ...msg, decrypted: plaintext };
+                        const plaintext = await decryptMessage(shared, msg.ciphertext, msg.iv);
+                        return { ...msg, decrypted: plaintext ?? "[Unable to decrypt]" };
                     } catch {
                         return { ...msg, decrypted: "[Unable to decrypt]" };
                     }
@@ -316,10 +313,10 @@ export default function MmoStorePage() {
     };
 
     const sendChatMessage = async () => {
-        if (!chatInput.trim() || !aesKey || chatSending) return;
+        if (!chatInput.trim() || !sharedKey || chatSending) return;
         setChatSending(true);
         try {
-            const encrypted = await encryptMessage(aesKey, chatInput.trim());
+            const encrypted = await encryptMessage(sharedKey, chatInput.trim());
             const res = await fetch("/api/mmo/chat/message", {
                 method: "POST", headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(encrypted),

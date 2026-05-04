@@ -28,8 +28,6 @@ export async function GET() {
             user: c.user, messageCount: c._count.messages,
             lastMessageAt: c.messages[0]?.createdAt ?? c.createdAt,
             lastSenderType: c.messages[0]?.senderType ?? null,
-            // Secret Chat eligibility: chat must be 30+ days old
-            secretChatEligible: (Date.now() - new Date(c.createdAt).getTime()) > 30 * 24 * 60 * 60 * 1000,
         })));
     } catch (err) {
         console.error("[GET /api/admin/chats]", err);

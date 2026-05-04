@@ -533,22 +533,28 @@ model MmoInventoryItem {
 
 // ─── Secure E2EE Support Chat ────────────────────────────────────
 
-/// Per-user chat thread for admin support on MMO items.
-/// `publicKey` stores the user's exported JWK public key for E2EE key agreement.
-/// `pinHash` is bcrypt-hashed PIN that gates access to chat history client-side.
+// ─── Secure E2EE Support Chat ────────────────────────────────────
+
+/// Per-user encrypted chat thread for admin support.
+/// Uses ECDH P-256 key agreement: user + admin each have a keypair.
+/// Private keys are stored encrypted with their respective PINs.
+/// PINs are local UI locks only — NOT the message encryption key.
 model SupportChat {
-  id         String   @id @default(cuid())
-  userId     String
-  publicKey  String   @db.Text        // User's exported ECDH public key (JWK)
-  pinHash    String                    // bcrypt hash of user-chosen PIN
-  closed     Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id              String    @id @default(cuid())
+  userId          String
+  userPubKey      String    @db.Text    // User's ECDH public key (JWK JSON)
+  userEncPrivKey  String    @db.Text    // User's private key encrypted with user PIN (base64)
+  userKeyIv       String                // IV used to encrypt user's private key (base64)
+  pinHash         String                // bcrypt hash of user-chosen PIN
+  closed          Boolean   @default(false)
+  closedAt        DateTime?             // Timestamp when permanently closed
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages SupportMessage[]
 
-  @@unique([userId])                   // one active chat per user
+  @@unique([userId])                    // one active chat per user
   @@index([userId])
 }
 
