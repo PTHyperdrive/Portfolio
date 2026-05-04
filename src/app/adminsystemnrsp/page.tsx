@@ -4,11 +4,9 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useThemeTokens } from "@/lib/useThemeTokens";
 import {
-    Shield, DollarSign, Users, Package, Monitor,
-    Wrench, ClipboardList, PenSquare, Globe, Lock,
+    Shield, DollarSign, Users, Package,
     Settings, ChevronRight, AlertTriangle, RefreshCw,
     Server, Activity, MessageSquare, MessagesSquare,
-    Ticket
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -22,16 +20,14 @@ interface PlatformStats {
 }
 
 const ADMIN_SECTIONS: { title: string; description: string; href: string; Icon: LucideIcon }[] = [
-    { title: "Ticket Management", description: "Review and resolve user support tickets", href: "/adminsystemnrsp/tickets", Icon: MessageSquare },
-    { title: "Support Chat", description: "E2EE chat threads with users", href: "/adminsystemnrsp/chats", Icon: MessagesSquare },
-    { title: "Pricing Management", description: "Edit VPS tier pricing and GPU rates", href: "/adminsystemnrsp/pricing", Icon: DollarSign },
-    { title: "Account Management", description: "View user accounts and VPS instances", href: "/adminsystemnrsp/accounts", Icon: Users },
-    { title: "Service Management", description: "Add, edit, or remove service listings", href: "/adminsystemnrsp/services", Icon: Wrench },
-    { title: "Order Management", description: "Process orders and update statuses", href: "/adminsystemnrsp/orders", Icon: ClipboardList },
-    { title: "Blog Management", description: "Create, edit, and publish blog posts", href: "/adminsystemnrsp/blog", Icon: PenSquare },
-    { title: "MMO Inventory", description: "Manage MMO digital asset stock and categories", href: "/adminsystemnrsp/mmo", Icon: Globe },
-    { title: "VPN Servers", description: "Configure VPN server endpoints", href: "/adminsystemnrsp/vpn", Icon: Lock },
-    { title: "System Settings", description: "Configure system parameters and flags", href: "/adminsystemnrsp/settings", Icon: Settings },
+    { title: "Server Management",  description: "All virtual machines across all users",        href: "/adminsystemnrsp/servers",    Icon: Server         },
+    { title: "User Accounts",      description: "View and manage all registered users",         href: "/adminsystemnrsp/accounts",   Icon: Users          },
+    { title: "Pricing",            description: "Edit VPS tier pricing and GPU rates",          href: "/adminsystemnrsp/pricing",    Icon: DollarSign     },
+    { title: "Billing & Invoices", description: "Global transaction log across all users",      href: "/adminsystemnrsp/billing",    Icon: Package        },
+    { title: "Audit Logs",         description: "Immutable record of all platform actions",     href: "/adminsystemnrsp/audit-logs", Icon: Activity       },
+    { title: "Support Tickets",    description: "Review and resolve user support tickets",      href: "/adminsystemnrsp/tickets",    Icon: MessageSquare  },
+    { title: "Secure Chat",        description: "E2EE chat threads with users",                 href: "/adminsystemnrsp/chats",      Icon: MessagesSquare },
+    { title: "System Settings",    description: "Platform config, maintenance, credit rates",   href: "/adminsystemnrsp/settings",   Icon: Settings       },
 ];
 
 export default function AdminDashboardPage() {
