@@ -276,7 +276,7 @@ export default function MmoLayout({ children }: { children: React.ReactNode }) {
                     <ThemeToggle variant="sidebar" />
 
                     {isAdmin && (
-                        <Link href="/admin/mmo" style={{
+                        <Link href="/adminsystemnrsp/mmo" style={{
                             display: "flex", alignItems: "center", gap: 8,
                             padding: "8px 12px", marginTop: 8, borderRadius: t.buttonRadius,
                             background: t.statusWarningBg, border: `1px solid ${t.statusWarning}33`,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -85,6 +85,17 @@ export default function Sidebar() {
     const t = useThemeTokens();
     const [expanded, setExpanded] = useState<Record<string, boolean>>({ Compute: true });
     const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+    const [unreadNotifs, setUnreadNotifs] = useState(0);
+
+    const fetchNotifs = useCallback(async () => {
+        if (!session?.user) return;
+        try {
+            const res = await fetch("/api/notifications");
+            if (res.ok) { const d = await res.json(); setUnreadNotifs(d.unread ?? 0); }
+        } catch { /* silent */ }
+    }, [session?.user]);
+
+    useEffect(() => { fetchNotifs(); const iv = setInterval(fetchNotifs, 60_000); return () => clearInterval(iv); }, [fetchNotifs]);
 
     const toggle = (label: string) =>
         setExpanded(prev => ({ ...prev, [label]: !prev[label] }));
@@ -225,6 +236,13 @@ export default function Sidebar() {
                                             <span style={{ display: "flex", alignItems: "center", gap: 12 }}>
                                                 <item.icon style={{ width: 18, height: 18, flexShrink: 0 }} />
                                                 {item.label}
+                                                {item.label === "Tickets" && unreadNotifs > 0 && (
+                                                    <span style={{
+                                                        fontSize: "0.58rem", fontWeight: 800, minWidth: 16, textAlign: "center",
+                                                        padding: "1px 5px", borderRadius: 8,
+                                                        background: t.statusError, color: "#fff",
+                                                    }}>{unreadNotifs}</span>
+                                                )}
                                             </span>
                                             {item.hasArrow && <ChevronRight style={{ width: 15, height: 15, opacity: 0.5 }} />}
                                         </Link>
@@ -276,17 +294,17 @@ export default function Sidebar() {
                             marginBottom: "8px", display: "block",
                         }}>ADMINISTRATION</span>
                         <Link
-                            href="/dashboard/admin"
+                            href="/adminsystemnrsp"
                             style={{
-                                ...navRow("/dashboard/admin", "Admin Panel"),
-                                color: isActive("/dashboard/admin") ? t.statusWarning : t.textSecondary,
-                                backgroundColor: isActive("/dashboard/admin")
+                                ...navRow("/adminsystemnrsp", "Admin Panel"),
+                                color: isActive("/adminsystemnrsp") ? t.statusWarning : t.textSecondary,
+                                backgroundColor: isActive("/adminsystemnrsp")
                                     ? t.statusWarningBg
                                     : "transparent",
                                 borderTop: t.isMono ? "none" : `1px solid ${t.statusWarningBg}`,
                                 borderRight: t.isMono ? "none" : `1px solid ${t.statusWarningBg}`,
                                 borderBottom: t.isMono ? "none" : `1px solid ${t.statusWarningBg}`,
-                                borderLeft: t.isMono && isActive("/dashboard/admin") ? `3px solid ${t.statusWarning}` : "3px solid transparent",
+                                borderLeft: t.isMono && isActive("/adminsystemnrsp") ? `3px solid ${t.statusWarning}` : "3px solid transparent",
                             }}
                             onMouseEnter={() => setHoveredItem("Admin Panel")}
                             onMouseLeave={() => setHoveredItem(null)}

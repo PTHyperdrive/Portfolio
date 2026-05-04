@@ -41,9 +41,11 @@ model User {
   appliedPromos     AppliedPromoCode[]
   deploymentTickets DeploymentTicket[]
   deviceSessions    DeviceSession[]
-  sshKeys           SshKey[]
-  nextcloudStorage  UserNextcloudStorage?
-  supportChats      SupportChat[]
+  sshKeys              SshKey[]
+  nextcloudStorage     UserNextcloudStorage?
+  supportChats         SupportChat[]
+  tickets              Ticket[]
+  ticketNotifications  TicketNotification[]
 }
 
 model Account {
@@ -565,4 +567,50 @@ model SupportMessage {
   chat SupportChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
 
   @@index([chatId, createdAt])
+}
+
+// ─── Global Ticket System ────────────────────────────────────────
+
+enum TicketStatus {
+  PENDING
+  UNSOLVED
+  SOLVED
+}
+
+/// Platform-wide support tickets. Supports markdown descriptions
+/// and secure image evidence uploads. Viewable only by the
+/// creator and platform administrators.
+model Ticket {
+  id          String       @id @default(cuid())
+  userId      String
+  title       String       @db.VarChar(200)
+  description String       @db.Text           // Markdown body
+  imageUrls   String?      @db.Text           // JSON array of upload paths
+  status      TicketStatus @default(PENDING)
+  priority    String       @default("medium") // low | medium | high | critical
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  resolvedAt  DateTime?
+
+  user          User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notifications TicketNotification[]
+
+  @@index([userId, status])
+  @@index([status, createdAt])
+}
+
+/// In-app notification sent when an admin changes a ticket to SOLVED.
+model TicketNotification {
+  id        String   @id @default(cuid())
+  ticketId  String
+  userId    String   // The ticket creator who receives the notification
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([ticketId])
 }

@@ -187,7 +187,7 @@ export default function BlogPage() {
             {/* Admin FAB — Create Post */}
             {isAdmin && (
                 <Link
-                    href="/admin/blog/new"
+                    href="/adminsystemnrsp/blog/new"
                     title="Create new post"
                     style={{
                         position: "fixed",

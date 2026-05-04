@@ -2,28 +2,33 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useThemeTokens } from "@/lib/useThemeTokens";
-import { MessageSquare, Plus, Clock, CheckCircle2, AlertCircle, X, ChevronRight, Send } from "lucide-react";
+import {
+    MessageSquare, Plus, Clock, CheckCircle2, AlertCircle, X,
+    ChevronRight, Send, Upload, Image as ImageIcon, FileText, Loader2
+} from "lucide-react";
 
 interface Ticket {
     id: string;
-    subject: string;
-    status: "open" | "in_progress" | "resolved" | "closed";
-    priority: "low" | "medium" | "high" | "critical";
+    title: string;
+    description: string;
+    imageUrls: string | null;
+    status: "PENDING" | "UNSOLVED" | "SOLVED";
+    priority: string;
     createdAt: string;
     updatedAt: string;
+    resolvedAt: string | null;
 }
 
 const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
-    open: { label: "Open", color: "#8ab4f8", bg: "rgba(138,180,248,0.12)" },
-    in_progress: { label: "In Progress", color: "#fdd663", bg: "rgba(253,214,99,0.12)" },
-    resolved: { label: "Resolved", color: "#81c995", bg: "rgba(129,201,149,0.12)" },
-    closed: { label: "Closed", color: "#9aa0a6", bg: "rgba(154,160,166,0.12)" },
+    PENDING:  { label: "Pending",  color: "#fdd663", bg: "rgba(253,214,99,0.12)" },
+    UNSOLVED: { label: "Unsolved", color: "#f28b82", bg: "rgba(242,139,130,0.12)" },
+    SOLVED:   { label: "Solved",   color: "#81c995", bg: "rgba(129,201,149,0.12)" },
 };
 
 const PRIORITY_META: Record<string, { label: string; color: string }> = {
-    low: { label: "Low", color: "#81c995" },
-    medium: { label: "Medium", color: "#8ab4f8" },
-    high: { label: "High", color: "#fdd663" },
+    low:      { label: "Low",      color: "#81c995" },
+    medium:   { label: "Medium",   color: "#8ab4f8" },
+    high:     { label: "High",     color: "#fdd663" },
     critical: { label: "Critical", color: "#f28b82" },
 };
 
@@ -32,12 +37,15 @@ export default function TicketsPage() {
     const [tickets, setTickets] = useState<Ticket[]>([]);
     const [loading, setLoading] = useState(true);
     const [showCreate, setShowCreate] = useState(false);
-    const [subject, setSubject] = useState("");
-    const [body, setBody] = useState("");
+    const [title, setTitle] = useState("");
+    const [description, setDescription] = useState("");
     const [priority, setPriority] = useState("medium");
+    const [files, setFiles] = useState<File[]>([]);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
+    const [filter, setFilter] = useState<string>("all");
+    const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
 
     const loadTickets = useCallback(async () => {
         try {
@@ -52,35 +60,49 @@ export default function TicketsPage() {
 
     useEffect(() => { loadTickets(); }, [loadTickets]);
 
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) setFiles(Array.from(e.target.files).slice(0, 5));
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!subject.trim()) { setError("Subject is required."); return; }
+        if (!title.trim()) { setError("Title is required."); return; }
         setSubmitting(true); setError("");
         try {
+            let imageUrls: string[] = [];
+            // Upload images first
+            if (files.length > 0) {
+                const fd = new FormData();
+                files.forEach(f => fd.append("files", f));
+                const uploadRes = await fetch("/api/tickets/upload", { method: "POST", body: fd });
+                if (!uploadRes.ok) { const j = await uploadRes.json(); throw new Error(j.error || "Upload failed"); }
+                const uploadData = await uploadRes.json();
+                imageUrls = uploadData.files;
+            }
+            // Create ticket
             const res = await fetch("/api/tickets", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ subject, body, priority }),
+                body: JSON.stringify({ title, description, priority, imageUrls: imageUrls.length ? imageUrls : undefined }),
             });
             if (!res.ok) { const j = await res.json(); throw new Error(j.error || "Failed."); }
             setSuccess("Ticket submitted successfully.");
-            setSubject(""); setBody(""); setShowCreate(false);
+            setTitle(""); setDescription(""); setFiles([]); setShowCreate(false);
             loadTickets();
         } catch (err) { setError(err instanceof Error ? err.message : "Failed."); }
         finally { setSubmitting(false); }
     };
 
+    const filtered = filter === "all" ? tickets : tickets.filter(t => t.status === filter);
+
     const card: React.CSSProperties = { background: t.bgCard, border: `1px solid ${t.borderPrimary}`, borderRadius: t.cardRadius, boxShadow: t.shadow };
-    const inputStyle: React.CSSProperties = { background: t.bgInput, border: `1px solid ${t.borderPrimary}`, borderRadius: t.isMono ? 4 : 8, color: t.textPrimary, fontSize: "0.875rem", outline: "none", padding: "9px 13px", width: "100%", boxSizing: "border-box" as const };
+    const inputStyle: React.CSSProperties = { background: t.bgInput, border: `1px solid ${t.borderPrimary}`, borderRadius: t.isMono ? 4 : 8, color: t.textPrimary, fontSize: "0.875rem", outline: "none", padding: "9px 13px", width: "100%", boxSizing: "border-box" as const, fontFamily: t.fontFamily };
 
     return (
         <div style={{ padding: "32px 36px", minHeight: "100vh", backgroundColor: t.bgPrimary }}>
             {/* Header */}
             <div style={{ marginBottom: 28 }}>
-                <p style={{ fontSize: "0.78rem", color: t.textMuted, marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
-                    Dashboard <span>&bull;</span>
-                    <span style={{ color: t.accentPrimary, fontWeight: 600, padding: "2px 10px", borderRadius: 6, background: t.accentPrimaryMuted }}>Tickets</span>
-                </p>
+                <p style={{ fontSize: "0.78rem", color: t.textMuted, marginBottom: 6 }}>Dashboard &bull; Tickets</p>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                         <div style={{ width: 44, height: 44, borderRadius: 12, background: t.accentPrimaryMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -88,7 +110,7 @@ export default function TicketsPage() {
                         </div>
                         <div>
                             <h1 style={{ fontSize: "1.6rem", fontWeight: 800, color: t.textPrimary }}>Support Tickets</h1>
-                            <p style={{ fontSize: "0.83rem", color: t.textMuted }}>Submit and track support requests. Our team responds within 24 hours.</p>
+                            <p style={{ fontSize: "0.83rem", color: t.textMuted }}>Submit and track support requests with markdown and image evidence.</p>
                         </div>
                     </div>
                     <button onClick={() => setShowCreate(!showCreate)} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 22px", borderRadius: t.buttonRadius, border: "none", background: t.accentPrimary, color: t.textInverse, fontWeight: 700, fontSize: "0.875rem", cursor: "pointer" }}>
@@ -110,8 +132,8 @@ export default function TicketsPage() {
                     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 180px", gap: 14 }}>
                             <div>
-                                <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 600, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Subject</label>
-                                <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Brief description of your issue" style={inputStyle} />
+                                <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 600, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Title</label>
+                                <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Brief description of your issue" style={inputStyle} maxLength={200} />
                             </div>
                             <div>
                                 <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 600, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Priority</label>
@@ -124,55 +146,81 @@ export default function TicketsPage() {
                             </div>
                         </div>
                         <div>
-                            <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 600, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Details</label>
-                            <textarea value={body} onChange={e => setBody(e.target.value)} placeholder="Describe your issue in detail..." rows={5} style={{ ...inputStyle, resize: "vertical" as const, fontFamily: "inherit" }} />
+                            <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 600, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>
+                                <FileText style={{ width: 11, height: 11, display: "inline", verticalAlign: "middle" }} /> Description (Markdown supported)
+                            </label>
+                            <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Describe your issue in detail. Markdown formatting is supported." rows={6} style={{ ...inputStyle, resize: "vertical" as const, fontFamily: t.fontMono, fontSize: "0.82rem" }} />
+                        </div>
+                        {/* Image Upload */}
+                        <div>
+                            <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 600, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Evidence (up to 5 images)</label>
+                            <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 18px", borderRadius: t.isMono ? 4 : 8, border: `2px dashed ${t.borderPrimary}`, cursor: "pointer", color: t.textMuted, fontSize: "0.82rem", justifyContent: "center" }}>
+                                <Upload style={{ width: 16, height: 16 }} />
+                                {files.length ? `${files.length} file(s) selected` : "Click or drag to upload images"}
+                                <input type="file" accept="image/*" multiple onChange={handleFileChange} style={{ display: "none" }} />
+                            </label>
+                            {files.length > 0 && (
+                                <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+                                    {files.map((f, i) => (
+                                        <span key={i} style={{ padding: "3px 8px", borderRadius: 4, background: t.bgTertiary, fontSize: "0.72rem", color: t.textSecondary, display: "flex", alignItems: "center", gap: 4 }}>
+                                            <ImageIcon style={{ width: 10, height: 10 }} /> {f.name.slice(0, 20)}
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                         <div style={{ display: "flex", justifyContent: "flex-end" }}>
                             <button type="submit" disabled={submitting} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 24px", borderRadius: t.buttonRadius, border: "none", background: submitting ? t.textMuted : t.accentPrimary, color: t.textInverse, fontWeight: 700, fontSize: "0.875rem", cursor: submitting ? "not-allowed" : "pointer" }}>
-                                <Send style={{ width: 14, height: 14 }} /> {submitting ? "Submitting..." : "Submit Ticket"}
+                                {submitting ? <Loader2 style={{ width: 14, height: 14, animation: "spin 1s linear infinite" }} /> : <Send style={{ width: 14, height: 14 }} />}
+                                {submitting ? "Submitting..." : "Submit Ticket"}
                             </button>
                         </div>
                     </div>
                 </form>
             )}
 
+            {/* Filter Tabs */}
+            <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+                {[{ key: "all", label: "All" }, { key: "PENDING", label: "Pending" }, { key: "UNSOLVED", label: "Unsolved" }, { key: "SOLVED", label: "Solved" }].map(tab => (
+                    <button key={tab.key} onClick={() => setFilter(tab.key)} style={{
+                        padding: "6px 16px", borderRadius: t.buttonRadius, border: `1px solid ${filter === tab.key ? t.accentPrimary + "55" : t.borderPrimary}`,
+                        background: filter === tab.key ? t.accentPrimaryMuted : "transparent",
+                        color: filter === tab.key ? t.accentPrimary : t.textSecondary,
+                        fontWeight: filter === tab.key ? 700 : 500, fontSize: "0.82rem", cursor: "pointer",
+                    }}>{tab.label}</button>
+                ))}
+                <span style={{ marginLeft: "auto", fontSize: "0.75rem", color: t.textMuted, alignSelf: "center" }}>{filtered.length} ticket{filtered.length !== 1 ? "s" : ""}</span>
+            </div>
+
             {/* Tickets List */}
             <div style={card}>
-                <div style={{ padding: "16px 24px", borderBottom: `1px solid ${t.borderSecondary}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                    <span style={{ fontWeight: 700, color: t.textPrimary, fontSize: "0.95rem" }}>Your Tickets</span>
-                    <span style={{ padding: "2px 10px", borderRadius: 10, background: t.accentPrimaryMuted, color: t.accentPrimary, fontSize: "0.72rem", fontWeight: 700 }}>{tickets.length} total</span>
-                </div>
-
                 {loading ? (
                     <div style={{ padding: 48, textAlign: "center", color: t.textMuted }}>Loading tickets...</div>
-                ) : tickets.length === 0 ? (
+                ) : filtered.length === 0 ? (
                     <div style={{ padding: "56px 24px", textAlign: "center" }}>
                         <div style={{ width: 64, height: 64, borderRadius: 16, background: t.accentPrimaryMuted, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
                             <MessageSquare style={{ width: 28, height: 28, color: t.accentPrimary }} />
                         </div>
-                        <p style={{ fontWeight: 700, color: t.textPrimary, fontSize: "1rem", marginBottom: 6 }}>No tickets yet</p>
-                        <p style={{ color: t.textMuted, fontSize: "0.875rem", maxWidth: 380, margin: "0 auto" }}>
-                            When you submit a support request, it will appear here with real-time status updates.
-                        </p>
+                        <p style={{ fontWeight: 700, color: t.textPrimary, fontSize: "1rem", marginBottom: 6 }}>No tickets found</p>
+                        <p style={{ color: t.textMuted, fontSize: "0.875rem" }}>Submit a support request to get started.</p>
                     </div>
                 ) : (
                     <div>
-                        {/* Table header */}
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 120px 100px 140px 30px", gap: 12, padding: "10px 24px", borderBottom: `1px solid ${t.borderSecondary}` }}>
-                            {["Subject", "Priority", "Status", "Updated", ""].map(h => (
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 100px 100px 120px 30px", gap: 12, padding: "10px 24px", borderBottom: `1px solid ${t.borderSecondary}` }}>
+                            {["Title", "Priority", "Status", "Updated", ""].map(h => (
                                 <span key={h} style={{ fontSize: "0.72rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.06em" }}>{h}</span>
                             ))}
                         </div>
-                        {tickets.map(ticket => {
-                            const sm = STATUS_META[ticket.status] ?? STATUS_META.open;
+                        {filtered.map(ticket => {
+                            const sm = STATUS_META[ticket.status] ?? STATUS_META.PENDING;
                             const pm = PRIORITY_META[ticket.priority] ?? PRIORITY_META.medium;
                             return (
-                                <div key={ticket.id} style={{ display: "grid", gridTemplateColumns: "1fr 120px 100px 140px 30px", gap: 12, padding: "14px 24px", borderBottom: `1px solid ${t.borderSecondary}`, alignItems: "center", cursor: "pointer", transition: "background 0.1s" }}
+                                <div key={ticket.id} onClick={() => setSelectedTicket(ticket)} style={{ display: "grid", gridTemplateColumns: "1fr 100px 100px 120px 30px", gap: 12, padding: "14px 24px", borderBottom: `1px solid ${t.borderSecondary}`, alignItems: "center", cursor: "pointer", transition: "background 0.1s" }}
                                     onMouseEnter={e => (e.currentTarget.style.background = t.bgCardHover)}
                                     onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
                                     <div>
-                                        <p style={{ fontWeight: 700, color: t.textPrimary, fontSize: "0.9rem" }}>{ticket.subject}</p>
-                                        <p style={{ fontSize: "0.75rem", color: t.textMuted, fontFamily: t.fontMono }}>#{ticket.id.slice(0, 8)}</p>
+                                        <p style={{ fontWeight: 700, color: t.textPrimary, fontSize: "0.9rem" }}>{ticket.title}</p>
+                                        <p style={{ fontSize: "0.72rem", color: t.textMuted, fontFamily: t.fontMono }}>#{ticket.id.slice(0, 8)}</p>
                                     </div>
                                     <span style={{ fontSize: "0.78rem", fontWeight: 600, color: pm.color }}>{pm.label}</span>
                                     <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "3px 8px", borderRadius: 6, background: sm.bg, color: sm.color, fontSize: "0.72rem", fontWeight: 700, width: "fit-content" }}>
@@ -186,6 +234,59 @@ export default function TicketsPage() {
                     </div>
                 )}
             </div>
+
+            {/* Ticket Detail Modal */}
+            {selectedTicket && (
+                <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}
+                    onClick={e => { if (e.target === e.currentTarget) setSelectedTicket(null); }}>
+                    <div style={{ ...card, width: "100%", maxWidth: 680, maxHeight: "85vh", overflowY: "auto", padding: 0 }}>
+                        <div style={{ padding: "20px 24px", borderBottom: `1px solid ${t.borderSecondary}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <div>
+                                <p style={{ fontSize: "0.72rem", color: t.textMuted, fontFamily: t.fontMono }}>#{selectedTicket.id.slice(0, 8)}</p>
+                                <h2 style={{ fontWeight: 800, fontSize: "1.1rem", color: t.textPrimary }}>{selectedTicket.title}</h2>
+                            </div>
+                            <button onClick={() => setSelectedTicket(null)} style={{ width: 28, height: 28, borderRadius: "50%", border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><X style={{ width: 14, height: 14 }} /></button>
+                        </div>
+                        <div style={{ padding: 24 }}>
+                            <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
+                                {(() => { const sm = STATUS_META[selectedTicket.status] ?? STATUS_META.PENDING; return <span style={{ padding: "4px 12px", borderRadius: 6, background: sm.bg, color: sm.color, fontSize: "0.78rem", fontWeight: 700 }}>{sm.label}</span>; })()}
+                                {(() => { const pm = PRIORITY_META[selectedTicket.priority] ?? PRIORITY_META.medium; return <span style={{ padding: "4px 12px", borderRadius: 6, background: t.bgTertiary, color: pm.color, fontSize: "0.78rem", fontWeight: 700 }}>{pm.label} priority</span>; })()}
+                                <span style={{ padding: "4px 12px", borderRadius: 6, background: t.bgTertiary, color: t.textMuted, fontSize: "0.78rem", display: "flex", alignItems: "center", gap: 4 }}>
+                                    <Clock style={{ width: 11, height: 11 }} /> {new Date(selectedTicket.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                                </span>
+                            </div>
+                            {selectedTicket.description && (
+                                <div style={{ padding: "16px 20px", borderRadius: t.isMono ? 4 : 8, background: t.bgSecondary, border: `1px solid ${t.borderSecondary}`, fontSize: "0.875rem", color: t.textSecondary, lineHeight: 1.7, whiteSpace: "pre-wrap", fontFamily: t.fontMono }}>
+                                    {selectedTicket.description}
+                                </div>
+                            )}
+                            {selectedTicket.imageUrls && (() => {
+                                try {
+                                    const imgs: string[] = JSON.parse(selectedTicket.imageUrls);
+                                    return imgs.length > 0 ? (
+                                        <div style={{ marginTop: 16 }}>
+                                            <p style={{ fontSize: "0.72rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", marginBottom: 8 }}>Evidence</p>
+                                            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                                                {imgs.map((img, i) => (
+                                                    <img key={i} src={`/api/tickets/file/${img}`} alt={`Evidence ${i + 1}`} style={{ maxWidth: 200, maxHeight: 150, borderRadius: t.isMono ? 4 : 8, border: `1px solid ${t.borderPrimary}`, objectFit: "cover" }} />
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ) : null;
+                                } catch { return null; }
+                            })()}
+                            {selectedTicket.resolvedAt && (
+                                <div style={{ marginTop: 16, padding: "10px 14px", borderRadius: t.isMono ? 4 : 8, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}33`, display: "flex", alignItems: "center", gap: 8 }}>
+                                    <CheckCircle2 style={{ width: 14, height: 14, color: t.statusSuccess }} />
+                                    <span style={{ fontSize: "0.82rem", color: t.statusSuccess }}>Resolved on {new Date(selectedTicket.resolvedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</span>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
         </div>
     );
 }
