@@ -70,7 +70,7 @@ export default function Navbar() {
 
     // ── While session is loading, render a skeleton to prevent flash ──
     if (status === "loading") {
-        if (pathname.startsWith("/dashboard")) return null;
+        if (pathname.startsWith("/dashboard") || pathname.startsWith("/adminsystemnrsp") || pathname.startsWith("/mmo")) return null;
         return (
             <nav
                 style={{
@@ -97,7 +97,7 @@ export default function Navbar() {
 
     const loggedIn = !!session;
 
-    if (pathname.startsWith("/dashboard") || pathname.startsWith("/mmo")) return null;
+    if (pathname.startsWith("/dashboard") || pathname.startsWith("/mmo") || pathname.startsWith("/adminsystemnrsp")) return null;
 
     const navBg = scrolled
         ? (t.isMono

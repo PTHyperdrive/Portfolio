@@ -31,7 +31,7 @@ const FOOTER_LINKS = {
 export default function Footer() {
     const pathname = usePathname();
     const t = useThemeTokens();
-    if (pathname.startsWith("/dashboard") || pathname.startsWith("/mmo")) return null;
+    if (pathname.startsWith("/dashboard") || pathname.startsWith("/mmo") || pathname.startsWith("/adminsystemnrsp")) return null;
 
     return (
         <footer
