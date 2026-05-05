@@ -359,16 +359,18 @@ export default function MmoStorePage() {
                 const res = await fetch("/api/mmo/chat");
                 const data = await res.json();
                 if (data.exists && data.messages) {
-                    const knownIds = new Set(chatMessages.map(m => m.id));
-                    const newMsgs = data.messages.filter((m: ChatMessage) => !knownIds.has(m.id));
-                    if (newMsgs.length > 0) {
-                        const decrypted = await Promise.all(newMsgs.map(async (msg: ChatMessage) => {
-                            try { return { ...msg, decrypted: await decryptMessage(sharedKey, msg.ciphertext, msg.iv) ?? "[Unable to decrypt]" }; }
-                            catch { return { ...msg, decrypted: "[Unable to decrypt]" }; }
-                        }));
-                        setChatMessages(prev => [...prev, ...decrypted]);
+                    const serverMsgs: ChatMessage[] = data.messages;
+                    const decryptedNew = await Promise.all(serverMsgs.map(async (msg: ChatMessage) => {
+                        try { return { ...msg, decrypted: await decryptMessage(sharedKey, msg.ciphertext, msg.iv) ?? "[Unable to decrypt]" }; }
+                        catch { return { ...msg, decrypted: "[Unable to decrypt]" }; }
+                    }));
+                    setChatMessages(prev => {
+                        const existingIds = new Set(prev.map(m => m.id));
+                        const newOnly = decryptedNew.filter(m => !existingIds.has(m.id));
+                        if (newOnly.length === 0) return prev;
                         setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
-                    }
+                        return [...prev, ...newOnly];
+                    });
                 }
                 // Poll typing
                 const tr = await fetch("/api/mmo/chat/typing");
@@ -377,7 +379,7 @@ export default function MmoStorePage() {
             } catch { /* silent */ }
         }, 3000);
         return () => clearInterval(iv);
-    }, [chatPhase, sharedKey, chatOpen, chatMessages]);
+    }, [chatPhase, sharedKey, chatOpen]);
 
     const card: React.CSSProperties = {
         background: t.bgCard, border: `1px solid ${t.borderPrimary}`,
