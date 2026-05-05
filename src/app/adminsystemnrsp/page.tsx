@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useThemeTokens } from "@/lib/useThemeTokens";
 import {
-    Shield, DollarSign, Users, Package, Monitor, Ticket,
+    Shield, DollarSign, Users, Package, Ticket, Key, Store,
     Settings, ChevronRight, AlertTriangle, RefreshCw,
     Server, Activity, MessageSquare, MessagesSquare,
 } from "lucide-react";
@@ -22,11 +22,12 @@ interface PlatformStats {
 const ADMIN_SECTIONS: { title: string; description: string; href: string; Icon: LucideIcon }[] = [
     { title: "Server Management",  description: "All virtual machines across all users",        href: "/adminsystemnrsp/servers",    Icon: Server         },
     { title: "User Accounts",      description: "View and manage all registered users",         href: "/adminsystemnrsp/accounts",   Icon: Users          },
-    { title: "Pricing",            description: "Edit VPS tier pricing and GPU rates",          href: "/adminsystemnrsp/pricing",    Icon: DollarSign     },
+    { title: "API Keys",           description: "Manage API keys and access tokens",            href: "/adminsystemnrsp/pricing",    Icon: Key            },
     { title: "Billing & Invoices", description: "Global transaction log across all users",      href: "/adminsystemnrsp/billing",    Icon: Package        },
     { title: "Audit Logs",         description: "Immutable record of all platform actions",     href: "/adminsystemnrsp/audit-logs", Icon: Activity       },
-    { title: "Support Tickets",    description: "Review and resolve user support tickets",      href: "/adminsystemnrsp/tickets",    Icon: MessageSquare  },
+    { title: "Tickets",            description: "Review and resolve user support tickets",      href: "/adminsystemnrsp/tickets",    Icon: MessageSquare  },
     { title: "Secure Chat",        description: "E2EE chat threads with users",                 href: "/adminsystemnrsp/chats",      Icon: MessagesSquare },
+    { title: "MMO Admin",          description: "Manage digital storefront categories and stock",href: "/adminsystemnrsp/mmo",       Icon: Store          },
     { title: "System Settings",    description: "Platform config, maintenance, credit rates",   href: "/adminsystemnrsp/settings",   Icon: Settings       },
 ];
 
@@ -58,7 +59,7 @@ export default function AdminDashboardPage() {
         { title: "Total Revenue", value: `${stats.totalRevenue.toLocaleString()} VND`, Icon: DollarSign, color: t.statusSuccess },
         { title: "Total Users", value: stats.totalUsers.toLocaleString(), Icon: Users, color: t.accentPrimary },
         { title: "Active Orders", value: stats.activeOrders.toLocaleString(), Icon: Package, color: t.statusWarning },
-        { title: "Active VMs", value: stats.activeVMs.toLocaleString(), Icon: Monitor, color: t.accentSecondary },
+        { title: "Active VMs", value: stats.activeVMs.toLocaleString(), Icon: Server, color: t.accentSecondary },
         { title: "Open Tickets", value: stats.openTickets.toLocaleString(), Icon: Ticket, color: t.statusError },
         { title: "Active Chats", value: stats.activeChats.toLocaleString(), Icon: MessagesSquare, color: t.statusSuccess },
     ];

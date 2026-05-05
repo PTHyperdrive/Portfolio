@@ -9,22 +9,26 @@ import { useThemeTokens } from "@/lib/useThemeTokens";
 import { useCredits } from "@/components/CreditProvider";
 import ThemeToggle from "@/components/ThemeToggle";
 import {
-    LayoutGrid, Server, Users, DollarSign, Receipt,
+    LayoutGrid, Server, Users, Key, DollarSign, Receipt,
     ScrollText, MessageSquare, MessagesSquare, SlidersHorizontal,
-    LogOut, ArrowLeft, Wallet, Shield
+    LogOut, ArrowLeft, Wallet, Shield, Store
 } from "lucide-react";
 
 type NavItem = { label: string; href: string; Icon: React.ElementType; badge?: number };
 
-const NAV_ITEMS: NavItem[] = [
+const SUPPORT_ITEMS: NavItem[] = [
+    { label: "Tickets",          href: "/adminsystemnrsp/tickets",      Icon: MessageSquare    },
+    { label: "Secure Chat",      href: "/adminsystemnrsp/chats",        Icon: MessagesSquare   },
+];
+
+const ADMIN_ITEMS: NavItem[] = [
     { label: "Dashboard",        href: "/adminsystemnrsp",              Icon: LayoutGrid       },
     { label: "Server Management",href: "/adminsystemnrsp/servers",      Icon: Server           },
     { label: "User Accounts",    href: "/adminsystemnrsp/accounts",     Icon: Users            },
-    { label: "Pricing",          href: "/adminsystemnrsp/pricing",      Icon: DollarSign       },
+    { label: "API Keys",         href: "/adminsystemnrsp/pricing",      Icon: Key              },
     { label: "Billing & Invoices",href: "/adminsystemnrsp/billing",     Icon: Receipt          },
     { label: "Audit Logs",       href: "/adminsystemnrsp/audit-logs",   Icon: ScrollText       },
-    { label: "Support Tickets",  href: "/adminsystemnrsp/tickets",      Icon: MessageSquare    },
-    { label: "Secure Chat",      href: "/adminsystemnrsp/chats",        Icon: MessagesSquare   },
+    { label: "MMO Admin",        href: "/adminsystemnrsp/mmo",          Icon: Store            },
     { label: "System Settings",  href: "/adminsystemnrsp/settings",     Icon: SlidersHorizontal},
 ];
 
@@ -83,6 +87,22 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         paddingLeft: 12, marginBottom: 4, marginTop: 10, display: "block",
     };
 
+    const renderNavItem = (item: NavItem) => {
+        const showBadge = item.label === "Tickets" && unreadTickets > 0;
+        return (
+            <Link key={item.label} href={item.href} style={linkStyle(item.href)}>
+                <item.Icon style={{ width: 15, height: 15, flexShrink: 0 }} />
+                <span style={{ flex: 1 }}>{item.label}</span>
+                {showBadge && (
+                    <span style={{
+                        fontSize: "0.6rem", fontWeight: 800, minWidth: 16, textAlign: "center",
+                        padding: "1px 5px", borderRadius: 8,
+                        background: t.statusError, color: "#fff",
+                    }}>{unreadTickets}</span>
+                )}
+            </Link>
+        );
+    };
     return (
         <div style={{
             display: "flex", height: "100vh", width: "100%", overflow: "hidden",
@@ -123,25 +143,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     </Link>
                 </div>
 
-                {/* Navigation */}
+                {/* Navigation — Two Groups */}
                 <nav style={{ flex: 1, padding: "4px 8px", display: "flex", flexDirection: "column", gap: 1 }}>
-                    <span style={sectionLabel}>ADMINISTRATION</span>
-                    {NAV_ITEMS.map(item => {
-                        const showBadge = item.label === "Support Tickets" && unreadTickets > 0;
-                        return (
-                            <Link key={item.label} href={item.href} style={linkStyle(item.href)}>
-                                <item.Icon style={{ width: 15, height: 15, flexShrink: 0 }} />
-                                <span style={{ flex: 1 }}>{item.label}</span>
-                                {showBadge && (
-                                    <span style={{
-                                        fontSize: "0.6rem", fontWeight: 800, minWidth: 16, textAlign: "center",
-                                        padding: "1px 5px", borderRadius: 8,
-                                        background: t.statusError, color: "#fff",
-                                    }}>{unreadTickets}</span>
-                                )}
-                            </Link>
-                        );
-                    })}
+                    <span style={sectionLabel}>SUPPORT</span>
+                    {SUPPORT_ITEMS.map(renderNavItem)}
+
+                    <span style={{ ...sectionLabel, marginTop: 16 }}>ADMINISTRATION</span>
+                    {ADMIN_ITEMS.map(renderNavItem)}
                 </nav>
 
                 {/* Footer */}
