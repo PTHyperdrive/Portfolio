@@ -182,6 +182,30 @@ h6 {
   }
 }
 
+@keyframes chatWidgetSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes chatFabPulse {
+
+  0%,
+  100% {
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+  }
+
+  50% {
+    box-shadow: 0 4px 32px rgba(59, 130, 246, 0.35);
+  }
+}
+
 @keyframes gradientShift {
   0% {
     background-position: 0% 50%;
@@ -857,6 +881,12 @@ h6 {
 
 [data-theme^="mono"] .animate-glow {
   animation: none;
+}
+
+/* ─── Chat Widget FAB → No glow ─── */
+[data-theme^="mono"] #contact-sales-fab {
+  animation: none !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
 }
 
 /* ─── Particles Background → Hidden ─── */

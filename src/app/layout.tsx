@@ -4,6 +4,7 @@ import "./globals.css";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import Providers from "@/components/Providers";
+import ContactSalesWidget from "@/components/ContactSalesWidget";
 import { auth } from "@/lib/auth";
 
 const inter = Inter({
@@ -65,6 +66,7 @@ export default async function RootLayout({
             {children}
           </main>
           {!isBare && <Footer />}
+          {!isBare && <ContactSalesWidget />}
         </Providers>
       </body>
     </html>
