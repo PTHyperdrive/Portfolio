@@ -5,15 +5,41 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 export default function RegisterPage() {
-    const [form, setForm] = useState({ name: "", email: "", password: "", confirmPassword: "" });
+    const [form, setForm] = useState({ name: "", email: "", password: "", confirmPassword: "", invitationCode: "" });
     const [error, setError] = useState("");
     const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
     const [loading, setLoading] = useState(false);
+    const [inviteStatus, setInviteStatus] = useState<{ valid?: boolean; msg?: string } | null>(null);
+    const [inviteChecking, setInviteChecking] = useState(false);
     const router = useRouter();
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setForm({ ...form, [e.target.name]: e.target.value });
+        const { name, value } = e.target;
+        setForm({ ...form, [name]: value });
         setFieldErrors({});
+
+        // Debounced invitation code validation
+        if (name === "invitationCode") {
+            setInviteStatus(null);
+            if (value.trim().length >= 6) {
+                setInviteChecking(true);
+                const timer = setTimeout(async () => {
+                    try {
+                        const res = await fetch("/api/invitations/validate", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ code: value.trim() }),
+                        });
+                        const d = await res.json();
+                        setInviteStatus({ valid: d.valid, msg: d.valid ? `Valid -- ${d.remainingUses} uses remaining` : (d.error || "Invalid code") });
+                    } catch { setInviteStatus({ valid: false, msg: "Validation failed" }); }
+                    finally { setInviteChecking(false); }
+                }, 500);
+                return () => clearTimeout(timer);
+            } else if (value.trim().length === 0) {
+                setInviteChecking(false);
+            }
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -161,6 +187,33 @@ export default function RegisterPage() {
                         />
                         {getFieldError("confirmPassword") && (
                             <p style={{ color: "var(--accent-magenta)", fontSize: "0.78rem", marginTop: "4px" }}>{getFieldError("confirmPassword")}</p>
+                        )}
+                    </div>
+
+                    <div>
+                        <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "6px" }}>
+                            Invitation Code <span style={{ fontWeight: 400, color: "var(--text-muted)" }}>(optional)</span>
+                        </label>
+                        <input
+                            type="text"
+                            name="invitationCode"
+                            className="input-field"
+                            placeholder="NRSP-XXXX-XXXX"
+                            value={form.invitationCode}
+                            onChange={handleChange}
+                            autoComplete="off"
+                            style={{ textTransform: "uppercase", letterSpacing: "0.05em" }}
+                        />
+                        <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "4px" }}>
+                            Have an invitation code? Enter it to unlock the free trial.
+                        </p>
+                        {inviteChecking && (
+                            <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "4px" }}>Validating...</p>
+                        )}
+                        {inviteStatus && (
+                            <p style={{ fontSize: "0.78rem", color: inviteStatus.valid ? "var(--accent-green)" : "var(--accent-magenta)", marginTop: "4px" }}>
+                                {inviteStatus.msg}
+                            </p>
                         )}
                     </div>
 

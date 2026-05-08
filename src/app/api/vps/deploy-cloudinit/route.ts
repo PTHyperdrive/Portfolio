@@ -112,6 +112,17 @@ export async function POST(req: Request) {
                     { status: 403 }
                 );
             }
+
+            // Invitation gate: user must have a redeemed invitation code
+            const hasInvitation = await prisma.invitationRedemption.findFirst({
+                where: { userId },
+            });
+            if (!hasInvitation) {
+                return NextResponse.json(
+                    { error: "A valid invitation code is required to activate the free trial." },
+                    { status: 403 }
+                );
+            }
         }
 
         // ── 1. Resolve plan ──────────────────────────────────────────

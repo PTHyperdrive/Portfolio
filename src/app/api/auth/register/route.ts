@@ -29,7 +29,7 @@ export async function POST(request: Request) {
             );
         }
 
-        const { name, email, password } = parsed.data;
+        const { name, email, password, invitationCode } = parsed.data;
 
         // Check if user exists
         const existingUser = await prisma.user.findUnique({
@@ -41,6 +41,27 @@ export async function POST(request: Request) {
                 { error: 'An account with this email already exists.' },
                 { status: 409 }
             );
+        }
+
+        // Validate invitation code if provided
+        let invitationData: { id: string; creatorId: string; code: string } | null = null;
+        if (invitationCode) {
+            const normalised = invitationCode.toUpperCase().trim();
+            const invitation = await prisma.invitationCode.findUnique({
+                where: { code: normalised },
+                select: { id: true, active: true, maxUses: true, usedCount: true, expiresAt: true, creatorId: true, code: true },
+            });
+
+            if (!invitation || !invitation.active) {
+                return NextResponse.json({ error: 'Invalid invitation code.' }, { status: 400 });
+            }
+            if (invitation.expiresAt && new Date() > invitation.expiresAt) {
+                return NextResponse.json({ error: 'Invitation code has expired.' }, { status: 400 });
+            }
+            if (invitation.usedCount >= invitation.maxUses) {
+                return NextResponse.json({ error: 'Invitation code has reached maximum uses.' }, { status: 400 });
+            }
+            invitationData = { id: invitation.id, creatorId: invitation.creatorId, code: invitation.code };
         }
 
         // Create user with hashed password
@@ -59,13 +80,51 @@ export async function POST(request: Request) {
             },
         });
 
-        // ISO 27001: Audit account creation
+        // If invitation code was provided, consume it atomically
+        if (invitationData) {
+            await prisma.$transaction([
+                prisma.invitationCode.update({
+                    where: { id: invitationData.id },
+                    data: { usedCount: { increment: 1 } },
+                }),
+                prisma.invitationRedemption.create({
+                    data: {
+                        invitationCodeId: invitationData.id,
+                        userId: user.id,
+                        context: "REGISTRATION",
+                    },
+                }),
+            ]);
+
+            // Audit invitation redemption
+            void audit({
+                userId: user.id,
+                action: "INVITE_CODE_REDEEMED",
+                resourceType: "InvitationCode",
+                resourceId: invitationData.id,
+                metadata: {
+                    code: invitationData.code,
+                    redeemedBy: user.id,
+                    invitedBy: invitationData.creatorId,
+                    context: "REGISTRATION",
+                },
+                req: request,
+            });
+        }
+
+        // ISO 27001: Audit account creation (enriched with invitation data)
         void audit({
             userId: user.id,
             action: "ACCOUNT_CREATED",
             resourceType: "UserAccount",
             resourceId: user.id,
-            metadata: { email: user.email },
+            metadata: {
+                email: user.email,
+                ...(invitationData ? {
+                    invitationCode: invitationData.code,
+                    invitedBy: invitationData.creatorId,
+                } : {}),
+            },
             req: request,
         });
 
@@ -81,3 +140,4 @@ export async function POST(request: Request) {
         );
     }
 }
+

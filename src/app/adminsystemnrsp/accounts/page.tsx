@@ -7,7 +7,7 @@ import { Users, Search, RefreshCw, ChevronDown, ChevronRight, Monitor, ShoppingB
 interface VpsInstance { id: string; vmId: string; node: string; name: string; os: string; status: string; }
 interface AdminUser {
     id: string; name: string | null; email: string; role: string;
-    credits: number; createdAt: string;
+    credits: number; hasUsedTrial: boolean; canInvite: boolean; createdAt: string;
     _count: { orders: number; vpsInstances: number };
     vpsInstances: VpsInstance[];
 }
@@ -18,6 +18,22 @@ export default function AdminAccountsPage() {
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
     const [expanded, setExpanded] = useState<string | null>(null);
+    const [toggling, setToggling] = useState<string | null>(null);
+
+    const toggleCanInvite = async (userId: string, current: boolean) => {
+        setToggling(userId);
+        try {
+            const res = await fetch("/api/admin/accounts", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ userId, canInvite: !current }),
+            });
+            if (res.ok) {
+                setUsers(prev => prev.map(u => u.id === userId ? { ...u, canInvite: !current } : u));
+            }
+        } catch { /* silent */ }
+        finally { setToggling(null); }
+    };
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -93,7 +109,7 @@ export default function AdminAccountsPage() {
                     <table style={{ width: "100%", borderCollapse: "collapse" }}>
                         <thead>
                             <tr style={{ background: t.bgSecondary }}>
-                                {["User", "Email", "Role", "Credits", "VMs", "Orders", "Joined", ""].map(h => (
+                                {["User", "Email", "Role", "Credits", "VMs", "Orders", "Allow Invite", "Joined", ""].map(h => (
                                     <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontSize: "0.68rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.07em", borderBottom: `1px solid ${t.borderSecondary}`, whiteSpace: "nowrap" }}>{h}</th>
                                 ))}
                             </tr>
@@ -133,6 +149,26 @@ export default function AdminAccountsPage() {
                                         </td>
                                         <td style={{ padding: "12px 16px", fontSize: "0.75rem", color: t.textMuted }}>{new Date(user.createdAt).toLocaleDateString()}</td>
                                         <td style={{ padding: "12px 16px" }}>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); toggleCanInvite(user.id, user.canInvite); }}
+                                                disabled={toggling === user.id}
+                                                style={{
+                                                    width: 36, height: 20, borderRadius: 10, border: "none", cursor: "pointer",
+                                                    background: user.canInvite ? t.statusSuccess : `${t.textMuted}40`,
+                                                    position: "relative", transition: "background 0.2s",
+                                                    opacity: toggling === user.id ? 0.5 : 1,
+                                                }}
+                                                title={user.canInvite ? "Disable invitations" : "Enable invitations"}
+                                            >
+                                                <span style={{
+                                                    position: "absolute", top: 2, left: user.canInvite ? 18 : 2,
+                                                    width: 16, height: 16, borderRadius: "50%",
+                                                    background: "#fff", transition: "left 0.2s",
+                                                    boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+                                                }} />
+                                            </button>
+                                        </td>
+                                        <td style={{ padding: "12px 16px" }}>
                                             {expanded === user.id
                                                 ? <ChevronDown style={{ width: 14, height: 14, color: t.textMuted }} />
                                                 : <ChevronRight style={{ width: 14, height: 14, color: t.textMuted }} />}
@@ -142,7 +178,7 @@ export default function AdminAccountsPage() {
                                     {/* Expanded VMs */}
                                     {expanded === user.id && user.vpsInstances.length > 0 && (
                                         <tr key={`${user.id}-exp`}>
-                                            <td colSpan={8} style={{ padding: "0 16px 14px", background: t.bgSecondary }}>
+                                            <td colSpan={9} style={{ padding: "0 16px 14px", background: t.bgSecondary }}>
                                                 <div style={{ padding: "12px 14px", borderRadius: t.isMono ? 4 : 8, background: t.bgTertiary, border: `1px solid ${t.borderSecondary}` }}>
                                                     <p style={{ fontSize: "0.68rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>VPS Instances</p>
                                                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>

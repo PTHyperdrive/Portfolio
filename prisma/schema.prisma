@@ -21,6 +21,7 @@ model User {
   hasUsedTrial  Boolean   @default(false)
   twoFactorEnabled Boolean @default(false)
   twoFactorSecret  String?
+  canInvite     Boolean   @default(false) // Admin toggle: allows user to generate invite codes
   trialExpiresAt DateTime?
   activePlan    String?
   planActivatedAt DateTime?
@@ -47,6 +48,7 @@ model User {
   tickets              Ticket[]
   ticketNotifications  TicketNotification[]
   cryptoTopups         CryptoTopup[]
+  invitationCodes      InvitationCode[]     @relation("InviteCreator")
 }
 
 model Account {
@@ -414,6 +416,10 @@ enum AuditAction {
   // Crypto Payments
   CRYPTO_TOPUP_INITIATED
   CRYPTO_TOPUP_COMPLETED
+  // Invitation System
+  INVITE_CODE_GENERATED
+  INVITE_CODE_REDEEMED
+  INVITE_PERMISSION_CHANGED
 }
 
 model AuditLog {
@@ -659,4 +665,40 @@ model CryptoTopup {
   @@index([userId])
   @@index([depositAddress])
   @@index([status])
+}
+
+// ─── Invitation Code System ──────────────────────────────────────
+
+/// User-generated invitation codes for trial access.
+/// Only users with canInvite = true can generate codes.
+/// Each code supports up to maxUses redemptions (default 10).
+model InvitationCode {
+  id          String    @id @default(cuid())
+  code        String    @unique            // Format: "NRSP-XXXX-XXXX"
+  creatorId   String                       // User who generated the code
+  maxUses     Int       @default(10)       // Max redemptions per code
+  usedCount   Int       @default(0)        // Current redemption count
+  expiresAt   DateTime?                    // Optional expiry
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  creator     User      @relation("InviteCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  redemptions InvitationRedemption[]
+
+  @@index([code])
+  @@index([creatorId])
+}
+
+/// Tracks each individual redemption of an invitation code.
+model InvitationRedemption {
+  id               String   @id @default(cuid())
+  invitationCodeId String
+  userId           String                  // User who redeemed the code
+  redeemedAt       DateTime @default(now())
+  context          String   @default("REGISTRATION") // "REGISTRATION" | "CHECKOUT"
+
+  invitationCode   InvitationCode @relation(fields: [invitationCodeId], references: [id], onDelete: Cascade)
+
+  @@unique([invitationCodeId, userId])    // One redemption per user per code
+  @@index([userId])
 }

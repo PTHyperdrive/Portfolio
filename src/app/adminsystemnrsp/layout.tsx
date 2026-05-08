@@ -9,7 +9,7 @@ import { useThemeTokens } from "@/lib/useThemeTokens";
 import { useCredits } from "@/components/CreditProvider";
 import ThemeToggle from "@/components/ThemeToggle";
 import {
-    LayoutGrid, Server, Users, DollarSign, Receipt,
+    LayoutGrid, Server, Users, Tag, Receipt,
     ScrollText, MessageSquare, MessagesSquare, SlidersHorizontal,
     LogOut, ArrowLeft, Wallet, Shield, Store
 } from "lucide-react";
@@ -25,7 +25,7 @@ const ADMIN_ITEMS: NavItem[] = [
     { label: "Dashboard",        href: "/adminsystemnrsp",              Icon: LayoutGrid       },
     { label: "Server Management",href: "/adminsystemnrsp/servers",      Icon: Server           },
     { label: "User Accounts",    href: "/adminsystemnrsp/accounts",     Icon: Users            },
-    { label: "Pricing",           href: "/adminsystemnrsp/pricing",      Icon: DollarSign       },
+    { label: "Pricing & Promo",  href: "/adminsystemnrsp/pricing",      Icon: Tag              },
     { label: "Billing & Invoices",href: "/adminsystemnrsp/billing",     Icon: Receipt          },
     { label: "Audit Logs",       href: "/adminsystemnrsp/audit-logs",   Icon: ScrollText       },
     { label: "MMO Admin",        href: "/adminsystemnrsp/mmo",          Icon: Store            },

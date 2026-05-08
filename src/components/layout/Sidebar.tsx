@@ -7,7 +7,7 @@ import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import {
     LayoutGrid, Server, Gamepad2, Cloud, Key, Globe, Settings as SettingsIcon,
-    Users, History, BarChart2, Wallet, User, Sliders, MessageSquare,
+    Users, History, BarChart2, Wallet, User, Sliders, MessageSquare, Ticket,
     ChevronDown, ChevronRight, LogOut, Shield, ShoppingBag
 } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -75,6 +75,7 @@ const SIDEBAR_STRUCTURE: NavGroup[] = [
             { label: "Settings", icon: User, href: "/dashboard/settings" },
             { label: "Resource Limits", icon: Sliders, href: "/dashboard/limits" },
             { label: "Tickets", icon: MessageSquare, href: "/dashboard/tickets" },
+            { label: "Invitations", icon: Ticket, href: "/dashboard/invitations" },
         ],
     },
 ];
