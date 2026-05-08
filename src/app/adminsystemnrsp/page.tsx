@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useThemeTokens } from "@/lib/useThemeTokens";
 import {
-    Shield, DollarSign, Users, Package, Ticket, Key, Store,
+    Shield, DollarSign, Users, Package, Ticket, Store,
     Settings, ChevronRight, AlertTriangle, RefreshCw,
     Server, Activity, MessageSquare, MessagesSquare,
 } from "lucide-react";
@@ -22,7 +22,7 @@ interface PlatformStats {
 const ADMIN_SECTIONS: { title: string; description: string; href: string; Icon: LucideIcon }[] = [
     { title: "Server Management",  description: "All virtual machines across all users",        href: "/adminsystemnrsp/servers",    Icon: Server         },
     { title: "User Accounts",      description: "View and manage all registered users",         href: "/adminsystemnrsp/accounts",   Icon: Users          },
-    { title: "API Keys",           description: "Manage API keys and access tokens",            href: "/adminsystemnrsp/pricing",    Icon: Key            },
+    { title: "Pricing",             description: "Manage platform tier pricing and credit rates", href: "/adminsystemnrsp/pricing",    Icon: DollarSign      },
     { title: "Billing & Invoices", description: "Global transaction log across all users",      href: "/adminsystemnrsp/billing",    Icon: Package        },
     { title: "Audit Logs",         description: "Immutable record of all platform actions",     href: "/adminsystemnrsp/audit-logs", Icon: Activity       },
     { title: "Tickets",            description: "Review and resolve user support tickets",      href: "/adminsystemnrsp/tickets",    Icon: MessageSquare  },

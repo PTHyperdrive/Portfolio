@@ -1,9 +1,26 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 
-const VPS_PLANS = [
+/* ── Static plan metadata (specs, features, display) ──────────── */
+
+interface VpsPlan {
+    name: string;
+    badge: string;
+    price: string;
+    period?: string;
+    currency: string;
+    specs: Record<string, string>;
+    features: string[];
+    featured: boolean;
+    color: string;
+    isTrial: boolean;
+    isHiddenFromPublic: boolean;
+}
+
+const VPS_PLANS: VpsPlan[] = [
     {
         name: "Trial Plan",
         badge: "VPS",
@@ -152,6 +169,33 @@ export default function VPSPage() {
     const isAdmin = userMeta?.role === "ADMIN";
     const activePlan = userMeta?.activePlan as string | undefined;
 
+    /* ── Dynamic pricing from admin overrides ────────────────── */
+    const [dynamicPrices, setDynamicPrices] = useState<Record<string, number>>({});
+
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await fetch("/api/admin/pricing");
+                if (res.ok) {
+                    const d = await res.json();
+                    const prices: Record<string, number> = {};
+                    for (const [name, config] of Object.entries(d.plans ?? {})) {
+                        prices[name] = (config as { priceInCredits: number }).priceInCredits;
+                    }
+                    setDynamicPrices(prices);
+                }
+            } catch { /* use static fallback */ }
+        })();
+    }, []);
+
+    const getDisplayPrice = (plan: VpsPlan): string => {
+        if (plan.isTrial) return "Free";
+        if (plan.name === "Operator-Exclusive") return "Internal";
+        const dynPrice = dynamicPrices[plan.name];
+        if (dynPrice !== undefined) return dynPrice.toLocaleString();
+        return plan.price;
+    };
+
     const visiblePlans = VPS_PLANS.filter((p) => {
         if (p.isTrial && hasUsedTrial && !isAdmin) return false;
         if (p.name === activePlan) return false;
@@ -192,7 +236,6 @@ export default function VPSPage() {
                 <div className="container">
                     {visiblePlans.length === 0 ? (
                         <div className="glass-card stagger" style={{ padding: "48px 32px", textAlign: "center", maxWidth: "600px", margin: "0 auto" }}>
-                            <div style={{ fontSize: "3.5rem", marginBottom: "20px" }}></div>
                             <h3 style={{ fontSize: "1.5rem", fontWeight: 700, marginBottom: "16px", color: "var(--text-primary)" }}>
                                 You own all available plans!
                             </h3>
@@ -226,12 +269,11 @@ export default function VPSPage() {
 
                                     <div style={{ marginBottom: "24px", display: "flex", alignItems: "center" }}>
                                         <span style={{ fontSize: "2.5rem", fontWeight: 800 }}>
-                                            <span className="gradient-text">{plan.price}</span>
+                                            <span className="gradient-text">{getDisplayPrice(plan)}</span>
                                         </span>
-                                        {/* "currency" and "period" blocks */}
                                         <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", marginLeft: "8px" }}>
-                                            {"currency" in plan && <span style={{ color: "var(--text-primary)", fontWeight: 700, fontSize: "1rem", lineHeight: "1" }}>{(plan as any).currency}</span>}
-                                            {"period" in plan && <span style={{ color: "var(--text-muted)", fontSize: "0.85rem", lineHeight: "1" }}>{(plan as any).period}</span>}
+                                            {"currency" in plan && <span style={{ color: "var(--text-primary)", fontWeight: 700, fontSize: "1rem", lineHeight: "1" }}>{plan.currency}</span>}
+                                            {"period" in plan && <span style={{ color: "var(--text-muted)", fontSize: "0.85rem", lineHeight: "1" }}>{plan.period}</span>}
                                         </div>
                                     </div>
 
@@ -260,7 +302,7 @@ export default function VPSPage() {
                                     <div style={{ marginBottom: "28px", flex: 1 }}>
                                         {plan.features.filter(Boolean).map((f) => (
                                             <div key={f} style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
-                                                <span style={{ color: plan.color, fontSize: "0.9rem" }}>✓</span>
+                                                <span style={{ color: plan.color, fontSize: "0.9rem" }}>&#x2713;</span>
                                                 <span style={{ color: "var(--text-secondary)", fontSize: "0.88rem" }}>{f}</span>
                                             </div>
                                         ))}
