@@ -273,29 +273,59 @@ export default function MmoStorePage() {
         if (chatPin.length < 4) { setChatPinErr("Enter your PIN"); return; }
         setChatLoading(true);
         try {
-            // 1. Fetch chat data (encrypted keys + messages)
-            const res = await fetch("/api/mmo/chat");
-            const data = await res.json();
-            if (!data.exists) { setChatPhase("pin-setup"); return; }
-            if (data.closed) { setChatClosed(true); setChatPhase("pin-setup"); return; }
+            // 1. Verify PIN server-side (rate-limited, 5 attempts/min)
+            const pinRes = await fetch("/api/mmo/chat/verify-pin", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ pin: chatPin }),
+            });
 
-            // 2. Verify PIN client-side (bcrypt)
-            const bcrypt = await import("bcryptjs");
-            const match = await bcrypt.compare(chatPin, data.pinHash);
-            if (!match) { setChatPinErr("Incorrect PIN"); setChatLoading(false); return; }
+            if (pinRes.status === 429) {
+                const d = await pinRes.json().catch(() => ({}));
+                setChatPinErr(d.error || "Too many attempts. Try again later.");
+                setChatLoading(false);
+                return;
+            }
 
-            // 3. Decrypt the stored private key using PIN-derived wrapping key
+            if (pinRes.status === 403) {
+                setChatPinErr("Incorrect PIN");
+                setChatLoading(false);
+                return;
+            }
+
+            if (!pinRes.ok) {
+                const d = await pinRes.json().catch(() => ({}));
+                setChatPinErr(d.error || "Verification failed");
+                setChatLoading(false);
+                return;
+            }
+
+            const pinData = await pinRes.json();
+            if (!pinData.verified) {
+                setChatPinErr("Incorrect PIN");
+                setChatLoading(false);
+                return;
+            }
+
+            // 2. Decrypt the stored private key using PIN-derived wrapping key
+            //    (key material is returned from verify-pin only on success)
             const wrappingKey = await pinToWrappingKey(chatPin);
-            const userPrivKey = await decryptPrivateKey(data.userEncPrivKey, data.userKeyIv, wrappingKey);
+            const userPrivKey = await decryptPrivateKey(pinData.userEncPrivKey, pinData.userKeyIv, wrappingKey);
+
+            // 3. Fetch chat messages + admin public key
+            const chatRes = await fetch("/api/mmo/chat");
+            const chatData = await chatRes.json();
+            if (!chatData.exists) { setChatPhase("pin-setup"); return; }
+            if (chatData.closed) { setChatClosed(true); setChatPhase("pin-setup"); return; }
 
             // 4. Derive shared AES key from ECDH(userPrivate, adminPublic)
-            if (!data.adminPubKey) { setChatPinErr("Admin chat not configured yet"); setChatLoading(false); return; }
-            const shared = await deriveSharedKey(userPrivKey, data.adminPubKey);
+            if (!chatData.adminPubKey) { setChatPinErr("Admin chat not configured yet"); setChatLoading(false); return; }
+            const shared = await deriveSharedKey(userPrivKey, chatData.adminPubKey);
             setSharedKey(shared);
 
             // 5. Decrypt messages
             const decrypted = await Promise.all(
-                data.messages.map(async (msg: ChatMessage) => {
+                chatData.messages.map(async (msg: ChatMessage) => {
                     try {
                         const plaintext = await decryptMessage(shared, msg.ciphertext, msg.iv);
                         return { ...msg, decrypted: plaintext ?? "[Unable to decrypt]" };

@@ -107,11 +107,16 @@ export const securityHeaders = {
     'X-Permitted-Cross-Domain-Policies': 'none',
     'Content-Security-Policy': [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+        // SECURITY: 'unsafe-eval' removed — it enables eval-based XSS vectors.
+        // Next.js production mode does not require it. If development HMR breaks,
+        // the dev server already injects its own permissive CSP.
+        "script-src 'self' 'unsafe-inline'",
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "font-src 'self' https://fonts.gstatic.com",
         "img-src 'self' data: blob: https:",
-        "connect-src 'self'",
+        // 'wss:' required for noVNC WebSocket connections to Proxmox VE.
+        // Shkeeper base URL added if configured (for crypto gateway polling).
+        `connect-src 'self' wss:${process.env.SHKEEPER_BASE_URL ? ` ${process.env.SHKEEPER_BASE_URL}` : ""}`,
         "frame-ancestors 'none'",
     ].join('; '),
 };

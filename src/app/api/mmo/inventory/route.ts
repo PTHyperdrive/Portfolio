@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { encryptInventoryData } from "@/lib/mmo-crypto";
 
 /** GET /api/mmo/inventory — Admin: list all categories with inventory counts */
 export async function GET() {
@@ -90,11 +91,11 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "All items invalid", details: errors }, { status: 400 });
         }
 
-        // Batch create
+        // Batch create — encrypt each item's data at rest (AES-256-GCM)
         const result = await prisma.mmoInventoryItem.createMany({
             data: validItems.map((data) => ({
                 categoryId,
-                data,
+                data: encryptInventoryData(data),
             })),
         });
 

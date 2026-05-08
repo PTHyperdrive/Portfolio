@@ -51,6 +51,56 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ status: "already_completed" });
         }
 
+        // Reject expired top-ups
+        if (topup.status === "EXPIRED" || new Date() > topup.expiresAt) {
+            if (topup.status !== "EXPIRED") {
+                await prisma.cryptoTopup.update({
+                    where: { id: topup.id },
+                    data: { status: "EXPIRED" },
+                });
+            }
+            return NextResponse.json({ status: "expired" });
+        }
+
+        // ── Amount Verification (anti-spoofing) ─────────────────────
+        // Prevent attackers from sending $0.01 to a valid address and
+        // getting full credits minted. Allows 0.1% tolerance for
+        // network fee deductions.
+        const receivedAmount = parseFloat(amount);
+        const expectedAmount = Number(topup.amountUsdt);
+        const tolerance = expectedAmount * 0.001; // 0.1%
+
+        if (isNaN(receivedAmount) || receivedAmount < expectedAmount - tolerance) {
+            console.warn(
+                `[webhook] Underpayment detected: expected ${expectedAmount} USDT, ` +
+                `received ${receivedAmount} USDT (topup ${topup.id})`
+            );
+            await prisma.cryptoTopup.update({
+                where: { id: topup.id },
+                data: {
+                    status: "UNDERPAID",
+                    txHash: txid || topup.txHash,
+                    confirmations,
+                },
+            });
+
+            void audit({
+                userId: topup.userId,
+                action: "CRYPTO_TOPUP_COMPLETED",
+                resourceType: "Billing",
+                resourceId: topup.id,
+                outcome: "FAILED",
+                metadata: {
+                    reason: "underpayment",
+                    expected: expectedAmount,
+                    received: receivedAmount,
+                    txHash: txid,
+                },
+            });
+
+            return NextResponse.json({ status: "underpaid", expected: expectedAmount, received: receivedAmount });
+        }
+
         // Determine chain and required confirmations
         const chain = topup.chain as "TRC20" | "ERC20";
         const requiredConfirmations = await getRequiredConfirmations();

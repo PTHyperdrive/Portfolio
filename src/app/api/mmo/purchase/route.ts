@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { safeDecrypt } from "@/lib/mmo-crypto";
 
 const MAX_ITEMS_PER_ORDER = 1000;
 const RETENTION_DAYS = 30;
@@ -114,7 +115,7 @@ export async function POST(req: NextRequest) {
             expiresAt: expiresAt.toISOString(),
             items: purchasedItems.map((item: { id: string; data: string; expiresAt: Date | null }) => ({
                 id: item.id,
-                data: item.data,
+                data: safeDecrypt(item.data),
                 expiresAt: item.expiresAt,
             })),
         });

@@ -10,6 +10,7 @@
 !.yarn/releases
 !.yarn/versions
 CHECKPOINT-*.md
+Checkpoint-*.md
 PERSONA.md
 ROLES.md
 CODING-STYLES.md

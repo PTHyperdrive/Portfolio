@@ -169,15 +169,26 @@ export async function getPaymentStatus(
 export function verifyWebhookSignature(rawBody: string, signatureHeader: string): boolean {
     const { webhookSecret } = getConfig();
     if (!webhookSecret) {
-        console.warn("[shkeeper] SHKEEPER_WEBHOOK_SECRET is not set — skipping signature validation");
-        return true; // Allow in development; production MUST set the secret
+        // SECURITY: Never allow unsigned webhooks — reject and log critical warning.
+        // An attacker could craft fake payloads to mint unlimited credits.
+        console.error(
+            "[shkeeper] CRITICAL: SHKEEPER_WEBHOOK_SECRET is not set. " +
+            "ALL webhooks will be REJECTED until configured. " +
+            "Set this variable immediately."
+        );
+        return false;
+    }
+
+    if (!signatureHeader) {
+        console.warn("[shkeeper] Webhook received without HMAC signature header");
+        return false;
     }
 
     const expectedSig = createHmac("sha256", webhookSecret)
         .update(rawBody)
         .digest("hex");
 
-    // Constant-time comparison
+    // Constant-time comparison to prevent timing attacks
     if (expectedSig.length !== signatureHeader.length) return false;
     let result = 0;
     for (let i = 0; i < expectedSig.length; i++) {

@@ -104,14 +104,14 @@ export async function GET() {
             id: chat.id,
             closed: chat.closed,
             closedAt: chat.closedAt,
-            // ECDH key material — client needs these to derive shared key
+            // ECDH public key — safe to expose (public by design)
             userPubKey: chat.userPubKey,
-            userEncPrivKey: chat.userEncPrivKey,
-            userKeyIv: chat.userKeyIv,
             adminPubKey: adminPubRow?.value ?? null,
-            // PIN verification
-            pinHash: chat.pinHash,
-            // Messages (still encrypted — client decrypts)
+            // SECURITY: pinHash, userEncPrivKey, and userKeyIv are NO LONGER
+            // sent here. They are returned only via POST /api/mmo/chat/verify-pin
+            // after server-side PIN verification (rate-limited, 5 attempts/min).
+            // This prevents offline brute-force cracking of the PIN hash.
+            // Messages (still encrypted — client decrypts after PIN unlock)
             messages: activeMessages,
         });
     } catch (err) {
