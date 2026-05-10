@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import speakeasy from "speakeasy";
 import { audit } from "@/lib/audit";
+import { safeDecryptTotpSecret } from "@/lib/totp-crypto";
 
 /**
  * POST /api/auth/2fa/verify
@@ -51,8 +52,9 @@ export async function POST(req: Request) {
         }
 
         // ── Verify the TOTP token ────────────────────────────────────────
+        const decryptedSecret = safeDecryptTotpSecret(user.twoFactorSecret);
         const isValid = speakeasy.totp.verify({
-            secret: user.twoFactorSecret,
+            secret: decryptedSecret,
             encoding: "base32",
             token,
         });

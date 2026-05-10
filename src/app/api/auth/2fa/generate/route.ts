@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import speakeasy from "speakeasy";
 import QRCode from "qrcode";
+import { encryptTotpSecret } from "@/lib/totp-crypto";
 
 /**
  * GET /api/auth/2fa/generate
@@ -43,11 +44,12 @@ export async function GET() {
         // ── 3. Generate QR Code data URI ─────────────────────────────────
         const qrCodeUrl = await QRCode.toDataURL(secret.otpauth_url as string);
 
-        // ── 4. Save the new secret and reset the enabled flag ─────────────
+        // ── 4. Save the new secret (encrypted) and reset the enabled flag ──
         // twoFactorEnabled stays/becomes false until the user verifies below
+        const encryptedSecret = encryptTotpSecret(manualKey);
         await prisma.user.update({
             where: { id: userId },
-            data: { twoFactorSecret: manualKey, twoFactorEnabled: false },
+            data: { twoFactorSecret: encryptedSecret, twoFactorEnabled: false },
         });
 
         return NextResponse.json({ secret: manualKey, qrCodeUrl });
