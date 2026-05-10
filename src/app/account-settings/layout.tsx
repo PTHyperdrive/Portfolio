@@ -15,16 +15,25 @@ export default function AccountSettingsLayout({
 
     return (
         <div style={{
-            minHeight: "100vh",
+            display: "flex",
+            flexDirection: "column",
+            height: "100vh",
+            width: "100%",
+            overflow: "hidden",
             backgroundColor: t.bgPrimary,
             color: t.textPrimary,
             fontFamily: t.fontFamily,
         }}>
             <SessionGuard />
-            <div style={{
+
+            {/* ── Fixed Top Bar ── */}
+            <header style={{
                 display: "flex", alignItems: "center", justifyContent: "space-between",
                 padding: "16px 48px",
                 borderBottom: `1px solid ${t.borderPrimary}`,
+                flexShrink: 0,
+                backgroundColor: t.bgPrimary,
+                zIndex: 10,
             }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     <Image
@@ -46,8 +55,15 @@ export default function AccountSettingsLayout({
                     <ArrowLeft style={{ width: 14, height: 14 }} />
                     Back to Console
                 </Link>
-            </div>
-            <main style={{ padding: "32px 48px" }}>
+            </header>
+
+            {/* ── Scrollable Content Area ── */}
+            <main style={{
+                flex: 1,
+                overflowY: "auto",
+                padding: "32px 48px 64px",
+                position: "relative",
+            }}>
                 {children}
             </main>
         </div>

@@ -37,12 +37,15 @@ The application uses **context-aware sidebar navigation**:
 |-------|--------|---------|
 | `/dashboard` | Full-width, no sidebar | None (Console Hub — GCP Welcome) |
 | `/dashboard/*` | Dashboard layout | Cloud infrastructure sidebar (no MMO) |
+| `/dashboard/settings` | Dashboard layout | Cloud sidebar — **context-aware settings** (fused) |
+| `/account-settings` | Standalone layout | None — **context-aware settings** (standalone) |
 | `/mmo/*` | MMO layout | MMO filter sidebar (categories, price, sort) |
 | `/adminsystemnrsp/*` | Admin layout | Admin-specific sidebar |
 
 - **Console Hub** (`/dashboard`): Full-width GCP-style service launcher with service cards, stats, and quick actions.
 - **Cloud Sidebar**: Shown for all `/dashboard/*` sub-routes. Does NOT contain MMO Market links.
 - **MMO Sidebar**: Completely isolated layout at `/mmo` with its own filter sidebar.
+- **Account Settings (Context-Aware)**: Both `/dashboard/settings` and `/account-settings` render the shared `AccountSettingsView` component. Sidebar navigation routes to `/dashboard/settings` (sidebar stays). Console Hub dropdown routes to `/account-settings` (standalone).
 - The Sidebar brand logo links back to `/dashboard` (Console Hub).
 
 ### File Naming

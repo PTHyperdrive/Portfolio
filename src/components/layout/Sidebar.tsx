@@ -330,23 +330,36 @@ export default function Sidebar() {
                 borderTop: `1px solid ${t.borderPrimary}`,
                 display: "flex", alignItems: "center", gap: "12px",
             }}>
-                <div style={{
-                    width: 34, height: 34, borderRadius: "50%", flexShrink: 0,
-                    background: t.isMono ? t.bgTertiary : "linear-gradient(135deg,#8b5cf6,#3b82f6)",
-                    border: t.isMono ? `1px solid ${t.borderPrimary}` : "none",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: "0.8rem", fontWeight: 700, color: t.textPrimary,
-                }}>
-                    {(session?.user?.name || session?.user?.email || "U")[0].toUpperCase()}
-                </div>
-                <div style={{ flex: 1, overflow: "hidden" }}>
-                    <p style={{ fontSize: "0.85rem", fontWeight: 700, color: t.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.4 }}>
-                        {session?.user?.name?.toUpperCase() || session?.user?.email?.split("@")[0]?.toUpperCase() || "GUEST"}
-                    </p>
-                    <p style={{ fontSize: "0.72rem", color: t.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.4 }}>
-                        {session?.user?.email || "Not signed in"}
-                    </p>
-                </div>
+                <Link
+                    href="/dashboard/settings"
+                    id="sidebar-profile-link"
+                    style={{
+                        display: "flex", alignItems: "center", gap: 12,
+                        flex: 1, overflow: "hidden", textDecoration: "none",
+                        borderRadius: 8, padding: "4px 6px", margin: "-4px -6px",
+                        transition: "background 0.15s",
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = t.bgCardHover; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
+                >
+                    <div style={{
+                        width: 34, height: 34, borderRadius: "50%", flexShrink: 0,
+                        background: t.isMono ? t.bgTertiary : "linear-gradient(135deg,#8b5cf6,#3b82f6)",
+                        border: t.isMono ? `1px solid ${t.borderPrimary}` : "none",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: "0.8rem", fontWeight: 700, color: t.textPrimary,
+                    }}>
+                        {(session?.user?.name || session?.user?.email || "U")[0].toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1, overflow: "hidden" }}>
+                        <p style={{ fontSize: "0.85rem", fontWeight: 700, color: t.textPrimary, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.4 }}>
+                            {session?.user?.name?.toUpperCase() || session?.user?.email?.split("@")[0]?.toUpperCase() || "GUEST"}
+                        </p>
+                        <p style={{ fontSize: "0.72rem", color: t.textMuted, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", lineHeight: 1.4 }}>
+                            {session?.user?.email || "Not signed in"}
+                        </p>
+                    </div>
+                </Link>
                 <button
                     onClick={() => signOut({ callbackUrl: "/" })}
                     title="Log out"
