@@ -63,6 +63,8 @@ export default function AccountSettingsLayout({
                 overflowY: "auto",
                 padding: "32px 48px 64px",
                 position: "relative",
+                display: "flex",
+                justifyContent: "center",
             }}>
                 {children}
             </main>
