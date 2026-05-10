@@ -21,6 +21,7 @@ model User {
   hasUsedTrial  Boolean   @default(false)
   twoFactorEnabled Boolean @default(false)
   twoFactorSecret  String?
+  loginWith2FA     Boolean @default(false)
   canInvite     Boolean   @default(false) // Admin toggle: allows user to generate invite codes
   trialExpiresAt DateTime?
   activePlan    String?
