@@ -432,6 +432,7 @@ export default function AccountSettingsView() {
 
                 {/* ── Preferences Tab ─────────────────────────────────────── */}
                 {activeTab === "preferences" && (
+                    <>
                     <div style={{ ...card, padding: "32px", display: "flex", flexDirection: "column", gap: "28px" }}>
                         <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "4px", color: t.textPrimary }}>Display & Network Preferences</h3>
                         <div>
@@ -523,6 +524,7 @@ export default function AccountSettingsView() {
                             </div>
                         )}
                     </div>
+                    </>
                 )}
 
                 {/* ── Security Tab ─────────────────────────────────────────── */}
