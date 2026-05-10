@@ -10,9 +10,13 @@ export async function PATCH(req: Request) {
         }
 
         const body = await req.json();
-        const { name, email } = body as { name?: string; email?: string };
+        const { name, email, loginWith2FA } = body as {
+            name?: string;
+            email?: string;
+            loginWith2FA?: boolean;
+        };
 
-        if (!name && !email) {
+        if (name === undefined && email === undefined && loginWith2FA === undefined) {
             return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
         }
 
@@ -31,8 +35,9 @@ export async function PATCH(req: Request) {
             data: {
                 ...(name !== undefined && { name }),
                 ...(email !== undefined && { email }),
+                ...(loginWith2FA !== undefined && { loginWith2FA }),
             },
-            select: { id: true, name: true, email: true },
+            select: { id: true, name: true, email: true, loginWith2FA: true },
         });
 
         return NextResponse.json({ user: updated });
