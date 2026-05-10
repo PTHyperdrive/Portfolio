@@ -10,7 +10,7 @@
 import bcrypt from "bcryptjs";
 
 // Inline Prisma client — avoids import path issues with generated client
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "../src/generated/prisma";
 const prisma = new PrismaClient();
 
 const ADMIN_EMAIL    = "admin@notrespond.com";
