@@ -38,6 +38,8 @@ export default function AccountSettingsView() {
     // Preferences state
     const [language, setLanguage] = useState("en");
     const [network, setNetwork] = useState("auto");
+    const [loginWith2FA, setLoginWith2FA] = useState(false);
+    const [login2FASaving, setLogin2FASaving] = useState(false);
 
     // Security state — 2FA
     const [is2FAEnabled, setIs2FAEnabled] = useState(false);
@@ -60,9 +62,12 @@ export default function AccountSettingsView() {
     useEffect(() => {
         fetch("/api/overview")
             .then(r => r.json())
-            .then((d: { user?: { twoFactorEnabled?: boolean } }) => {
+            .then((d: { user?: { twoFactorEnabled?: boolean; loginWith2FA?: boolean } }) => {
                 if (d?.user?.twoFactorEnabled) {
                     setIs2FAEnabled(true);
+                }
+                if (d?.user?.loginWith2FA) {
+                    setLoginWith2FA(true);
                 }
             })
             .catch(() => { /* non-critical — toggle stays off */ });
@@ -461,6 +466,62 @@ export default function AccountSettingsView() {
                         }}>
                             Save Preferences
                         </button>
+                    </div>
+
+                    {/* Login Security Preference */}
+                    <div style={{ ...card, padding: "28px", marginTop: 24 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                            <div>
+                                <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "4px", color: t.textPrimary, display: "flex", alignItems: "center", gap: 8 }}>
+                                    <ShieldCheck style={{ width: 18, height: 18, color: t.accentPrimary }} />
+                                    Require 2FA at Login
+                                </h3>
+                                <p style={{ fontSize: "0.82rem", color: t.textMuted, maxWidth: 420 }}>
+                                    {is2FAEnabled
+                                        ? "When enabled, you must enter a 6-digit authenticator code every time you sign in."
+                                        : "You need to enable Two-Factor Authentication in the Security tab first."}
+                                </p>
+                            </div>
+                            <button
+                                id="login-2fa-toggle"
+                                onClick={async () => {
+                                    if (!is2FAEnabled) return;
+                                    setLogin2FASaving(true);
+                                    try {
+                                        const res = await fetch("/api/user/profile", {
+                                            method: "PATCH",
+                                            headers: { "Content-Type": "application/json" },
+                                            body: JSON.stringify({ loginWith2FA: !loginWith2FA }),
+                                        });
+                                        if (res.ok) setLoginWith2FA(!loginWith2FA);
+                                    } catch { /* silent */ } finally {
+                                        setLogin2FASaving(false);
+                                    }
+                                }}
+                                disabled={!is2FAEnabled || login2FASaving}
+                                aria-label={loginWith2FA ? "Disable login 2FA" : "Enable login 2FA"}
+                                style={{
+                                    width: 52, height: 28, borderRadius: 14, border: "none",
+                                    cursor: !is2FAEnabled || login2FASaving ? "not-allowed" : "pointer",
+                                    background: loginWith2FA ? t.accentPrimary : `${t.textMuted}33`,
+                                    position: "relative", transition: "background 0.25s", flexShrink: 0,
+                                    opacity: !is2FAEnabled ? 0.35 : login2FASaving ? 0.6 : 1,
+                                }}
+                            >
+                                <span style={{
+                                    position: "absolute", top: 4,
+                                    left: loginWith2FA ? 26 : 4,
+                                    width: 20, height: 20, borderRadius: "50%",
+                                    background: "#fff", transition: "left 0.25s",
+                                }} />
+                            </button>
+                        </div>
+                        {loginWith2FA && is2FAEnabled && (
+                            <div style={{ marginTop: 14, padding: "12px 16px", borderRadius: t.isMono ? 4 : 8, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}33`, display: "flex", alignItems: "center", gap: 8 }}>
+                                <ShieldCheck style={{ width: 16, height: 16, color: t.statusSuccess, flexShrink: 0 }} />
+                                <p style={{ fontSize: "0.82rem", fontWeight: 600, color: t.statusSuccess }}>Login 2FA is active. A code will be required at every sign-in.</p>
+                            </div>
+                        )}
                     </div>
                 )}
 
