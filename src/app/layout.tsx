@@ -54,7 +54,7 @@ export default async function RootLayout({
   const { headers } = await import("next/headers");
   const hdrs = await headers();
   const pathname = hdrs.get("x-pathname") ?? "";
-  const isBare = pathname.startsWith("/console-window");
+  const isBare = pathname.startsWith("/console-window") || pathname.startsWith("/dashboard");
 
   return (
     <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable} ${roboto.variable} ${robotoMono.variable}`} style={{ scrollBehavior: "smooth" }}>

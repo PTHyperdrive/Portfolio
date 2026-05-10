@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 
 export default function LoginPage() {
@@ -11,6 +11,9 @@ export default function LoginPage() {
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const router = useRouter();
+    const searchParams = useSearchParams();
+    // Honour callbackUrl from middleware, default to Console overview
+    const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -29,7 +32,7 @@ export default function LoginPage() {
             } else {
                 // Fire-and-forget: log the login event
                 fetch("/api/auth/log-login", { method: "POST" }).catch(() => {});
-                router.push("/dashboard");
+                router.push(callbackUrl);
             }
         } catch {
             setError("An unexpected error occurred.");

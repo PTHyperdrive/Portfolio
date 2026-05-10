@@ -2,23 +2,19 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
+import { useSession } from "next-auth/react";
 import { useThemeTokens } from "@/lib/useThemeTokens";
 import { useCredits } from "@/components/CreditProvider";
 import {
-    Zap, CreditCard, KeyRound, MessageSquare, Monitor,
-    FileText, BookOpen, HelpCircle, Cloud, ChevronRight,
-    AlertTriangle, Clock, Server
+    Server, HardDrive, Globe, Wallet, ShoppingBag,
+    KeyRound, Users, MessageSquare, Plus, CreditCard,
+    Ticket, CloudUpload, ChevronRight, LayoutGrid,
+    AlertTriangle, ArrowRight
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
-interface VpsInstance {
-    id: string;
-    vmId: string;
-    name: string;
-    os: string;
-    status: string;
-    node: string;
-    ipAddress: string | null;
-}
+/* ─── Types ─── */
 
 interface OverviewData {
     user: {
@@ -29,21 +25,50 @@ interface OverviewData {
         twoFactorEnabled: boolean;
         activePlan: string | null;
     };
-    vpsInstances: VpsInstance[];
+    vpsInstances: {
+        id: string;
+        vmId: string;
+        name: string;
+        status: string;
+    }[];
 }
 
-function getGreeting() {
+interface ServiceCard {
+    label: string;
+    description: string;
+    Icon: LucideIcon;
+    href: string;
+    color: string;
+}
+
+/* ─── Helpers ─── */
+
+function getGreeting(): string {
     const h = new Date().getHours();
     if (h < 12) return "Good morning";
     if (h < 18) return "Good afternoon";
     return "Good evening";
 }
 
-export default function OverviewPage() {
+function planDisplayName(plan: string | null | undefined): string {
+    if (!plan) return "No active plan";
+    const map: Record<string, string> = {
+        free_trial: "Free Trial",
+        starter: "Starter",
+        pro: "Pro",
+        enterprise: "Enterprise",
+    };
+    return map[plan] ?? plan;
+}
+
+/* ─── Component ─── */
+
+export default function ConsoleHubPage() {
     const [data, setData] = useState<OverviewData | null>(null);
     const [loading, setLoading] = useState(true);
     const t = useThemeTokens();
     const { credits: globalCredits } = useCredits();
+    const { data: session } = useSession();
 
     useEffect(() => {
         fetch("/api/overview")
@@ -52,6 +77,17 @@ export default function OverviewPage() {
             .finally(() => setLoading(false));
     }, []);
 
+    /* ─── Derived ─── */
+    const user = data?.user;
+    const firstName = user?.name?.split(" ")[0] || user?.email?.split("@")[0] || "there";
+    const vpsCount = data?.vpsInstances?.length ?? 0;
+    const runningCount = data?.vpsInstances?.filter(v => v.status === "running").length ?? 0;
+    const currentPlan = planDisplayName(
+        user?.activePlan
+        ?? (session?.user as Record<string, unknown>)?.activePlan as string | null
+    );
+
+    /* ─── Style helpers ─── */
     const card = {
         background: t.bgCard,
         border: `1px solid ${t.borderPrimary}`,
@@ -59,201 +95,296 @@ export default function OverviewPage() {
         boxShadow: t.shadow,
     } as React.CSSProperties;
 
-    const statusStyle = (s: string) => ({
-        dot: s === "running" ? t.statusSuccess : s === "stopped" ? t.statusError : t.statusWarning,
-        label: s === "running" ? "Running" : s === "stopped" ? "Stopped" : "Provisioning",
-    });
+    /* ─── Quick Actions ─── */
+    const QUICK_ACTIONS = [
+        { label: "Create a VM", href: "/dashboard/billing", Icon: Plus },
+        { label: "Add Credit", href: "/dashboard/billing", Icon: CreditCard },
+        { label: "Open a Ticket", href: "/dashboard/tickets", Icon: Ticket },
+        { label: "Deploy Storage", href: "/dashboard/storage", Icon: CloudUpload },
+    ];
 
+    /* ─── Service Cards ─── */
+    const SERVICE_CARDS: ServiceCard[] = [
+        { label: "Compute Engine", description: "Virtual machines & bare metal", Icon: Server, href: "/dashboard/vps", color: t.accentPrimary },
+        { label: "Storage & Backups", description: "Nextcloud, block storage, snapshots", Icon: HardDrive, href: "/dashboard/storage", color: t.statusSuccess },
+        { label: "Network", description: "VPN, proxy, DNS configuration", Icon: Globe, href: "/dashboard/networks", color: t.accentSecondary },
+        { label: "Billing & Credits", description: `${globalCredits.toLocaleString()} credits available`, Icon: Wallet, href: "/dashboard/billing", color: t.statusWarning },
+        { label: "MMO Marketplace", description: "Game accounts & digital assets", Icon: ShoppingBag, href: "/mmo", color: t.statusError },
+        { label: "SSH Keys", description: "Manage authentication keys", Icon: KeyRound, href: "/dashboard/ssh", color: t.textSecondary },
+        { label: "Team & IAM", description: "Members, roles, audit log", Icon: Users, href: "/dashboard/team", color: t.accentPrimary },
+        { label: "Support Tickets", description: "Get help from NRSP Cloud", Icon: MessageSquare, href: "/dashboard/tickets", color: t.statusSuccess },
+    ];
+
+    /* ─── Loading State ─── */
     if (loading) {
         return (
-            <div style={{ padding: "48px 36px", background: t.bgPrimary, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <p style={{ color: t.textMuted }}>Loading...</p>
+            <div style={{
+                minHeight: "100vh", display: "flex", alignItems: "center",
+                justifyContent: "center", backgroundColor: t.bgPrimary,
+            }}>
+                <div style={{ textAlign: "center" }}>
+                    <div style={{
+                        width: 48, height: 48, borderRadius: "50%",
+                        border: `3px solid ${t.borderPrimary}`,
+                        borderTopColor: t.accentPrimary,
+                        animation: "spin 0.8s linear infinite",
+                        margin: "0 auto 16px",
+                    }} />
+                    <p style={{ color: t.textMuted, fontSize: "0.875rem" }}>Loading console...</p>
+                    <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+                </div>
             </div>
         );
     }
 
-    const user = data?.user;
-    const vps = data?.vpsInstances ?? [];
-    const firstName = user?.name?.split(" ")[0] || user?.email?.split("@")[0] || "there";
-
-    const QUICK_ACTIONS = [
-        { label: "Deploy New Server", href: "/dashboard/billing", Icon: Zap },
-        { label: "Add Credit", href: "/dashboard/billing", Icon: CreditCard },
-        { label: "SSH Keys", href: "/dashboard/ssh", Icon: KeyRound },
-        { label: "Open Ticket", href: "/dashboard/tickets", Icon: MessageSquare },
-    ];
-
-    const SUPPORT_LINKS = [
-        { label: "Developer Docs", Icon: FileText, href: "#" },
-        { label: "How-to Guides", Icon: BookOpen, href: "#" },
-        { label: "FAQs", Icon: HelpCircle, href: "#" },
-        { label: "NRSP Cloud Features", Icon: Cloud, href: "#" },
-    ];
-
     return (
-        <div style={{ padding: "32px 36px", minHeight: "100vh", backgroundColor: t.bgPrimary }}>
+        <div style={{
+            minHeight: "100vh",
+            backgroundColor: t.bgPrimary,
+            padding: "0 48px 48px",
+        }}>
+            {/* ─── Top Bar ─── */}
+            <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "20px 0", borderBottom: `1px solid ${t.borderPrimary}`,
+                marginBottom: 32,
+            }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    <Image
+                        src="/logo.png" alt="NRSP Cloud" width={32} height={32}
+                        style={{ objectFit: "contain", filter: t.isLight ? "none" : "brightness(0) invert(1)" }}
+                    />
+                    <span style={{
+                        fontWeight: 800, fontSize: "1.05rem", color: t.textPrimary,
+                        letterSpacing: "-0.02em",
+                    }}>
+                        Not<span style={{ color: t.accentPrimary }}>Respond</span>
+                    </span>
+                </div>
+                <Link
+                    href="/dashboard/vps"
+                    style={{
+                        display: "flex", alignItems: "center", gap: 6,
+                        fontSize: "0.82rem", color: t.accentPrimary, textDecoration: "none",
+                        fontWeight: 600,
+                    }}
+                >
+                    <LayoutGrid style={{ width: 14, height: 14 }} />
+                    Go to Dashboard
+                    <ChevronRight style={{ width: 14, height: 14 }} />
+                </Link>
+            </div>
 
-            {/* Breadcrumb */}
-            <p style={{ fontSize: "0.78rem", color: t.textMuted, marginBottom: 24 }}>
-                Dashboard &nbsp;&bull;&nbsp; Overview
-            </p>
-
-            {/* 2FA Warning Banner */}
+            {/* ─── 2FA Warning ─── */}
             {user && !user.twoFactorEnabled && (
                 <div style={{
                     display: "flex", alignItems: "center", gap: 14,
-                    padding: "14px 20px", marginBottom: 16, borderRadius: t.isMono ? 4 : 10,
+                    padding: "14px 20px", marginBottom: 24, borderRadius: t.cardRadius,
                     background: t.statusWarningBg, border: `1px solid ${t.statusWarning}33`,
                     color: t.statusWarning,
                 }}>
                     <AlertTriangle style={{ width: 20, height: 20, flexShrink: 0 }} />
                     <p style={{ fontSize: "0.875rem", lineHeight: 1.5 }}>
-                        NRSP Cloud recommends enabling two-factor authentication to enhance your account security.{" "}
+                        Two-factor authentication is not enabled.{" "}
                         <Link href="/dashboard/settings" style={{ color: t.accentPrimary, fontWeight: 700, textDecoration: "underline" }}>
-                            Click here
-                        </Link>{" "}
-                        to set it up now.
+                            Enable now
+                        </Link>
                     </p>
                 </div>
             )}
 
-            {/* Main Two-Column Grid */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: 24, alignItems: "start", width: "100%" }}>
+            {/* ─── Welcome Header ─── */}
+            <div style={{ marginBottom: 32 }}>
+                <h1 style={{
+                    fontSize: "1.8rem", fontWeight: 400, color: t.textPrimary,
+                    marginBottom: 8, letterSpacing: "-0.01em",
+                    fontFamily: t.fontFamily,
+                }}>
+                    {getGreeting()}, {firstName}
+                </h1>
+                <p style={{ fontSize: "0.9rem", color: t.textSecondary }}>
+                    Current plan: <span style={{ fontWeight: 700, color: t.accentPrimary }}>{currentPlan}</span>
+                </p>
+            </div>
 
-                {/* LEFT COLUMN */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-
-                    {/* Greeting + Quick Actions */}
-                    <div style={{ ...card, padding: 28 }}>
-                        <h2 style={{ fontSize: "1.3rem", fontWeight: 800, color: t.textPrimary, marginBottom: 6 }}>
-                            {getGreeting()}, {firstName}
-                        </h2>
-                        <p style={{ color: t.textMuted, fontSize: "0.875rem", marginBottom: 24 }}>
-                            Here&apos;s a snapshot of your NRSP Cloud workspace.
-                        </p>
-
-                        <p style={{ fontSize: "0.72rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 12 }}>
-                            Quick Actions
-                        </p>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
-                            {QUICK_ACTIONS.map(a => (
-                                <Link key={a.label} href={a.href} style={{
-                                    display: "inline-flex", alignItems: "center", gap: 8,
-                                    padding: "8px 16px", borderRadius: t.isMono ? 4 : 8, textDecoration: "none",
-                                    background: t.accentPrimaryMuted, border: `1px solid ${t.accentPrimary}33`,
-                                    color: t.accentPrimary, fontSize: "0.85rem", fontWeight: 600,
-                                    transition: "all 0.15s",
-                                }}>
-                                    <a.Icon style={{ width: 14, height: 14 }} /> {a.label}
-                                </Link>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Instances Panel */}
-                    <div style={{ ...card, overflow: "hidden" }}>
-                        <div style={{ padding: "20px 24px", borderBottom: `1px solid ${t.borderSecondary}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                <Server style={{ width: 18, height: 18, color: t.accentPrimary }} />
-                                <p style={{ fontWeight: 700, color: t.textPrimary, fontSize: "0.95rem" }}>Your Instances</p>
-                            </div>
-                            <Link href="/dashboard/vps" style={{ fontSize: "0.8rem", color: t.accentPrimary, textDecoration: "none", fontWeight: 600 }}>
-                                View all &rarr;
-                            </Link>
-                        </div>
-
-                        {vps.length === 0 ? (
-                            <div style={{ padding: "56px 24px", textAlign: "center" as const }}>
-                                <div style={{ width: 64, height: 64, borderRadius: 16, background: t.accentPrimaryMuted, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
-                                    <Monitor style={{ width: 28, height: 28, color: t.accentPrimary }} />
-                                </div>
-                                <p style={{ fontWeight: 700, color: t.textPrimary, fontSize: "1rem", marginBottom: 8 }}>No services yet</p>
-                                <p style={{ color: t.textMuted, fontSize: "0.875rem", marginBottom: 24 }}>
-                                    Deploy your first server to get started with NRSP Cloud
-                                </p>
-                                <Link href="/dashboard/billing" style={{
-                                    display: "inline-flex", alignItems: "center", gap: 8,
-                                    padding: "10px 22px", borderRadius: t.buttonRadius, textDecoration: "none",
-                                    background: t.accentPrimary, color: t.textInverse, fontSize: "0.875rem", fontWeight: 700,
-                                }}>
-                                    <Zap style={{ width: 14, height: 14 }} /> Deploy New Server
-                                </Link>
-                            </div>
-                        ) : (
-                            <div>
-                                {vps.map(vm => {
-                                    const ss = statusStyle(vm.status);
-                                    return (
-                                        <div key={vm.id} style={{ padding: "14px 24px", borderBottom: `1px solid ${t.borderSecondary}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                                            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                                                <div style={{ width: 8, height: 8, borderRadius: "50%", background: ss.dot, flexShrink: 0 }} />
-                                                <div>
-                                                    <p style={{ fontWeight: 700, color: t.textPrimary, fontSize: "0.9rem" }}>{vm.name}</p>
-                                                    <p style={{ color: t.textMuted, fontSize: "0.78rem" }}>{vm.os} &middot; {vm.node} &middot; VM {vm.vmId}</p>
-                                                </div>
-                                            </div>
-                                            <div style={{ textAlign: "right" as const }}>
-                                                <span style={{ fontSize: "0.78rem", fontWeight: 700, color: ss.dot }}>{ss.label}</span>
-                                                {vm.ipAddress && <p style={{ color: t.textMuted, fontSize: "0.75rem", fontFamily: t.fontMono }}>{vm.ipAddress}</p>}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                {/* RIGHT COLUMN */}
-                <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-
-                    {/* Cloud Credit Card */}
-                    <div style={{ ...card, padding: 24, textAlign: "center" as const }}>
-                        <div style={{ width: 56, height: 56, borderRadius: "50%", background: t.accentPrimaryMuted, margin: "0 auto 14px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                            <Clock style={{ width: 24, height: 24, color: t.accentPrimary }} />
-                        </div>
-                        <p style={{ fontWeight: 800, color: t.textPrimary, fontSize: "1rem", marginBottom: 4 }}>
-                            {user?.name || user?.email?.split("@")[0]}
-                        </p>
-                        <p style={{ fontSize: "0.75rem", color: t.textMuted, marginBottom: 20 }}>Cloud Credit</p>
-                        <p style={{ fontSize: "2rem", fontWeight: 900, color: t.textPrimary, marginBottom: 20 }}>
-                            {globalCredits.toLocaleString()} <span style={{ fontSize: "1rem", color: t.textMuted }}>Credits</span>
-                        </p>
-                        <Link href="/dashboard/billing/topup" style={{
-                            display: "block", padding: "10px 0", borderRadius: t.buttonRadius, textDecoration: "none",
-                            background: t.accentPrimary, color: t.textInverse, fontWeight: 700, fontSize: "0.875rem",
-                            textAlign: "center",
+            {/* ─── Stats Row ─── */}
+            <div style={{
+                display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                gap: 16, marginBottom: 32,
+            }}>
+                {/* Credit Balance */}
+                <div style={{ ...card, padding: "20px 24px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                        <div style={{
+                            width: 36, height: 36, borderRadius: t.isMono ? 6 : 10,
+                            background: t.statusWarningBg, display: "flex",
+                            alignItems: "center", justifyContent: "center",
                         }}>
-                            Add Credit
-                        </Link>
-                    </div>
-
-                    {/* Support Links */}
-                    <div style={{ ...card, overflow: "hidden" }}>
-                        <div style={{ padding: "16px 20px", borderBottom: `1px solid ${t.borderSecondary}` }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                <HelpCircle style={{ width: 16, height: 16, color: t.statusSuccess }} />
-                                <p style={{ fontWeight: 700, color: t.textPrimary, fontSize: "0.9rem" }}>Support</p>
-                            </div>
+                            <Wallet style={{ width: 18, height: 18, color: t.statusWarning }} />
                         </div>
-                        {SUPPORT_LINKS.map(item => (
-                            <Link key={item.label} href={item.href} style={{
-                                display: "flex", alignItems: "center", justifyContent: "space-between",
-                                padding: "13px 20px", borderBottom: `1px solid ${t.borderSecondary}`,
-                                textDecoration: "none", color: t.textSecondary, fontSize: "0.875rem",
-                                transition: "background 0.1s",
-                            }}
-                                onMouseEnter={e => (e.currentTarget.style.background = t.bgCardHover)}
-                                onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-                            >
-                                <span style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                    <item.Icon style={{ width: 15, height: 15, color: t.textMuted }} /> {item.label}
-                                </span>
-                                <ChevronRight style={{ width: 14, height: 14, color: t.textMuted }} />
-                            </Link>
-                        ))}
+                        <span style={{ fontSize: "0.75rem", fontWeight: 600, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                            Credit Balance
+                        </span>
                     </div>
+                    <p style={{ fontSize: "1.6rem", fontWeight: 800, color: t.textPrimary, fontFamily: t.fontMono }}>
+                        {globalCredits.toLocaleString()}
+                    </p>
+                    <Link href="/dashboard/billing" style={{
+                        fontSize: "0.78rem", color: t.accentPrimary, textDecoration: "none",
+                        fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4, marginTop: 6,
+                    }}>
+                        Add credit <ArrowRight style={{ width: 12, height: 12 }} />
+                    </Link>
                 </div>
+
+                {/* Active VMs */}
+                <div style={{ ...card, padding: "20px 24px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                        <div style={{
+                            width: 36, height: 36, borderRadius: t.isMono ? 6 : 10,
+                            background: t.accentPrimaryMuted, display: "flex",
+                            alignItems: "center", justifyContent: "center",
+                        }}>
+                            <Server style={{ width: 18, height: 18, color: t.accentPrimary }} />
+                        </div>
+                        <span style={{ fontSize: "0.75rem", fontWeight: 600, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                            Virtual Machines
+                        </span>
+                    </div>
+                    <p style={{ fontSize: "1.6rem", fontWeight: 800, color: t.textPrimary, fontFamily: t.fontMono }}>
+                        {vpsCount}
+                    </p>
+                    <p style={{ fontSize: "0.75rem", color: t.textMuted, marginTop: 6 }}>
+                        {runningCount} running
+                    </p>
+                </div>
+
+                {/* Current Plan */}
+                <div style={{ ...card, padding: "20px 24px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                        <div style={{
+                            width: 36, height: 36, borderRadius: t.isMono ? 6 : 10,
+                            background: t.statusSuccessBg, display: "flex",
+                            alignItems: "center", justifyContent: "center",
+                        }}>
+                            <CreditCard style={{ width: 18, height: 18, color: t.statusSuccess }} />
+                        </div>
+                        <span style={{ fontSize: "0.75rem", fontWeight: 600, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                            Active Plan
+                        </span>
+                    </div>
+                    <p style={{ fontSize: "1.2rem", fontWeight: 800, color: t.textPrimary }}>
+                        {currentPlan}
+                    </p>
+                    <Link href="/dashboard/billing" style={{
+                        fontSize: "0.78rem", color: t.accentPrimary, textDecoration: "none",
+                        fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4, marginTop: 6,
+                    }}>
+                        Manage plan <ArrowRight style={{ width: 12, height: 12 }} />
+                    </Link>
+                </div>
+            </div>
+
+            {/* ─── Quick Actions ─── */}
+            <div style={{ marginBottom: 36 }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                    {QUICK_ACTIONS.map(a => (
+                        <Link key={a.label} href={a.href} id={`qa-${a.label.toLowerCase().replace(/\s+/g, "-")}`} style={{
+                            display: "inline-flex", alignItems: "center", gap: 8,
+                            padding: "10px 20px", borderRadius: t.buttonRadius,
+                            background: t.accentPrimaryMuted,
+                            border: `1px solid ${t.accentPrimary}33`,
+                            color: t.accentPrimary, fontSize: "0.85rem", fontWeight: 600,
+                            textDecoration: "none", transition: "all 0.15s",
+                        }}>
+                            <a.Icon style={{ width: 15, height: 15 }} />
+                            {a.label}
+                        </Link>
+                    ))}
+                </div>
+            </div>
+
+            {/* ─── Quick Access — Service Cards ─── */}
+            <div style={{ marginBottom: 48 }}>
+                <h2 style={{
+                    fontSize: "1.1rem", fontWeight: 700, color: t.textPrimary,
+                    marginBottom: 20,
+                }}>
+                    Quick access
+                </h2>
+
+                <div style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+                    gap: 14,
+                }}>
+                    {SERVICE_CARDS.map(svc => (
+                        <Link
+                            key={svc.label}
+                            href={svc.href}
+                            id={`svc-${svc.label.toLowerCase().replace(/\s+/g, "-")}`}
+                            style={{
+                                ...card,
+                                padding: "20px 22px",
+                                textDecoration: "none",
+                                display: "flex",
+                                alignItems: "flex-start",
+                                gap: 14,
+                                transition: "all 0.15s",
+                                cursor: "pointer",
+                            }}
+                            onMouseEnter={e => {
+                                e.currentTarget.style.borderColor = svc.color + "55";
+                                e.currentTarget.style.background = t.bgCardHover;
+                            }}
+                            onMouseLeave={e => {
+                                e.currentTarget.style.borderColor = t.borderPrimary;
+                                e.currentTarget.style.background = t.bgCard;
+                            }}
+                        >
+                            <div style={{
+                                width: 40, height: 40, borderRadius: t.isMono ? 6 : 10,
+                                background: svc.color + "18",
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                flexShrink: 0,
+                            }}>
+                                <svc.Icon style={{ width: 20, height: 20, color: svc.color }} />
+                            </div>
+                            <div style={{ minWidth: 0 }}>
+                                <p style={{
+                                    fontSize: "0.9rem", fontWeight: 700, color: t.textPrimary,
+                                    marginBottom: 3,
+                                }}>
+                                    {svc.label}
+                                </p>
+                                <p style={{
+                                    fontSize: "0.78rem", color: t.textMuted, lineHeight: 1.4,
+                                }}>
+                                    {svc.description}
+                                </p>
+                            </div>
+                        </Link>
+                    ))}
+                </div>
+            </div>
+
+            {/* ─── View All Products Link ─── */}
+            <div style={{ textAlign: "center" }}>
+                <Link
+                    href="/services/vps"
+                    id="view-all-products"
+                    style={{
+                        display: "inline-flex", alignItems: "center", gap: 8,
+                        fontSize: "0.88rem", color: t.accentPrimary, textDecoration: "none",
+                        fontWeight: 600, padding: "10px 24px",
+                        borderRadius: t.buttonRadius,
+                        border: `1px solid ${t.accentPrimary}33`,
+                        transition: "all 0.15s",
+                    }}
+                >
+                    <LayoutGrid style={{ width: 16, height: 16 }} />
+                    View all products
+                </Link>
             </div>
         </div>
     );

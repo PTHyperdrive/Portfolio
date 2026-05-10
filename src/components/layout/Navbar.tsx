@@ -133,7 +133,7 @@ export default function Navbar() {
                     {!loggedIn && <NavLink href="/services/vpn" label="VPN" pathname={pathname} t={t} />}
                     <NavLink href="/mmo" label="MMO" pathname={pathname} t={t} />
                     <NavLink href="/blog" label="Blog" pathname={pathname} t={t} />
-                    {loggedIn && <NavLink href="/dashboard/vps" label="Dashboard" pathname={pathname} t={t} />}
+                    {loggedIn && <NavLink href="/dashboard" label="Console" pathname={pathname} t={t} />}
                 </div>
 
                 {/* Auth Area + Credits + Theme Toggle */}
@@ -236,7 +236,7 @@ export default function Navbar() {
                     {!loggedIn && <MobileLink href="/services/vpn" label="VPN" pathname={pathname} t={t} />}
                     <MobileLink href="/mmo" label="MMO" pathname={pathname} t={t} />
                     <MobileLink href="/blog" label="Blog" pathname={pathname} t={t} />
-                    {loggedIn && <MobileLink href="/dashboard/vps" label="Dashboard" pathname={pathname} t={t} />}
+                    {loggedIn && <MobileLink href="/dashboard" label="Console" pathname={pathname} t={t} />}
 
                     {/* Mobile Credit Display */}
                     {loggedIn && (

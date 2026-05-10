@@ -8,7 +8,7 @@ import { useSession, signOut } from "next-auth/react";
 import {
     LayoutGrid, Server, Gamepad2, Cloud, Key, Globe, Settings as SettingsIcon,
     Users, History, BarChart2, Wallet, User, Sliders, MessageSquare, Ticket,
-    ChevronDown, ChevronRight, LogOut, Shield, ShoppingBag
+    ChevronDown, ChevronRight, LogOut, Shield
 } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useThemeTokens } from "@/lib/useThemeTokens";
@@ -54,12 +54,7 @@ const SIDEBAR_STRUCTURE: NavGroup[] = [
             },
         ],
     },
-    {
-        title: "SERVICES",
-        items: [
-            { label: "MMO Market", icon: ShoppingBag, href: "/mmo" },
-        ],
-    },
+
     {
         title: "TEAM",
         items: [
@@ -151,7 +146,7 @@ export default function Sidebar() {
             fontFamily: t.fontFamily,
         }}>
             {/* ── Brand ── */}
-            <Link href="/" style={{
+            <Link href="/dashboard" style={{
                 display: "flex", alignItems: "center", gap: "12px",
                 padding: "20px 20px 18px", flexShrink: 0, textDecoration: "none",
             }}>
@@ -186,13 +181,13 @@ export default function Sidebar() {
                         borderRadius: t.isMono ? 6 : 10,
                         fontSize: "0.92rem", fontWeight: 600,
                         marginBottom: "20px", textDecoration: "none", transition: "all 0.15s",
-                        borderLeft: t.isMono && pathname === "/dashboard" ? `3px solid ${t.accentPrimary}` : "3px solid transparent",
-                        color: pathname === "/dashboard" ? t.accentPrimary : t.textSecondary,
-                        backgroundColor: pathname === "/dashboard" ? t.accentPrimaryMuted : "transparent",
+                        borderLeft: "3px solid transparent",
+                        color: t.textSecondary,
+                        backgroundColor: "transparent",
                     }}
                 >
                     <LayoutGrid style={{ width: 18, height: 18, flexShrink: 0 }} />
-                    Overview
+                    Console Home
                 </Link>
 
                 {/* Groups */}
