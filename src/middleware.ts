@@ -32,7 +32,8 @@ export function middleware(request: NextRequest) {
     // ── Protect Dashboard & Console-Window Routes ──
     const isAuthRoute = pathname.startsWith('/dashboard')
         || pathname.startsWith('/admin')
-        || pathname.startsWith('/console-window');
+        || pathname.startsWith('/console-window')
+        || pathname.startsWith('/account-settings');
 
     if (isAuthRoute && !token) {
         const loginUrl = new URL('/auth/login', request.url);

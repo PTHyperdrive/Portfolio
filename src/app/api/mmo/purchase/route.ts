@@ -2,12 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { safeDecrypt } from "@/lib/mmo-crypto";
+import { require2fa, twoFactorErrorResponse } from "@/lib/require2fa";
 
 const MAX_ITEMS_PER_ORDER = 1000;
 const RETENTION_DAYS = 30;
+const BULK_THRESHOLD = 10;         // Items in one category that trigger 2FA
+const VELOCITY_COOLDOWN_MS = 120_000; // 2 minutes between orders
 
 /** POST /api/mmo/purchase — User: purchase items from a category
- *  Body: { categoryId: string, quantity: number }
+ *  Body: { categoryId: string, quantity: number, totpToken?: string }
+ *  - Enforces 2FA for users with 2FA enabled
+ *  - Enforces 2FA for bulk purchases (>10 items) or velocity violations (<2 min)
  *  - Deducts credits atomically
  *  - Assigns next unsold items FIFO
  *  - Sets expiresAt = now + 30 days
@@ -20,7 +25,8 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
         }
 
-        const { categoryId, quantity } = await req.json();
+        const body = await req.json();
+        const { categoryId, quantity, totpToken } = body;
         const qty = Number(quantity);
 
         if (!categoryId || !qty || qty < 1) {
@@ -53,6 +59,44 @@ export async function POST(req: NextRequest) {
                 required: totalCost,
                 available: user.credits,
             }, { status: 402 });
+        }
+
+        // ── 2FA Enforcement: always check if user has 2FA enabled ──
+        const twoFaCheck = await require2fa(user.id, totpToken);
+        if (!twoFaCheck.ok) {
+            return twoFactorErrorResponse(twoFaCheck.error!);
+        }
+
+        // ── Fraud Prevention: Bulk Buying (>10 items in one order) ──
+        // If user does NOT have 2FA enabled, still require 2FA for bulk orders
+        if (!user.twoFactorEnabled && qty > BULK_THRESHOLD) {
+            return NextResponse.json({
+                error: "2FA_RECOMMENDED",
+                message: `Purchasing more than ${BULK_THRESHOLD} items requires two-factor authentication. Please enable 2FA in Account Settings.`,
+            }, { status: 403 });
+        }
+
+        // ── Fraud Prevention: Velocity Check (<2 min since last order) ──
+        const lastPurchase = await prisma.mmoInventoryItem.findFirst({
+            where: { soldToId: user.id },
+            orderBy: { soldAt: "desc" },
+            select: { soldAt: true },
+        });
+
+        if (lastPurchase?.soldAt) {
+            const elapsed = Date.now() - lastPurchase.soldAt.getTime();
+            if (elapsed < VELOCITY_COOLDOWN_MS) {
+                // If user has 2FA enabled, we already verified above — allow through
+                // If user does NOT have 2FA enabled, enforce cooldown
+                if (!user.twoFactorEnabled) {
+                    const remainingSec = Math.ceil((VELOCITY_COOLDOWN_MS - elapsed) / 1000);
+                    return NextResponse.json({
+                        error: "VELOCITY_COOLDOWN",
+                        message: `Please wait ${remainingSec} seconds before making another purchase, or enable 2FA to bypass this cooldown.`,
+                        retryAfterSeconds: remainingSec,
+                    }, { status: 429 });
+                }
+            }
         }
 
         // Find unsold items FIFO

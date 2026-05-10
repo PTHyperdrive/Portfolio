@@ -6,11 +6,12 @@ import Image from "next/image";
 import { useSession } from "next-auth/react";
 import { useThemeTokens } from "@/lib/useThemeTokens";
 import { useCredits } from "@/components/CreditProvider";
+import AccountDropdown from "@/components/layout/AccountDropdown";
 import {
     Server, HardDrive, Globe, Wallet, ShoppingBag,
     KeyRound, Users, MessageSquare, Plus, CreditCard,
-    Ticket, CloudUpload, ChevronRight, LayoutGrid,
-    AlertTriangle, ArrowRight
+    Ticket, CloudUpload, LayoutGrid,
+    AlertTriangle, ArrowRight, Shield
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -86,6 +87,7 @@ export default function ConsoleHubPage() {
         user?.activePlan
         ?? (session?.user as Record<string, unknown>)?.activePlan as string | null
     );
+    const isAdmin = (session?.user as Record<string, unknown>)?.role === "ADMIN";
 
     /* ─── Style helpers ─── */
     const card = {
@@ -161,19 +163,43 @@ export default function ConsoleHubPage() {
                         Not<span style={{ color: t.accentPrimary }}>Respond</span>
                     </span>
                 </div>
-                <Link
-                    href="/dashboard/vps"
+                <AccountDropdown />
+            </div>
+
+            {/* ─── Admin Banner ─── */}
+            {isAdmin && (
+                <div
+                    id="admin-banner"
                     style={{
-                        display: "flex", alignItems: "center", gap: 6,
-                        fontSize: "0.82rem", color: t.accentPrimary, textDecoration: "none",
-                        fontWeight: 600,
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        padding: "14px 20px", marginBottom: 16, borderRadius: t.cardRadius,
+                        background: t.accentPrimaryMuted,
+                        border: `1px solid ${t.accentPrimary}33`,
                     }}
                 >
-                    <LayoutGrid style={{ width: 14, height: 14 }} />
-                    Go to Dashboard
-                    <ChevronRight style={{ width: 14, height: 14 }} />
-                </Link>
-            </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <Shield style={{ width: 20, height: 20, color: t.accentPrimary, flexShrink: 0 }} />
+                        <p style={{ fontSize: "0.875rem", color: t.textPrimary, lineHeight: 1.5 }}>
+                            You are signed in as <span style={{ fontWeight: 700 }}>Administrator</span>. You have access to the system admin panel.
+                        </p>
+                    </div>
+                    <Link
+                        href="/adminsystemnrsp"
+                        id="admin-panel-link"
+                        style={{
+                            display: "inline-flex", alignItems: "center", gap: 6,
+                            padding: "8px 18px", borderRadius: t.buttonRadius,
+                            background: t.accentPrimary, color: t.textInverse,
+                            fontSize: "0.82rem", fontWeight: 700,
+                            textDecoration: "none", whiteSpace: "nowrap",
+                            transition: "opacity 0.15s",
+                        }}
+                    >
+                        <Shield style={{ width: 13, height: 13 }} />
+                        Open Admin Panel
+                    </Link>
+                </div>
+            )}
 
             {/* ─── 2FA Warning ─── */}
             {user && !user.twoFactorEnabled && (
@@ -318,7 +344,9 @@ export default function ConsoleHubPage() {
                     gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
                     gap: 14,
                 }}>
-                    {SERVICE_CARDS.map(svc => (
+                    {SERVICE_CARDS.map(svc => {
+                        const isMmo = svc.label === "MMO Marketplace";
+                        return (
                         <Link
                             key={svc.label}
                             href={svc.href}
@@ -332,14 +360,19 @@ export default function ConsoleHubPage() {
                                 gap: 14,
                                 transition: "all 0.15s",
                                 cursor: "pointer",
+                                ...(isMmo ? {
+                                    borderLeft: `3px solid ${svc.color}`,
+                                    background: svc.color + "08",
+                                } : {}),
                             }}
                             onMouseEnter={e => {
                                 e.currentTarget.style.borderColor = svc.color + "55";
-                                e.currentTarget.style.background = t.bgCardHover;
+                                e.currentTarget.style.background = isMmo ? svc.color + "14" : t.bgCardHover;
                             }}
                             onMouseLeave={e => {
-                                e.currentTarget.style.borderColor = t.borderPrimary;
-                                e.currentTarget.style.background = t.bgCard;
+                                e.currentTarget.style.borderColor = isMmo ? svc.color : t.borderPrimary;
+                                e.currentTarget.style.background = isMmo ? svc.color + "08" : t.bgCard;
+                                if (isMmo) e.currentTarget.style.borderLeftColor = svc.color;
                             }}
                         >
                             <div style={{
@@ -364,7 +397,8 @@ export default function ConsoleHubPage() {
                                 </p>
                             </div>
                         </Link>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
 

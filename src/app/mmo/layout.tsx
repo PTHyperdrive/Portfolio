@@ -10,7 +10,7 @@ import { useCredits } from "@/components/CreditProvider";
 import ThemeToggle from "@/components/ThemeToggle";
 import {
     ShoppingBag, SlidersHorizontal, Tag, ArrowLeft, ChevronDown,
-    LogOut, Shield, LayoutGrid, User, Home, Wallet, Layers
+    LogOut, LayoutGrid, User, Home, Wallet, Layers
 } from "lucide-react";
 
 type CategoryMeta = {
@@ -24,7 +24,6 @@ export default function MmoLayout({ children }: { children: React.ReactNode }) {
     const t = useThemeTokens();
     const pathname = usePathname();
     const { data: session } = useSession();
-    const isAdmin = (session?.user as { role?: string })?.role === "ADMIN";
     const { credits: globalCredits } = useCredits();
 
     /* ─── Filter Sidebar State ─── */
@@ -129,15 +128,15 @@ export default function MmoLayout({ children }: { children: React.ReactNode }) {
                         <Home style={{ width: 16, height: 16 }} /> Home
                     </Link>
 
-                    {/* Back to Dashboard */}
-                    <Link href="/dashboard/vps" style={{
+                    {/* Back to Console */}
+                    <Link href="/dashboard" style={{
                         display: "flex", alignItems: "center", gap: 10,
                         padding: "10px 12px", borderRadius: t.buttonRadius,
                         textDecoration: "none", marginBottom: 4,
                         color: t.textMuted, fontWeight: 500, fontSize: "0.85rem",
                         transition: "color 0.12s",
                     }}>
-                        <ArrowLeft style={{ width: 14, height: 14 }} /> Dashboard
+                        <ArrowLeft style={{ width: 14, height: 14 }} /> Back to Console
                     </Link>
                 </div>
 
@@ -275,17 +274,7 @@ export default function MmoLayout({ children }: { children: React.ReactNode }) {
                 <div style={{ marginTop: "auto", padding: "12px 16px", borderTop: `1px solid ${t.borderPrimary}` }}>
                     <ThemeToggle variant="sidebar" />
 
-                    {isAdmin && (
-                        <Link href="/adminsystemnrsp/mmo" style={{
-                            display: "flex", alignItems: "center", gap: 8,
-                            padding: "8px 12px", marginTop: 8, borderRadius: t.buttonRadius,
-                            background: t.statusWarningBg, border: `1px solid ${t.statusWarning}33`,
-                            textDecoration: "none", color: t.statusWarning,
-                            fontSize: "0.78rem", fontWeight: 700,
-                        }}>
-                            <Shield style={{ width: 13, height: 13 }} /> Admin Inventory
-                        </Link>
-                    )}
+
 
                     {session?.user && (
                         <button
