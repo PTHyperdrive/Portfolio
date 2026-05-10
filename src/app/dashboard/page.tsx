@@ -111,7 +111,6 @@ export default function ConsoleHubPage() {
         { label: "Storage & Backups", description: "Nextcloud, block storage, snapshots", Icon: HardDrive, href: "/dashboard/storage", color: t.statusSuccess },
         { label: "Network", description: "VPN, proxy, DNS configuration", Icon: Globe, href: "/dashboard/networks", color: t.accentSecondary },
         { label: "Billing & Credits", description: `${globalCredits.toLocaleString()} credits available`, Icon: Wallet, href: "/dashboard/billing", color: t.statusWarning },
-        { label: "MMO Marketplace", description: "Game accounts & digital assets", Icon: ShoppingBag, href: "/mmo", color: t.statusError },
         { label: "SSH Keys", description: "Manage authentication keys", Icon: KeyRound, href: "/dashboard/ssh", color: t.textSecondary },
         { label: "Team & IAM", description: "Members, roles, audit log", Icon: Users, href: "/dashboard/team", color: t.accentPrimary },
         { label: "Support Tickets", description: "Get help from NRSP Cloud", Icon: MessageSquare, href: "/dashboard/tickets", color: t.statusSuccess },
@@ -310,6 +309,50 @@ export default function ConsoleHubPage() {
                     </Link>
                 </div>
             </div>
+
+            {/* ─── MMO Marketplace Banner ─── */}
+            <Link
+                href="/mmo"
+                id="mmo-marketplace-banner"
+                style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    padding: "18px 24px", marginBottom: 32,
+                    borderRadius: t.cardRadius,
+                    background: t.bgCard,
+                    border: `1px solid ${t.statusError}33`,
+                    borderLeft: `3px solid ${t.statusError}`,
+                    boxShadow: t.shadow,
+                    textDecoration: "none",
+                    transition: "all 0.15s",
+                }}
+                onMouseEnter={e => {
+                    e.currentTarget.style.borderLeftColor = t.statusError;
+                    e.currentTarget.style.background = t.bgCardHover;
+                }}
+                onMouseLeave={e => {
+                    e.currentTarget.style.borderLeftColor = t.statusError;
+                    e.currentTarget.style.background = t.bgCard;
+                }}
+            >
+                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                    <div style={{
+                        width: 40, height: 40, borderRadius: t.isMono ? 6 : 10,
+                        background: `${t.statusError}1a`,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                        <ShoppingBag style={{ width: 20, height: 20, color: t.statusError }} />
+                    </div>
+                    <div>
+                        <p style={{ fontSize: "0.95rem", fontWeight: 700, color: t.textPrimary }}>
+                            MMO Marketplace
+                        </p>
+                        <p style={{ fontSize: "0.78rem", color: t.textMuted, marginTop: 2 }}>
+                            Game accounts & digital assets
+                        </p>
+                    </div>
+                </div>
+                <ArrowRight style={{ width: 16, height: 16, color: t.textMuted }} />
+            </Link>
 
             {/* ─── Quick Actions ─── */}
             <div style={{ marginBottom: 36 }}>

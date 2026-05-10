@@ -7,5 +7,9 @@ import AccountSettingsView from "@/components/AccountSettingsView";
  * Rendered when navigating from Console Hub or non-sidebar contexts.
  */
 export default function AccountSettingsPage() {
-    return <AccountSettingsView />;
+    return (
+        <div style={{ maxWidth: 800, margin: "0 auto" }}>
+            <AccountSettingsView />
+        </div>
+    );
 }

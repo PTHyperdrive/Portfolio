@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import {
     LayoutGrid, Server, Gamepad2, Cloud, Key, Globe, Settings as SettingsIcon,
@@ -77,6 +77,7 @@ const SIDEBAR_STRUCTURE: NavGroup[] = [
 
 export default function Sidebar() {
     const pathname = usePathname();
+    const router = useRouter();
     const { data: session } = useSession();
     const t = useThemeTokens();
     const [expanded, setExpanded] = useState<Record<string, boolean>>({ Compute: true });
@@ -330,12 +331,15 @@ export default function Sidebar() {
                 borderTop: `1px solid ${t.borderPrimary}`,
                 display: "flex", alignItems: "center", gap: "12px",
             }}>
-                <Link
-                    href="/dashboard/settings"
+                <div
                     id="sidebar-profile-link"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => router.push("/dashboard/settings")}
+                    onKeyDown={e => { if (e.key === "Enter") router.push("/dashboard/settings"); }}
                     style={{
                         display: "flex", alignItems: "center", gap: 12,
-                        flex: 1, overflow: "hidden", textDecoration: "none",
+                        flex: 1, overflow: "hidden", cursor: "pointer",
                         borderRadius: 8, padding: "4px 6px", margin: "-4px -6px",
                         transition: "background 0.15s",
                     }}
@@ -359,7 +363,7 @@ export default function Sidebar() {
                             {session?.user?.email || "Not signed in"}
                         </p>
                     </div>
-                </Link>
+                </div>
                 <button
                     onClick={() => signOut({ callbackUrl: "/" })}
                     title="Log out"
