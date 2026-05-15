@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import { prisma } from '@/lib/db';
 import { auth } from '@/lib/auth';
 
-// GET /api/blog/[slug] — Public: get single post
+// GET /api/blog/[slug] — Public: get single post (via CmsPost)
 export async function GET(
     _request: NextRequest,
     { params }: { params: Promise<{ slug: string }> }
 ) {
     try {
         const { slug } = await params;
-        const post = await prisma.blogPost.findUnique({
-            where: { slug },
+        const post = await prisma.cmsPost.findFirst({
+            where: { slug, type: "BLOG" },
             include: {
                 author: {
                     select: { name: true, image: true },
@@ -36,7 +36,7 @@ export async function GET(
     }
 }
 
-// PUT /api/blog/[slug] — Admin only: update post
+// PUT /api/blog/[slug] — Admin only: update post (via CmsPost)
 export async function PUT(
     request: NextRequest,
     { params }: { params: Promise<{ slug: string }> }
@@ -51,21 +51,21 @@ export async function PUT(
         const body = await request.json();
         const { title, slug: newSlug, excerpt, content, coverImage, published } = body;
 
-        const existing = await prisma.blogPost.findUnique({ where: { slug } });
+        const existing = await prisma.cmsPost.findFirst({ where: { slug, type: "BLOG" } });
         if (!existing) {
             return NextResponse.json({ error: 'Post not found' }, { status: 404 });
         }
 
         // Check new slug uniqueness if changed
         if (newSlug && newSlug !== slug) {
-            const slugTaken = await prisma.blogPost.findUnique({ where: { slug: newSlug } });
+            const slugTaken = await prisma.cmsPost.findUnique({ where: { slug: newSlug } });
             if (slugTaken) {
                 return NextResponse.json({ error: 'Slug already exists' }, { status: 409 });
             }
         }
 
-        const post = await prisma.blogPost.update({
-            where: { slug },
+        const post = await prisma.cmsPost.update({
+            where: { id: existing.id },
             data: {
                 ...(title && { title }),
                 ...(newSlug && { slug: newSlug }),
@@ -82,7 +82,7 @@ export async function PUT(
     }
 }
 
-// DELETE /api/blog/[slug] — Admin only: delete post
+// DELETE /api/blog/[slug] — Admin only: delete post (via CmsPost)
 export async function DELETE(
     _request: NextRequest,
     { params }: { params: Promise<{ slug: string }> }
@@ -94,12 +94,12 @@ export async function DELETE(
         }
 
         const { slug } = await params;
-        const existing = await prisma.blogPost.findUnique({ where: { slug } });
+        const existing = await prisma.cmsPost.findFirst({ where: { slug, type: "BLOG" } });
         if (!existing) {
             return NextResponse.json({ error: 'Post not found' }, { status: 404 });
         }
 
-        await prisma.blogPost.delete({ where: { slug } });
+        await prisma.cmsPost.delete({ where: { id: existing.id } });
 
         return NextResponse.json({ message: 'Post deleted' });
     } catch {

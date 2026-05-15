@@ -144,12 +144,13 @@ export default function ConsoleHubPage() {
             backgroundColor: t.bgPrimary,
             padding: "0 48px 48px",
         }}>
-            {/* ─── Top Bar ─── */}
-            <div style={{
+            {/* ─── Top Navbar ─── */}
+            <nav style={{
                 display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: "20px 0", borderBottom: `1px solid ${t.borderPrimary}`,
+                padding: "16px 0", borderBottom: `1px solid ${t.borderPrimary}`,
                 marginBottom: 32,
             }}>
+                {/* Left — Logo */}
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     <Image
                         src="/logo.png" alt="NRSP Cloud" width={32} height={32}
@@ -162,8 +163,41 @@ export default function ConsoleHubPage() {
                         Not<span style={{ color: t.accentPrimary }}>Respond</span>
                     </span>
                 </div>
+
+                {/* Center — Nav Links */}
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                    {[
+                        { label: "News", href: "/news" },
+                        { label: "Blogs", href: "/blog" },
+                        { label: "FAQs", href: "/faq" },
+                    ].map(link => (
+                        <Link
+                            key={link.href}
+                            href={link.href}
+                            id={`nav-${link.label.toLowerCase()}`}
+                            style={{
+                                padding: "8px 16px", borderRadius: t.isMono ? 4 : 8,
+                                fontSize: "0.85rem", fontWeight: 600,
+                                color: t.textSecondary, textDecoration: "none",
+                                transition: "all 0.15s",
+                            }}
+                            onMouseEnter={e => {
+                                e.currentTarget.style.color = t.textPrimary;
+                                e.currentTarget.style.background = t.bgCardHover;
+                            }}
+                            onMouseLeave={e => {
+                                e.currentTarget.style.color = t.textSecondary;
+                                e.currentTarget.style.background = "transparent";
+                            }}
+                        >
+                            {link.label}
+                        </Link>
+                    ))}
+                </div>
+
+                {/* Right — Account */}
                 <AccountDropdown />
-            </div>
+            </nav>
 
             {/* ─── Admin Banner ─── */}
             {isAdmin && (

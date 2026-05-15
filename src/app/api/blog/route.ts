@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import { prisma } from '@/lib/db';
 import { auth } from '@/lib/auth';
 
 /**
@@ -24,11 +24,11 @@ function parseMeta(content: string): { tags: string[]; publisher: string } {
     }
 }
 
-// GET /api/blog — Public: list published posts
+// GET /api/blog — Public: list published BLOG posts (via CmsPost)
 export async function GET() {
     try {
-        const posts = await prisma.blogPost.findMany({
-            where: { published: true },
+        const posts = await prisma.cmsPost.findMany({
+            where: { published: true, type: "BLOG" },
             orderBy: { createdAt: 'desc' },
             select: {
                 id: true,
@@ -53,7 +53,7 @@ export async function GET() {
     }
 }
 
-// POST /api/blog — Admin only: create a new post
+// POST /api/blog — Admin only: create a new BLOG post (via CmsPost)
 export async function POST(request: NextRequest) {
     try {
         const session = await auth();
@@ -72,13 +72,14 @@ export async function POST(request: NextRequest) {
         }
 
         // Check slug uniqueness
-        const existing = await prisma.blogPost.findUnique({ where: { slug } });
+        const existing = await prisma.cmsPost.findUnique({ where: { slug } });
         if (existing) {
             return NextResponse.json({ error: 'Slug already exists' }, { status: 409 });
         }
 
-        const post = await prisma.blogPost.create({
+        const post = await prisma.cmsPost.create({
             data: {
+                type: "BLOG",
                 title,
                 slug,
                 excerpt:    excerpt    || null,

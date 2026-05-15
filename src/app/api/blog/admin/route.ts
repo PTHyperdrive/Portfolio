@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import prisma from '@/lib/db';
+import { prisma } from '@/lib/db';
 import { auth } from '@/lib/auth';
 
-// GET /api/blog/admin — Admin only: list ALL posts (including drafts)
+// GET /api/blog/admin — Admin only: list ALL BLOG posts (including drafts)
 export async function GET() {
     try {
         const session = await auth();
@@ -10,7 +10,8 @@ export async function GET() {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const posts = await prisma.blogPost.findMany({
+        const posts = await prisma.cmsPost.findMany({
+            where: { type: "BLOG" },
             orderBy: { createdAt: 'desc' },
             select: {
                 id: true,

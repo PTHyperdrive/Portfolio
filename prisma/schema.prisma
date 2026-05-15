@@ -35,7 +35,7 @@ model User {
   vpnConfigs        VpnConfig[]
   proxyAccounts     ProxyAccount[]
   emailAccounts     EmailAccount[]
-  blogPosts         BlogPost[]
+  cmsPosts         CmsPost[]
   vpsInstances      VpsInstance[]
   transactions      Transaction[]
   auditLogs         AuditLog[]
@@ -329,10 +329,16 @@ model UserNextcloudStorage {
   @@index([ncUsername])
 }
 
-// ─── Blog Models ────────────────────────────────────────────────
+// ─── CMS Models ─────────────────────────────────────────────────
 
-model BlogPost {
+enum CmsType {
+  NEWS
+  BLOG
+}
+
+model CmsPost {
   id         String   @id @default(cuid())
+  type       CmsType
   title      String
   slug       String   @unique
   excerpt    String?  @db.Text
@@ -346,7 +352,20 @@ model BlogPost {
   author User @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
   @@index([authorId])
-  @@index([published])
+  @@index([published, type])
+}
+
+model FaqEntry {
+  id        String   @id @default(cuid())
+  question  String   @db.Text
+  answer    String   @db.LongText
+  category  String   @default("General")
+  sortOrder Int      @default(0)
+  published Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([published, category])
 }
 
 // ─── Billing & Transactions ────────────────────────────────
