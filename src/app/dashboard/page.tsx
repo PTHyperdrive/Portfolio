@@ -170,6 +170,7 @@ export default function ConsoleHubPage() {
                         { label: "News", href: "/news" },
                         { label: "Blogs", href: "/blog" },
                         { label: "FAQs", href: "/faq" },
+                        { label: "Docs", href: "/docs" },
                     ].map(link => (
                         <Link
                             key={link.href}

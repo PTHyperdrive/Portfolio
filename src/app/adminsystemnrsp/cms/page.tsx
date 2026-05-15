@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useThemeTokens } from "@/lib/useThemeTokens";
-import { Plus, FileText, Newspaper, BookOpen, HelpCircle, Trash2, Eye, EyeOff, Pencil } from "lucide-react";
+import { Plus, FileText, Newspaper, BookOpen, HelpCircle, Trash2, Eye, EyeOff, Pencil, BookMarked } from "lucide-react";
 
 interface CmsPost {
     id: string;
@@ -94,6 +94,16 @@ export default function CmsDashboard() {
                     </div>
                 </div>
                 <div style={{ display: "flex", gap: 10 }}>
+                    <Link href="/adminsystemnrsp/cms/manual" style={{
+                        display: "inline-flex", alignItems: "center", gap: 8,
+                        padding: "10px 20px", borderRadius: t.buttonRadius,
+                        border: `1px solid ${t.borderPrimary}`, background: "transparent",
+                        color: t.textSecondary, fontWeight: 600, fontSize: "0.875rem",
+                        textDecoration: "none",
+                    }}>
+                        <BookMarked style={{ width: 14, height: 14 }} />
+                        User Manual
+                    </Link>
                     <Link href="/adminsystemnrsp/cms/faq" style={{
                         display: "inline-flex", alignItems: "center", gap: 8,
                         padding: "10px 20px", borderRadius: t.buttonRadius,

@@ -368,6 +368,44 @@ model FaqEntry {
   @@index([published, category])
 }
 
+// ─── User Manual Models ─────────────────────────────────────────
+
+model ManualChapter {
+  id        String   @id @default(cuid())
+  title     String
+  slug      String   @unique
+  icon      String?
+  sortOrder Int      @default(0)
+  published Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  sections  ManualSection[]
+
+  @@index([published, sortOrder])
+}
+
+model ManualSection {
+  id         String   @id @default(cuid())
+  chapterId  String
+  parentId   String?
+  title      String
+  slug       String
+  content    String   @db.LongText
+  sortOrder  Int      @default(0)
+  published  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  chapter    ManualChapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  parent     ManualSection? @relation("SectionTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children   ManualSection[] @relation("SectionTree")
+
+  @@unique([chapterId, slug])
+  @@index([chapterId, sortOrder])
+  @@index([parentId])
+}
+
 // ─── Billing & Transactions ────────────────────────────────
 
 model Transaction {
