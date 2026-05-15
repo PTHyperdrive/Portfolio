@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import speakeasy from "speakeasy";
+import { safeDecryptTotpSecret } from "@/lib/totp-crypto";
 
 /**
  * require2fa — Server-side 2FA enforcement helper
@@ -41,9 +42,12 @@ export async function require2fa(
         return { ok: false, error: "2FA_NOT_CONFIGURED" };
     }
 
+    // Decrypt the stored secret before verifying
+    const decryptedSecret = safeDecryptTotpSecret(user.twoFactorSecret);
+
     // Verify the TOTP token
     const isValid = speakeasy.totp.verify({
-        secret: user.twoFactorSecret,
+        secret: decryptedSecret,
         encoding: "base32",
         token: totpToken.trim(),
     });
