@@ -50,6 +50,7 @@ model User {
   ticketNotifications  TicketNotification[]
   cryptoTopups         CryptoTopup[]
   invitationCodes      InvitationCode[]     @relation("InviteCreator")
+  uploads              FileUpload[]
 }
 
 model Account {
@@ -404,6 +405,34 @@ model ManualSection {
   @@unique([chapterId, slug])
   @@index([chapterId, sortOrder])
   @@index([parentId])
+}
+
+// ─── File Upload Registry ───────────────────────────────────
+
+enum UploadContext {
+  TICKET
+  CHAT
+  AVATAR
+  MMO_ITEM
+  CMS_COVER
+}
+
+model FileUpload {
+  id           String        @id @default(cuid())
+  context      UploadContext
+  originalName String
+  storedName   String        @unique
+  mimeType     String
+  sizeBytes    Int
+  sha256       String
+  uploaderId   String
+  createdAt    DateTime      @default(now())
+
+  uploader User @relation(fields: [uploaderId], references: [id], onDelete: Cascade)
+
+  @@index([uploaderId])
+  @@index([sha256])
+  @@index([context])
 }
 
 // ─── Billing & Transactions ────────────────────────────────

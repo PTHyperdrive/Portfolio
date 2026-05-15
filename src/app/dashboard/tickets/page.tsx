@@ -70,27 +70,37 @@ export default function TicketsPage() {
         setSubmitting(true); setError("");
         try {
             let imageUrls: string[] = [];
-            // Upload images first
+            // Upload images via centralized secure pipeline
             if (files.length > 0) {
                 const fd = new FormData();
                 files.forEach(f => fd.append("files", f));
-                const uploadRes = await fetch("/api/tickets/upload", { method: "POST", body: fd });
+                fd.append("context", "TICKET");
+                const uploadRes = await fetch("/api/uploads", { method: "POST", body: fd });
                 if (!uploadRes.ok) {
-                    // The server may return HTML (e.g. 413 from Next.js before handler runs),
-                    // so we try JSON first and fall back to a status-code message.
                     let errMsg = `Upload failed (HTTP ${uploadRes.status})`;
                     if (uploadRes.status === 413) {
-                        errMsg = "File too large. Maximum total upload size is 25 MB.";
+                        errMsg = "File too large. Maximum total upload size is 18 MB per file.";
                     } else {
                         try {
                             const j = await uploadRes.json();
                             errMsg = j.error || errMsg;
-                        } catch { /* response was not JSON — use status-code message */ }
+                        } catch { /* response was not JSON */ }
                     }
                     throw new Error(errMsg);
                 }
                 const uploadData = await uploadRes.json();
-                imageUrls = uploadData.files;
+                // Collect stored file names from successful uploads
+                imageUrls = (uploadData.files ?? []).map((f: { storedName: string }) => f.storedName);
+                // Show warnings for any per-file errors (e.g. duplicates)
+                if (uploadData.errors?.length > 0) {
+                    const warnings = (uploadData.errors as Array<{ fileName: string; error: string }>)
+                        .map(e => `${e.fileName}: ${e.error}`).join("\n");
+                    setError(warnings);
+                }
+                if (imageUrls.length === 0 && uploadData.errors?.length > 0) {
+                    throw new Error("All files were rejected. " +
+                        (uploadData.errors as Array<{ error: string }>)[0].error);
+                }
             }
             // Create ticket
             const res = await fetch("/api/tickets", {
