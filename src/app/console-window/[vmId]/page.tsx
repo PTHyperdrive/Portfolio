@@ -83,8 +83,8 @@ export default function ConsoleWindowPage({ params }: { params: Promise<{ vmId: 
 
             if (!viewerRef.current) return;
 
-            const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-            const fullWsUrl = `${wsProtocol}//${window.location.host}${data.wsUrl}`;
+            // data.wsUrl is a full wss:// URL pointing directly at Proxmox VE
+            const fullWsUrl = data.wsUrl;
 
             const rfb = new RFB(viewerRef.current, fullWsUrl, {
                 credentials: { username: "", password: data.password, target: "" },

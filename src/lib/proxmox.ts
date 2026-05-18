@@ -301,12 +301,16 @@ export async function getSpiceTicket(node: string, vmId: string, vmType: "qemu" 
 
 /**
  * Get the VNC websocket URL for connecting noVNC.
+ *
+ * Returns a full wss:// URL pointing directly at the Proxmox VE node.
+ * The browser connects to Proxmox without proxying through Next.js,
+ * because Next.js rewrites cannot handle WebSocket protocol upgrades.
  */
 export function getVncWebsocketUrl(node: string, vmId: string, port: number, ticket: string, vmType: "qemu" | "lxc" = "qemu") {
     const encodedTicket = encodeURIComponent(ticket);
-    // Return only the path — the frontend prepends wss:// + window.location.host
-    // so the URL is domain-agnostic (works with any domain/proxy).
-    return `/novnc/api2/json/nodes/${node}/${vmType}/${vmId}/vncwebsocket?port=${port}&vncticket=${encodedTicket}`;
+    const host = process.env.PROXMOX_VE_HOST;
+    const pvePort = process.env.PROXMOX_VE_PORT || "8006";
+    return `wss://${host}:${pvePort}/api2/json/nodes/${node}/${vmType}/${vmId}/vncwebsocket?port=${port}&vncticket=${encodedTicket}`;
 }
 
 /**
