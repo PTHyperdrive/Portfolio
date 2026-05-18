@@ -57,7 +57,7 @@ export default async function RootLayout({
   const isBare = pathname.startsWith("/console-window") || pathname.startsWith("/dashboard") || pathname.startsWith("/account-settings");
 
   return (
-    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable} ${roboto.variable} ${robotoMono.variable}`} style={{ scrollBehavior: "smooth" }}>
+    <html lang="en" className={`${inter.variable} ${jetbrainsMono.variable} ${roboto.variable} ${robotoMono.variable}`} data-scroll-behavior="smooth">
       <body>
         <Providers session={session}>
           {!isBare && <div className="particles-bg" aria-hidden="true" />}
