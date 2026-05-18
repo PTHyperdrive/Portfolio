@@ -14,7 +14,8 @@ import { createServer } from "node:http";
 import { connect as tlsConnect } from "node:tls";
 import { readFileSync } from "node:fs";
 import next from "next";
-import { loadEnvConfig } from "@next/env";
+import pkg from "@next/env";
+const { loadEnvConfig } = pkg;
 
 // ── Environment ─────────────────────────────────────────────────
 const dev = process.env.NODE_ENV !== "production";
