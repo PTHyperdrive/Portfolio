@@ -16,6 +16,14 @@ const nextConfig: NextConfig = {
       "@/generated/prisma": "./src/generated/prisma/client.ts",
     },
   },
+  async rewrites() {
+    return [
+      {
+        source: '/novnc/:path*',
+        destination: `https://${process.env.PROXMOX_VE_HOST}:${process.env.PROXMOX_VE_PORT || '8006'}/:path*`,
+      },
+    ];
+  },
 };
 
 export default nextConfig;
