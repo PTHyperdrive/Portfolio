@@ -57,6 +57,9 @@ app.prepare().then(() => {
     const pveHost  = process.env.PROXMOX_VE_HOST;
     const pvePort  = parseInt(process.env.PROXMOX_VE_PORT || "8006", 10);
 
+    const pveTokenId    = process.env.PROXMOX_VE_TOKEN_ID;
+    const pveTokenValue = process.env.PROXMOX_VE_TOKEN_VALUE;
+
     if (!pveHost) {
         console.warn("[vnc-proxy] PROXMOX_VE_HOST not set — VNC proxy disabled");
     }
@@ -73,6 +76,17 @@ app.prepare().then(() => {
         // Strip the /novnc prefix → forward to Proxmox VE
         const targetPath = url.replace(/^\/novnc/, "");
 
+        // ── Security: only allow vncwebsocket endpoints ─────────
+        // Without this, an attacker could proxy arbitrary Proxmox API
+        // calls (e.g. /api2/json/.../status/stop) using our token.
+        const pathname = targetPath.split("?")[0];
+        if (!pathname.endsWith("/vncwebsocket")) {
+            console.warn(`[vnc-proxy] ✘ Blocked non-VNC path: ${pathname}`);
+            socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
+            socket.destroy();
+            return;
+        }
+
         console.log(`[vnc-proxy] Upgrading: ${targetPath.slice(0, 80)}…`);
 
         // Open a TLS connection to Proxmox
@@ -80,7 +94,6 @@ app.prepare().then(() => {
             host: pveHost,
             port: pvePort,
             ...tlsOpts,
-            // Use VE host as SNI servername if not overridden
             servername: tlsOpts.servername || pveHost,
         }, () => {
             // Build the HTTP upgrade request to Proxmox
@@ -89,6 +102,8 @@ app.prepare().then(() => {
                 `Host: ${pveHost}:${pvePort}`,
                 `Upgrade: websocket`,
                 `Connection: Upgrade`,
+                // Authenticate with the PVE API token
+                `Authorization: PVEAPIToken=${pveTokenId}=${pveTokenValue}`,
             ];
 
             // Forward WebSocket handshake headers from the client
