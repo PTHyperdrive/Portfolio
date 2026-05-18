@@ -7,11 +7,81 @@
  */
 
 import { Agent } from "undici";
+import { readFileSync } from "fs";
 
-// Shared dispatcher that skips TLS validation for internal APIs
-// (Proxmox uses self-signed certs / certs issued for FQDN, not IP)
-const insecureAgent = new Agent({
-    connect: { rejectUnauthorized: false },
+// ─── TLS Configuration ──────────────────────────────────────────
+//
+// Three modes for connecting to Proxmox VE over HTTPS:
+//
+//   1. System-trusted CA (default):
+//      Leave all TLS vars unset. Node.js uses the OS root CA bundle.
+//      Works out of the box with Let's Encrypt or any public CA.
+//
+//   2. Custom CA certificate (private CA / self-signed):
+//      Set PROXMOX_VE_CA_PATH to the absolute path of a PEM-encoded
+//      CA certificate file. This cert is loaded at startup and pinned
+//      for all Proxmox API and WebSocket connections.
+//
+//   3. Insecure / skip verification (development only):
+//      Set PROXMOX_VE_TLS_INSECURE="true" to disable all verification.
+//      ⚠ NEVER use this in production — it enables MITM attacks.
+//
+// Additionally:
+//   PROXMOX_VE_TLS_SERVERNAME — Override the TLS SNI hostname.
+//     Useful when connecting by IP but the certificate's CN/SAN is
+//     a hostname (e.g., connecting to 10.0.1.5 but cert is for
+//     "pve.example.com"). Omit to use PROXMOX_VE_HOST automatically.
+// ─────────────────────────────────────────────────────────────────
+
+function buildProxmoxTlsConnect(): Record<string, unknown> {
+    const insecure   = process.env.PROXMOX_VE_TLS_INSECURE === "true";
+    const caPath     = process.env.PROXMOX_VE_CA_PATH;
+    const servername = process.env.PROXMOX_VE_TLS_SERVERNAME;
+
+    // ── Mode 3: Insecure (opt-in escape hatch) ──────────────────
+    if (insecure) {
+        console.warn(
+            "[proxmox] ⚠ TLS verification DISABLED (PROXMOX_VE_TLS_INSECURE=true). " +
+            "Do NOT use this in production."
+        );
+        return { rejectUnauthorized: false };
+    }
+
+    const opts: Record<string, unknown> = {
+        rejectUnauthorized: true,
+    };
+
+    // ── Mode 2: Custom CA certificate ───────────────────────────
+    if (caPath) {
+        try {
+            opts.ca = readFileSync(caPath, "utf-8");
+            console.log(`[proxmox] ✔ Using custom CA certificate: ${caPath}`);
+        } catch (err) {
+            // Fail fast — a misconfigured CA path is a security risk
+            const msg = err instanceof Error ? err.message : String(err);
+            console.error(`[proxmox] ✘ Failed to read CA certificate at "${caPath}": ${msg}`);
+            throw new Error(`Cannot read PROXMOX_VE_CA_PATH "${caPath}": ${msg}`);
+        }
+    }
+
+    // ── SNI hostname override ───────────────────────────────────
+    if (servername) {
+        opts.servername = servername;
+    }
+
+    return opts;
+}
+
+/**
+ * Resolved TLS connect options for Proxmox connections.
+ * Exported so the WebSocket proxy (server.mjs / VNC bridge) can reuse
+ * the same CA / insecure / servername configuration.
+ */
+export const proxmoxTlsConnect = buildProxmoxTlsConnect();
+
+// Shared dispatcher for all Proxmox HTTP requests
+const proxmoxAgent = new Agent({
+    connect: proxmoxTlsConnect,
 });
 
 // ─── Manager API Client ──────────────────────────────────────────
@@ -34,8 +104,8 @@ async function managerFetch(endpoint: string, options: RequestInit = {}) {
     const res = await fetch(url, {
         ...options,
         headers,
-        // @ts-expect-error -- undici dispatcher for TLS bypass
-        dispatcher: insecureAgent,
+        // @ts-expect-error -- undici dispatcher for TLS configuration
+        dispatcher: proxmoxAgent,
     });
 
     if (!res.ok) {
@@ -175,8 +245,8 @@ export async function pveFetch(endpoint: string, options: RequestInit = {}) {
     const res = await fetch(url, {
         ...options,
         headers,
-        // @ts-expect-error -- undici dispatcher for TLS bypass
-        dispatcher: insecureAgent,
+        // @ts-expect-error -- undici dispatcher for TLS configuration
+        dispatcher: proxmoxAgent,
     });
 
     if (!res.ok) {
