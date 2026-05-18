@@ -161,7 +161,7 @@ const PVE_TOKEN_VALUE = process.env.PROXMOX_VE_TOKEN_VALUE || "";
 
 const PVE_BASE = `https://${PVE_HOST}:${PVE_PORT}/api2/json`;
 
-async function pveFetch(endpoint: string, options: RequestInit = {}) {
+export async function pveFetch(endpoint: string, options: RequestInit = {}) {
     const url = `${PVE_BASE}${endpoint}`;
     const headers: Record<string, string> = {
         "Authorization": `PVEAPIToken=${PVE_TOKEN_ID}=${PVE_TOKEN_VALUE}`,

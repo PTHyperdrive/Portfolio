@@ -79,7 +79,7 @@ export async function GET(
             webp: "image/webp", gif: "image/gif",
         };
 
-        return new Response(buffer, {
+        return new Response(buffer as any, {
             headers: {
                 "Content-Type": mimeMap[ext || "png"] || "application/octet-stream",
                 "Content-Disposition": `attachment; filename="${safeName}"`,

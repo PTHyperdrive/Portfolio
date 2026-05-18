@@ -53,7 +53,6 @@ export async function GET() {
     return NextResponse.json({
         provisioned:   !!record,
         eligible:      hasVm,
-        freeGb:        NC_FREE_GB,
         maxTotalGb:    NC_MAX_TOTAL_GB,
         stepGb:        NC_STEP_GB,
         pricing:       STORAGE_PRICING,
@@ -65,6 +64,7 @@ export async function GET() {
             remainingGb: NC_MAX_TOTAL_GB - record.totalGb,
         } : {
             ncUsername: null,
+            freeGb:     NC_FREE_GB,
             paidGb:     0,
             totalGb:    0,
         }),

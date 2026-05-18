@@ -60,7 +60,7 @@ export async function GET(_req: Request, { params }: Params) {
             .replace(/[^\w.\-]/g, "_")
             .substring(0, 200);
 
-        return new Response(buffer, {
+        return new Response(buffer as any, {
             headers: {
                 "Content-Type": file.mimeType,
                 "Content-Disposition": `attachment; filename="${safeName}"`,

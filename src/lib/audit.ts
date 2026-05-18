@@ -83,7 +83,7 @@ export async function audit(entry: AuditEntry): Promise<void> {
                 resourceId:   entry.resourceId ?? null,
                 ipAddress:    ipAddress ?? null,
                 userAgent:    userAgent ?? null,
-                metadata:     entry.metadata ?? undefined,
+                metadata:     (entry.metadata as any) ?? undefined,
                 outcome:      entry.outcome ?? "SUCCESS",
             },
         });
