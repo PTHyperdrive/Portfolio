@@ -90,8 +90,9 @@ export default function ConsolePage({ params }: { params: Promise<{ vmId: string
             // ── 3. Initialise RFB ────────────────────────────────────────
             if (!viewerRef.current) return; // guard: unmounted during async ops
 
-            // data.wsUrl is a full wss:// URL pointing directly at Proxmox VE
-            const fullWsUrl = data.wsUrl;
+            // data.wsUrl is a relative /novnc/... path — server.mjs proxies it to Proxmox
+            const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+            const fullWsUrl = `${wsProtocol}//${window.location.host}${data.wsUrl}`;
 
             const rfb = new RFB(viewerRef.current, fullWsUrl, {
                 credentials: { username: "", password: data.password, target: "" },
