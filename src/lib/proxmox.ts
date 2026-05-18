@@ -34,8 +34,8 @@ import { readFileSync } from "fs";
 // ─────────────────────────────────────────────────────────────────
 
 function buildProxmoxTlsConnect(): Record<string, unknown> {
-    const insecure   = process.env.PROXMOX_VE_TLS_INSECURE === "true";
-    const caPath     = process.env.PROXMOX_VE_CA_PATH;
+    const insecure = process.env.PROXMOX_VE_TLS_INSECURE === "true";
+    const caPath = process.env.PROXMOX_VE_CA_PATH;
     const servername = process.env.PROXMOX_VE_TLS_SERVERNAME;
 
     // ── Mode 3: Insecure (opt-in escape hatch) ──────────────────
@@ -523,10 +523,10 @@ export async function waitForVMStopped(
     vmId: string,
     timeoutMs = 60_000
 ): Promise<void> {
-    const deadline  = Date.now() + timeoutMs;
-    const maxDelay  = 16_000;
-    const jitter    = () => Math.random() * 500 - 250; // ±250 ms
-    let   delay     = 1_000; // start at 1 s
+    const deadline = Date.now() + timeoutMs;
+    const maxDelay = 16_000;
+    const jitter = () => Math.random() * 500 - 250; // ±250 ms
+    let delay = 1_000; // start at 1 s
 
     while (Date.now() < deadline) {
         const status = await pveFetch(
@@ -593,7 +593,7 @@ export async function detachAndDeleteDisk(
 
         if (colonIdx !== -1) {
             const storageId = volumeWithOptions.slice(0, colonIdx);   // "local-zfs"
-            const volumeId  = volumeWithOptions.slice(colonIdx + 1);  // "vm-150-disk-0"
+            const volumeId = volumeWithOptions.slice(colonIdx + 1);  // "vm-150-disk-0"
 
             try {
                 // Encode the volume ID — some pools use slashes (e.g. ceph/vm-150-disk-0)
@@ -678,11 +678,11 @@ export function generateMac(): string {
 // ── Snapshots ────────────────────────────────────────────────────────────────
 
 export interface VmSnapshot {
-    name:        string;
+    name: string;
     description: string;
-    snaptime:    number;
-    vmstate:     number; // 1 = includes RAM state
-    parent?:     string;
+    snaptime: number;
+    vmstate: number; // 1 = includes RAM state
+    parent?: string;
 }
 
 /**
@@ -701,9 +701,9 @@ export async function listSnapshots(node: string, vmId: string): Promise<VmSnaps
  * @param includeRam  - If true, captures live RAM state (VM keeps running but creates larger snapshot)
  */
 export async function createSnapshot(
-    node:        string,
-    vmId:        string,
-    snapname:    string,
+    node: string,
+    vmId: string,
+    snapname: string,
     description: string,
     includeRam = false
 ): Promise<string> {
@@ -724,8 +724,8 @@ export async function createSnapshot(
  * @param force - If true, also removes associated disk changes (removes all child snapshots)
  */
 export async function deleteSnapshot(
-    node:     string,
-    vmId:     string,
+    node: string,
+    vmId: string,
     snapname: string,
     force = false
 ): Promise<string> {
@@ -741,8 +741,8 @@ export async function deleteSnapshot(
  * ⚠ This will stop the VM if it is running.
  */
 export async function rollbackSnapshot(
-    node:     string,
-    vmId:     string,
+    node: string,
+    vmId: string,
     snapname: string
 ): Promise<string> {
     const upid = await pveFetch(`/nodes/${node}/qemu/${vmId}/snapshot/${snapname}/rollback`, {
@@ -755,11 +755,11 @@ export async function rollbackSnapshot(
 // ── Backups ──────────────────────────────────────────────────────────────────
 
 export interface BackupJob {
-    upid:      string;
+    upid: string;
     starttime: number;
-    status:    string;
-    volid?:    string;  // resulting archive volume ID
-    size?:     number;  // bytes
+    status: string;
+    volid?: string;  // resulting archive volume ID
+    size?: number;  // bytes
 }
 
 /**
@@ -773,19 +773,19 @@ export interface BackupJob {
  * @param storage - Proxmox storage ID that can hold backups (type: dir or btrfs with max-protected-backups)
  */
 export async function createBackup(
-    node:    string,
-    vmId:    string,
+    node: string,
+    vmId: string,
     storage: string,
-    notes?:  string
+    notes?: string
 ): Promise<string> {
     const upid = await pveFetch(`/nodes/${node}/vzdump`, {
         method: "POST",
         body: JSON.stringify({
-            vmid:     vmId,
+            vmid: vmId,
             storage,
-            mode:     "snapshot",   // ENFORCED: no downtime
+            mode: "snapshot",   // ENFORCED: no downtime
             compress: "zstd",       // ENFORCED: storage optimization
-            remove:   0,            // keep all backups
+            remove: 0,            // keep all backups
             ...(notes ? { "notes-template": notes } : {}),
         }),
     });
@@ -796,12 +796,12 @@ export async function createBackup(
  * List backups stored on a given storage that belong to a specific VM.
  */
 export async function listBackups(
-    node:    string,
+    node: string,
     storage: string,
-    vmId?:   string
+    vmId?: string
 ): Promise<{ volid: string; ctime: number; size: number; notes?: string; vmid?: string }[]> {
     const data = await pveFetch(`/nodes/${node}/storage/${storage}/content?content=backup`);
-    const all  = data as { volid: string; ctime: number; size: number; notes?: string; vmid?: string }[];
+    const all = data as { volid: string; ctime: number; size: number; notes?: string; vmid?: string }[];
     return vmId ? all.filter((b) => String(b.vmid) === String(vmId)) : all;
 }
 
@@ -810,7 +810,7 @@ export async function listBackups(
  * @param volid - Full volume ID, e.g. "backups:backup/vzdump-qemu-150-2024_01_01.vma.zst"
  */
 export async function deleteBackup(
-    node:  string,
+    node: string,
     volid: string
 ): Promise<string> {
     const [storageId, volumePath] = volid.split(":");
@@ -837,14 +837,14 @@ export async function deleteBackup(
  * @param timeoutMs - Maximum wait time in ms (default 300 s / 5 min)
  */
 export async function waitForTask(
-    node:       string,
-    upid:       string,
+    node: string,
+    upid: string,
     timeoutMs = 300_000
 ): Promise<string> {
-    const deadline  = Date.now() + timeoutMs;
-    const maxDelay  = 16_000;
-    const jitter    = () => Math.random() * 500 - 250; // ±250 ms
-    let   delay     = 1_000; // start at 1 s
+    const deadline = Date.now() + timeoutMs;
+    const maxDelay = 16_000;
+    const jitter = () => Math.random() * 500 - 250; // ±250 ms
+    let delay = 1_000; // start at 1 s
 
     while (Date.now() < deadline) {
         const status = await pveFetch(
@@ -908,10 +908,10 @@ export async function cloneTemplate(
     }
 
     const body: Record<string, string | number> = {
-        newid:   newVmid,
-        name:    newName,
-        target:  node,
-        full:    full ? 1 : 0,
+        newid: newVmid,
+        name: newName,
+        target: node,
+        full: full ? 1 : 0,
     };
     if (full) {
         body.storage = targetStorage;
@@ -1008,12 +1008,12 @@ export async function setCloudInitConfig(
 ): Promise<void> {
     // Build only the defined fields — Proxmox ignores undefined/null
     const payload: Record<string, string> = {};
-    if (config.ciuser)        payload.ciuser       = config.ciuser;
-    if (config.cipassword)    payload.cipassword   = config.cipassword;
-    if (config.sshkeys)       payload.sshkeys      = config.sshkeys;
-    if (config.ipconfig0)     payload.ipconfig0    = config.ipconfig0;
-    if (config.nameserver)    payload.nameserver   = config.nameserver;
-    if (config.searchdomain)  payload.searchdomain = config.searchdomain;
+    if (config.ciuser) payload.ciuser = config.ciuser;
+    if (config.cipassword) payload.cipassword = config.cipassword;
+    if (config.sshkeys) payload.sshkeys = config.sshkeys;
+    if (config.ipconfig0) payload.ipconfig0 = config.ipconfig0;
+    if (config.nameserver) payload.nameserver = config.nameserver;
+    if (config.searchdomain) payload.searchdomain = config.searchdomain;
 
     if (Object.keys(payload).length === 0) return;
 
@@ -1043,10 +1043,10 @@ export async function applyPlanHardware(
     }
 ): Promise<void> {
     const payload: Record<string, string | number> = {
-        cores:   specs.cores,
+        cores: specs.cores,
         sockets: 1,
-        memory:  specs.memory,
-        cpu:     "host",
+        memory: specs.memory,
+        cpu: "host",
     };
 
     // Update net0 rate limit if specified — preserve existing bridge/mac
