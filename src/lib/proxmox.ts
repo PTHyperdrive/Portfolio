@@ -833,16 +833,20 @@ export async function cloneTemplate(
         );
     }
 
+    const body: Record<string, string | number> = {
+        newid:   newVmid,
+        name:    newName,
+        target:  node,
+        full:    full ? 1 : 0,
+    };
+    if (full) {
+        body.storage = targetStorage;
+    }
+
     // Step 2: Clone the template
     const upid = await pveFetch(`/nodes/${node}/qemu/${templateVmid}/clone`, {
         method: "POST",
-        body: JSON.stringify({
-            newid:   newVmid,
-            name:    newName,
-            target:  node,
-            storage: targetStorage,
-            full:    full ? 1 : 0,
-        }),
+        body: JSON.stringify(body),
     });
 
     return upid as string;
