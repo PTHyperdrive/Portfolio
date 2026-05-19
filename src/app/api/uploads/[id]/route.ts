@@ -60,10 +60,13 @@ export async function GET(_req: Request, { params }: Params) {
             .replace(/[^\w.\-]/g, "_")
             .substring(0, 200);
 
+        // Images → inline (allows <img> rendering); others → attachment (forces download)
+        const disposition = file.mimeType.startsWith("image/") ? "inline" : "attachment";
+
         return new Response(buffer as any, {
             headers: {
                 "Content-Type": file.mimeType,
-                "Content-Disposition": `attachment; filename="${safeName}"`,
+                "Content-Disposition": `${disposition}; filename="${safeName}"`,
                 "X-Content-Type-Options": "nosniff",
                 "X-Frame-Options": "DENY",
                 "Cache-Control": "private, max-age=3600",

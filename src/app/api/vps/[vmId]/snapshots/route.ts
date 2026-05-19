@@ -4,9 +4,9 @@ import { prisma } from "@/lib/db";
 import { audit } from "@/lib/audit";
 import { listSnapshots, createSnapshot, deleteSnapshot, rollbackSnapshot } from "@/lib/proxmox";
 
-/** Validate snapshot name: alphanumeric + underscore + hyphen, 1-40 chars */
+/** Validate snapshot name: must start with a letter, then alphanumeric/underscore/hyphen, 2-40 chars (Proxmox config ID format) */
 function validSnapName(name: string): boolean {
-    return /^[a-zA-Z0-9_-]{1,40}$/.test(name);
+    return /^[a-zA-Z][a-zA-Z0-9_-]{0,39}$/.test(name);
 }
 
 async function getVmInstance(vmId: string, userId: string) {
@@ -65,7 +65,7 @@ export async function POST(
     }
     if (!validSnapName(snapname)) {
         return NextResponse.json(
-            { error: "snapname must be 1–40 alphanumeric/underscore/hyphen characters (no spaces)." },
+            { error: "snapname must start with a letter and contain only alphanumeric/underscore/hyphen characters (max 40)." },
             { status: 400 }
         );
     }
