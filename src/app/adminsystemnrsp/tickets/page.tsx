@@ -38,6 +38,7 @@ export default function AdminTicketsPage() {
     const [filter, setFilter] = useState("all");
     const [selected, setSelected] = useState<Ticket | null>(null);
     const [updating, setUpdating] = useState(false);
+    const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -174,7 +175,7 @@ export default function AdminTicketsPage() {
                                     {selected.description}
                                 </div>
                             )}
-                            {selected.imageUrls && (() => { try { const imgs: string[] = JSON.parse(selected.imageUrls); return imgs.length > 0 ? (<div><p style={{ fontSize: "0.72rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", marginBottom: 8 }}>Evidence</p><div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{imgs.map((img, i) => (<img key={i} src={`/api/tickets/file/${img}`} alt={`Evidence ${i+1}`} style={{ maxWidth: 200, maxHeight: 150, borderRadius: t.isMono ? 4 : 8, border: `1px solid ${t.borderPrimary}`, objectFit: "cover" }} />))}</div></div>) : null; } catch { return null; } })()}
+                            {selected.imageUrls && (() => { try { const imgs: string[] = JSON.parse(selected.imageUrls); return imgs.length > 0 ? (<div><p style={{ fontSize: "0.72rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", marginBottom: 8 }}>Evidence</p><div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{imgs.map((img, i) => (<img key={i} src={`/api/tickets/file/${img}`} alt={`Evidence ${i+1}`} onClick={() => setLightboxUrl(`/api/tickets/file/${img}`)} style={{ maxWidth: 200, maxHeight: 150, borderRadius: t.isMono ? 4 : 8, border: `1px solid ${t.borderPrimary}`, objectFit: "cover", cursor: "pointer", transition: "opacity 0.15s" }} onMouseEnter={e => (e.currentTarget.style.opacity = "0.8")} onMouseLeave={e => (e.currentTarget.style.opacity = "1")} />))}</div></div>) : null; } catch { return null; } })()}
                             {/* Admin Status Controls */}
                             <div style={{ marginTop: 20, padding: "14px 18px", borderRadius: t.isMono ? 4 : 8, background: t.statusWarningBg, border: `1px solid ${t.statusWarning}33` }}>
                                 <p style={{ fontSize: "0.72rem", fontWeight: 700, color: t.statusWarning, textTransform: "uppercase", marginBottom: 8 }}>Update Status</p>
@@ -192,6 +193,18 @@ export default function AdminTicketsPage() {
                             </div>
                         </div>
                     </div>
+                </div>
+            )}
+
+            {/* Lightbox */}
+            {lightboxUrl && (
+                <div
+                    onClick={() => setLightboxUrl(null)}
+                    onKeyDown={e => { if (e.key === "Escape") setLightboxUrl(null); }}
+                    tabIndex={0}
+                    style={{ position: "fixed", inset: 0, zIndex: 99999, background: "rgba(0,0,0,0.88)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-out", padding: 32 }}
+                >
+                    <img src={lightboxUrl} alt="Evidence fullscreen" style={{ maxWidth: "92vw", maxHeight: "92vh", objectFit: "contain", borderRadius: t.isMono ? 4 : 12, boxShadow: "0 8px 48px rgba(0,0,0,0.6)" }} />
                 </div>
             )}
         </div>
