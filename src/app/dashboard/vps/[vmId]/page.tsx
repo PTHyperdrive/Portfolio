@@ -111,7 +111,7 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
     };
 
     const formatUptime = (s: number) => { if (!s) return "—"; const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60); return d > 0 ? `${d}d ${h}h ${m}m` : h > 0 ? `${h}h ${m}m` : `${m}m`; };
-    const formatBytes = (b: number) => { if (!b) return "0"; if (b >= 1e12) return `${(b / 1e12).toFixed(1)} TB`; if (b >= 1e9) return `${(b / 1e9).toFixed(1)} GB`; if (b >= 1e6) return `${(b / 1e6).toFixed(1)} MB`; return `${(b / 1e3).toFixed(0)} KB`; };
+    const formatBytes = (b: number) => { if (!b) return "0 B"; if (b >= 1e12) return `${(b / 1e12).toFixed(1)} TB`; if (b >= 1e9) return `${(b / 1e9).toFixed(1)} GB`; if (b >= 1e6) return `${(b / 1e6).toFixed(1)} MB`; return `${(b / 1e3).toFixed(0)} KB`; };
 
     const card: React.CSSProperties = { background: t.bgCard, border: `1px solid ${t.borderPrimary}`, borderRadius: t.cardRadius, boxShadow: t.shadow, padding: 24 };
 

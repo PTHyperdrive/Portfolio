@@ -65,7 +65,20 @@ export async function GET(
 
             const push = async () => {
                 try {
-                    const liveData = await getVMStatus(node, vmId);
+                    const raw = await getVMStatus(node, vmId) as Record<string, unknown>;
+                    // Normalize Proxmox field names → frontend interface
+                    // Proxmox returns `mem` but our VmDetail.liveData expects `memory`
+                    const liveData = {
+                        status:  raw.status  ?? "unknown",
+                        uptime:  raw.uptime  ?? 0,
+                        cpu:     raw.cpu     ?? 0,
+                        memory:  raw.mem     ?? 0,   // Proxmox: `mem` (bytes)
+                        maxmem:  raw.maxmem  ?? 0,
+                        disk:    raw.disk    ?? 0,
+                        maxdisk: raw.maxdisk ?? 0,
+                        netin:   raw.netin   ?? 0,
+                        netout:  raw.netout  ?? 0,
+                    };
                     controller.enqueue(encode(liveData));
                 } catch {
                     // Proxmox temporarily unreachable — send a null pulse so

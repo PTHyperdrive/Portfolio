@@ -77,7 +77,18 @@ export async function GET(req: Request) {
             instances.map(async (inst) => {
                 let liveData = null;
                 try {
-                    liveData = await getVMStatus(inst.node, inst.vmId);
+                    const raw = await getVMStatus(inst.node, inst.vmId) as Record<string, unknown>;
+                    liveData = {
+                        status:  raw.status  ?? "unknown",
+                        uptime:  raw.uptime  ?? 0,
+                        cpu:     raw.cpu     ?? 0,
+                        memory:  raw.mem     ?? 0,
+                        maxmem:  raw.maxmem  ?? 0,
+                        disk:    raw.disk    ?? 0,
+                        maxdisk: raw.maxdisk ?? 0,
+                        netin:   raw.netin   ?? 0,
+                        netout:  raw.netout  ?? 0,
+                    };
                 } catch {
                     // Proxmox unreachable — fall back to DB status
                 }

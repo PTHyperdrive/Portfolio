@@ -31,7 +31,19 @@ export async function GET(
         // Get live status from Proxmox
         let liveData = null;
         try {
-            liveData = await getVMStatus(instance.node, vmId);
+            const raw = await getVMStatus(instance.node, vmId) as Record<string, unknown>;
+            // Normalize Proxmox field names → frontend interface
+            liveData = {
+                status:  raw.status  ?? "unknown",
+                uptime:  raw.uptime  ?? 0,
+                cpu:     raw.cpu     ?? 0,
+                memory:  raw.mem     ?? 0,   // Proxmox: `mem` (bytes)
+                maxmem:  raw.maxmem  ?? 0,
+                disk:    raw.disk    ?? 0,
+                maxdisk: raw.maxdisk ?? 0,
+                netin:   raw.netin   ?? 0,
+                netout:  raw.netout  ?? 0,
+            };
         } catch {
             // Proxmox unreachable
         }
