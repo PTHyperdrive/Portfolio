@@ -124,8 +124,7 @@ export default function InfrastructurePage() {
                         <div key={i} style={{ ...card, padding: 24, height: 120 }}>
                             <div style={{
                                 width: "60%", height: 14, borderRadius: 4,
-                                backgroundImage: `linear-gradient(90deg, ${t.bgSecondary} 25%, ${t.bgTertiary} 50%, ${t.bgSecondary} 75%)`,
-                                backgroundSize: "200% 100%",
+                                background: `linear-gradient(90deg, ${t.bgSecondary} 25%, ${t.bgTertiary} 50%, ${t.bgSecondary} 75%) 0 0 / 200% 100%`,
                                 animation: "shimmer 1.5s infinite",
                             }} />
                         </div>

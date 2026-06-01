@@ -14,7 +14,7 @@
  *   MIKROTIK_PARENT_INTERFACE — Physical interface for VLAN trunking (e.g. "ether2")
  */
 
-import { Agent } from "undici";
+import { Agent, fetch as undiciFetch } from "undici";
 
 // ─── Configuration (lazy — read at request time) ─────────────────
 
@@ -86,10 +86,10 @@ export async function mikrotikFetch(
         headers["Content-Type"] = "application/json";
     }
 
-    const res = await fetch(url, {
-        ...options,
+    const res = await undiciFetch(url, {
+        method: options.method || "GET",
         headers,
-        // @ts-expect-error -- undici dispatcher for TLS configuration
+        body: options.body as string | undefined,
         dispatcher: getMikrotikAgent(),
     });
 
@@ -201,12 +201,10 @@ export async function pingRouter(): Promise<PingResult> {
 
     try {
         const url = `${cfg.base}/system/identity`;
-        console.log(`[mikrotik-debug] host=${cfg.host} user=${cfg.user} passLen=${cfg.pass.length} pass=${cfg.pass} url=${url}`);
-        const res = await fetch(url, {
+        const res = await undiciFetch(url, {
             method: "GET",
             headers: { Authorization: cfg.auth },
             signal: controller.signal,
-            // @ts-expect-error -- undici dispatcher
             dispatcher: getMikrotikAgent(),
         });
 
