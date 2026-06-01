@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, Fragment } from "react";
 import { useThemeTokens } from "@/lib/useThemeTokens";
-import { Users, Search, RefreshCw, ChevronDown, ChevronRight, Monitor, ShoppingBag, X } from "lucide-react";
+import { Users, Search, RefreshCw, ChevronDown, ChevronRight, Monitor, ShoppingBag, X, KeyRound, Eye, EyeOff } from "lucide-react";
 
 interface VpsInstance { id: string; vmId: string; node: string; name: string; os: string; status: string; }
 interface AdminUser {
@@ -19,6 +19,11 @@ export default function AdminAccountsPage() {
     const [search, setSearch] = useState("");
     const [expanded, setExpanded] = useState<string | null>(null);
     const [toggling, setToggling] = useState<string | null>(null);
+    const [pwModal, setPwModal] = useState<{ userId: string; name: string; email: string } | null>(null);
+    const [newPw, setNewPw] = useState("");
+    const [pwVisible, setPwVisible] = useState(false);
+    const [pwSaving, setPwSaving] = useState(false);
+    const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
     const toggleCanInvite = async (userId: string, current: boolean) => {
         setToggling(userId);
@@ -33,6 +38,26 @@ export default function AdminAccountsPage() {
             }
         } catch { /* silent */ }
         finally { setToggling(null); }
+    };
+
+    const resetPassword = async () => {
+        if (!pwModal || newPw.length < 8) { setPwMsg({ ok: false, text: "Password must be at least 8 characters" }); return; }
+        setPwSaving(true); setPwMsg(null);
+        try {
+            const res = await fetch("/api/admin/accounts/password", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ userId: pwModal.userId, newPassword: newPw }),
+            });
+            if (res.ok) {
+                setPwMsg({ ok: true, text: "Password updated successfully" });
+                setTimeout(() => { setPwModal(null); setNewPw(""); setPwVisible(false); setPwMsg(null); }, 1500);
+            } else {
+                const d = await res.json();
+                setPwMsg({ ok: false, text: d.error || "Failed to reset password" });
+            }
+        } catch { setPwMsg({ ok: false, text: "Network error" }); }
+        finally { setPwSaving(false); }
     };
 
     const load = useCallback(async () => {
@@ -109,8 +134,8 @@ export default function AdminAccountsPage() {
                     <table style={{ width: "100%", borderCollapse: "collapse" }}>
                         <thead>
                             <tr style={{ background: t.bgSecondary }}>
-                                {["User", "Email", "Role", "Credits", "VMs", "Orders", "Allow Invite", "Joined", ""].map(h => (
-                                    <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontSize: "0.68rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.07em", borderBottom: `1px solid ${t.borderSecondary}`, whiteSpace: "nowrap" }}>{h}</th>
+                                {["User", "Email", "Role", "Credits", "VMs", "Orders", "Allow Invite", "Joined", "", ""].map((h, i) => (
+                                    <th key={`${h}-${i}`} style={{ padding: "10px 16px", textAlign: "left", fontSize: "0.68rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.07em", borderBottom: `1px solid ${t.borderSecondary}`, whiteSpace: "nowrap" }}>{h}</th>
                                 ))}
                             </tr>
                         </thead>
@@ -169,6 +194,22 @@ export default function AdminAccountsPage() {
                                             </button>
                                         </td>
                                         <td style={{ padding: "12px 16px" }}>
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); setPwModal({ userId: user.id, name: user.name || "—", email: user.email }); setNewPw(""); setPwVisible(false); setPwMsg(null); }}
+                                                title="Reset password"
+                                                style={{
+                                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                                    width: 28, height: 28, borderRadius: t.isMono ? 4 : 6,
+                                                    border: `1px solid ${t.borderPrimary}`, background: "transparent",
+                                                    color: t.textMuted, cursor: "pointer", transition: "all 0.15s",
+                                                }}
+                                                onMouseEnter={e => { e.currentTarget.style.background = t.accentPrimaryMuted; e.currentTarget.style.color = t.accentPrimary; e.currentTarget.style.borderColor = t.accentPrimary; }}
+                                                onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = t.textMuted; e.currentTarget.style.borderColor = t.borderPrimary; }}
+                                            >
+                                                <KeyRound style={{ width: 13, height: 13 }} />
+                                            </button>
+                                        </td>
+                                        <td style={{ padding: "12px 16px" }}>
                                             {expanded === user.id
                                                 ? <ChevronDown style={{ width: 14, height: 14, color: t.textMuted }} />
                                                 : <ChevronRight style={{ width: 14, height: 14, color: t.textMuted }} />}
@@ -178,7 +219,7 @@ export default function AdminAccountsPage() {
                                     {/* Expanded VMs */}
                                     {expanded === user.id && user.vpsInstances.length > 0 && (
                                         <tr key={`${user.id}-exp`}>
-                                            <td colSpan={9} style={{ padding: "0 16px 14px", background: t.bgSecondary }}>
+                                            <td colSpan={10} style={{ padding: "0 16px 14px", background: t.bgSecondary }}>
                                                 <div style={{ padding: "12px 14px", borderRadius: t.isMono ? 4 : 8, background: t.bgTertiary, border: `1px solid ${t.borderSecondary}` }}>
                                                     <p style={{ fontSize: "0.68rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>VPS Instances</p>
                                                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -205,6 +246,61 @@ export default function AdminAccountsPage() {
                     <p style={{ padding: "40px", textAlign: "center", color: t.textMuted }}>No users found.</p>
                 )}
             </div>
+
+            {/* Password Reset Modal */}
+            {pwModal && (
+                <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }} onClick={() => setPwModal(null)}>
+                    <div onClick={e => e.stopPropagation()} style={{ ...card, padding: "28px 32px", maxWidth: 420, width: "90%", position: "relative" }}>
+                        <button onClick={() => setPwModal(null)} style={{ position: "absolute", top: 12, right: 12, background: "none", border: "none", color: t.textMuted, cursor: "pointer", display: "flex" }}>
+                            <X style={{ width: 16, height: 16 }} />
+                        </button>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+                            <div style={{ width: 36, height: 36, borderRadius: 8, background: t.statusWarningBg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                <KeyRound style={{ width: 18, height: 18, color: t.statusWarning }} />
+                            </div>
+                            <div>
+                                <p style={{ fontSize: "1rem", fontWeight: 700, color: t.textPrimary }}>Reset Password</p>
+                                <p style={{ fontSize: "0.75rem", color: t.textMuted }}>{pwModal.name} &bull; {pwModal.email}</p>
+                            </div>
+                        </div>
+                        <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 600, color: t.textMuted, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>New Password</label>
+                        <div style={{ position: "relative", marginBottom: 6 }}>
+                            <input
+                                type={pwVisible ? "text" : "password"}
+                                value={newPw}
+                                onChange={e => setNewPw(e.target.value)}
+                                placeholder="Enter new password (min 8 chars)"
+                                autoFocus
+                                style={{ ...inp, width: "100%", paddingRight: 38, boxSizing: "border-box" as const }}
+                            />
+                            <button onClick={() => setPwVisible(!pwVisible)} style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: t.textMuted, cursor: "pointer", display: "flex" }}>
+                                {pwVisible ? <EyeOff style={{ width: 14, height: 14 }} /> : <Eye style={{ width: 14, height: 14 }} />}
+                            </button>
+                        </div>
+                        {newPw.length > 0 && newPw.length < 8 && (
+                            <p style={{ fontSize: "0.7rem", color: t.statusError, marginBottom: 6 }}>Password must be at least 8 characters</p>
+                        )}
+                        {pwMsg && (
+                            <p style={{ fontSize: "0.75rem", color: pwMsg.ok ? t.statusSuccess : t.statusError, marginBottom: 8, fontWeight: 600 }}>{pwMsg.text}</p>
+                        )}
+                        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
+                            <button onClick={() => setPwModal(null)} style={{ padding: "7px 16px", borderRadius: t.isMono ? 4 : 8, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>Cancel</button>
+                            <button
+                                onClick={resetPassword}
+                                disabled={pwSaving || newPw.length < 8}
+                                style={{
+                                    padding: "7px 16px", borderRadius: t.isMono ? 4 : 8, border: "none",
+                                    background: newPw.length >= 8 ? t.accentPrimary : `${t.textMuted}40`,
+                                    color: "#fff", fontSize: "0.8rem", fontWeight: 600, cursor: newPw.length >= 8 ? "pointer" : "not-allowed",
+                                    opacity: pwSaving ? 0.6 : 1, transition: "all 0.15s",
+                                }}
+                            >
+                                {pwSaving ? "Resetting…" : "Reset Password"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
