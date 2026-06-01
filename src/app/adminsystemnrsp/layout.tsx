@@ -11,7 +11,8 @@ import ThemeToggle from "@/components/ThemeToggle";
 import {
     LayoutGrid, Server, Users, Tag, Receipt,
     ScrollText, MessageSquare, MessagesSquare, SlidersHorizontal,
-    LogOut, ArrowLeft, Wallet, Shield, Store, FileText
+    LogOut, ArrowLeft, Wallet, Shield, Store, FileText,
+    Activity, Network,
 } from "lucide-react";
 
 type NavItem = { label: string; href: string; Icon: React.ElementType; badge?: number };
@@ -19,6 +20,11 @@ type NavItem = { label: string; href: string; Icon: React.ElementType; badge?: n
 const SUPPORT_ITEMS: NavItem[] = [
     { label: "Tickets",          href: "/adminsystemnrsp/tickets",      Icon: MessageSquare    },
     { label: "Secure Chat",      href: "/adminsystemnrsp/chats",        Icon: MessagesSquare   },
+];
+
+const INFRA_ITEMS: NavItem[] = [
+    { label: "Infrastructure",   href: "/adminsystemnrsp/infrastructure", Icon: Activity        },
+    { label: "VPC Networks",     href: "/adminsystemnrsp/vpcs",           Icon: Network         },
 ];
 
 const ADMIN_ITEMS: NavItem[] = [
@@ -67,7 +73,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const isActive = (href: string) =>
         href === "/adminsystemnrsp"
             ? pathname === "/adminsystemnrsp"
-            : pathname.startsWith(href);
+            : (pathname ?? "").startsWith(href);
 
     const linkStyle = (href: string): React.CSSProperties => {
         const active = isActive(href);
@@ -148,6 +154,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <nav style={{ flex: 1, padding: "4px 8px", display: "flex", flexDirection: "column", gap: 1 }}>
                     <span style={sectionLabel}>SUPPORT</span>
                     {SUPPORT_ITEMS.map(renderNavItem)}
+
+                    <span style={{ ...sectionLabel, marginTop: 16 }}>INFRASTRUCTURE</span>
+                    {INFRA_ITEMS.map(renderNavItem)}
 
                     <span style={{ ...sectionLabel, marginTop: 16 }}>ADMINISTRATION</span>
                     {ADMIN_ITEMS.map(renderNavItem)}

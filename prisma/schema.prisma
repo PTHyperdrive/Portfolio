@@ -257,6 +257,7 @@ model VpsInstance {
   ticket        DeploymentTicket?  @relation(fields: [ticketId], references: [id])
   gpuNode       GpuNode?           @relation(fields: [gpuNodeId], references: [id], onDelete: Restrict)
   blockStorage  VmBlockStorageAddon[]
+  vpcAssignment VpcAssignment?
 
   @@unique([vmId, node])
   @@index([userId])
@@ -304,6 +305,50 @@ model VmBlockStorageAddon {
   vpsInstance VpsInstance @relation(fields: [vpsInstanceId], references: [id], onDelete: Cascade)
 
   @@index([vpsInstanceId])
+}
+
+// ─── Per-Customer Virtual Private Cloud ──────────────────────────
+
+/// Tracks isolated VPC networks with per-customer VLANs (501-599).
+/// Each VPC maps to a Proxmox SDN VNet and a MikroTik VLAN interface.
+/// /28 subnets provide 14 usable IPs per customer.
+model Vpc {
+  id              String      @id @default(cuid())
+  name            String      // "VPC-001", "Customer-ABC"
+  vlanId          Int         @unique  // 501-599
+  vnetName        String      @unique  // Proxmox SDN VNet name: "vc001"
+  zoneName        String      @default("vxlan-vpc")  // Proxmox SDN Zone
+  mikrotikVlanIf  String?     // MikroTik VLAN interface name (auto-created)
+  subnet          String      // "10.50.1.0/28"
+  gateway         String      // "10.50.1.1"
+  dhcpStart       String?     // "10.50.1.2"
+  dhcpEnd         String?     // "10.50.1.14"
+  isolate         Boolean     @default(true)  // Proxmox "Isolate Ports"
+  status          String      @default("ACTIVE")  // ACTIVE | DISABLED
+  description     String?     @db.Text
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  assignments VpcAssignment[]
+
+  @@index([vlanId])
+  @@index([status])
+}
+
+/// Links a VPS instance to a VPC. 1:1 relationship — each VM
+/// belongs to at most one VPC at a time.
+model VpcAssignment {
+  id             String      @id @default(cuid())
+  vpcId          String
+  vpsInstanceId  String      @unique  // 1:1 — one VM per VPC assignment
+  bridgeName     String      // Proxmox bridge assigned (e.g. "vc001")
+  ipAddress      String?     // Static IP within subnet
+  assignedAt     DateTime    @default(now())
+
+  vpc         Vpc         @relation(fields: [vpcId], references: [id], onDelete: Cascade)
+  vpsInstance VpsInstance  @relation(fields: [vpsInstanceId], references: [id], onDelete: Cascade)
+
+  @@index([vpcId])
 }
 
 // ─── Phase 2: Per-User Nextcloud Cloud Storage ─────────────────────
@@ -512,6 +557,11 @@ enum AuditAction {
   ADMIN_PIN_RESET
   ADMIN_CHAT_KEY_SETUP
   USER_CHAT_PIN_RESET
+  // VPC / Network
+  VPC_CREATE
+  VPC_DELETE
+  VPC_ASSIGN_VM
+  VPC_UNASSIGN_VM
   // Misc
   REDIRECT_TO_PLANS
   TRIGGER_UPSELL_FLOW

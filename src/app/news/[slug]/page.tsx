@@ -18,7 +18,8 @@ interface NewsArticle {
 }
 
 export default function NewsArticlePage() {
-    const { slug } = useParams<{ slug: string }>();
+    const params = useParams<{ slug: string }>();
+    const slug = params?.slug;
     const [post, setPost] = useState<NewsArticle | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);

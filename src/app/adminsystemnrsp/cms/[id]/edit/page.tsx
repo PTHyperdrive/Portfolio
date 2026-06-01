@@ -9,7 +9,8 @@ import { ArrowLeft, Save, Eye, Trash2 } from "lucide-react";
 export default function CmsEditPost() {
     const t = useThemeTokens();
     const router = useRouter();
-    const { id } = useParams<{ id: string }>();
+    const params = useParams<{ id: string }>();
+    const id = params?.id;
 
     const [type, setType] = useState<string>("NEWS");
     const [title, setTitle] = useState("");

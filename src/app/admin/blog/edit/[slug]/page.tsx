@@ -7,7 +7,7 @@ import Link from "next/link";
 export default function EditBlogPostPage() {
     const router = useRouter();
     const params = useParams();
-    const slug = params.slug as string;
+    const slug = params?.slug as string;
 
     const [saving, setSaving] = useState(false);
     const [loading, setLoading] = useState(true);

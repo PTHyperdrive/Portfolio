@@ -33,7 +33,8 @@ interface Chapter {
 
 export default function ChapterEditor() {
     const t = useThemeTokens();
-    const { chapterId } = useParams<{ chapterId: string }>();
+    const params = useParams<{ chapterId: string }>();
+    const chapterId = params?.chapterId;
 
     const [chapter, setChapter] = useState<Chapter | null>(null);
     const [loading, setLoading] = useState(true);

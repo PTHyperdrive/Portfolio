@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { WINDOWS_ISOS, getIsosByCategory } from "@/lib/windows-isos";
 import { useThemeTokens } from "@/lib/useThemeTokens";
-import { AlertTriangle, Play, X } from "lucide-react";
+import { AlertTriangle, Play, X, Globe, Network } from "lucide-react";
 
 interface VmDetail {
     id: string;
@@ -31,6 +31,13 @@ interface VmDetail {
     } | null;
 }
 
+interface VpcAssignmentInfo {
+    id: string;
+    bridgeName: string;
+    ipAddress: string | null;
+    vpc: { id: string; name: string; vlanId: number; subnet: string; gateway: string; status: string };
+}
+
 export default function VmDetailPage({ params }: { params: Promise<{ vmId: string }> }) {
     const { vmId } = use(params);
     const searchParams = useSearchParams();
@@ -44,6 +51,7 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
     const [actionLoading, setActionLoading] = useState("");
     const [selectedIso, setSelectedIso] = useState<string>(WINDOWS_ISOS[0].id);
     const [error, setError] = useState("");
+    const [vpcAssignments, setVpcAssignments] = useState<VpcAssignmentInfo[]>([]);
 
     const [showDestroy, setShowDestroy] = useState(false);
     const [destroyPwd, setDestroyPwd] = useState("");
@@ -65,13 +73,25 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
         finally { setLoading(false); }
     }, [vmId, node]);
 
+    const loadVpcData = useCallback(async () => {
+        try {
+            const res = await fetch("/api/networks");
+            if (res.ok) {
+                const data = await res.json();
+                const mine = (data.assignments ?? []).filter((a: VpcAssignmentInfo & { vpsInstance: { vmId: string } }) => a.vpsInstance?.vmId === vmId);
+                setVpcAssignments(mine);
+            }
+        } catch { /* silent */ }
+    }, [vmId]);
+
     useEffect(() => {
         loadVm();
+        loadVpcData();
         const es = new EventSource(`/api/proxmox/vms/${vmId}/stream?node=${encodeURIComponent(node)}`);
         es.onmessage = (event: MessageEvent<string>) => { try { const liveData = JSON.parse(event.data) as VmDetail["liveData"]; setVm(prev => prev ? { ...prev, liveData } : prev); } catch { /* ignore */ } };
         es.onerror = () => {};
         return () => es.close();
-    }, [vmId, node, loadVm]);
+    }, [vmId, node, loadVm, loadVpcData]);
 
     const handleAction = async (action: string, isoId?: string) => {
         setActionLoading(action); setError("");
@@ -136,6 +156,7 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
 
     const tabs = [
         { id: "overview", label: "Overview" },
+        { id: "network", label: "Network" },
         { id: "console", label: "Console" },
         { id: "settings", label: "Settings" },
     ];
@@ -234,6 +255,47 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
                             ))}
                         </div>
                     </div>
+                </div>
+            )}
+
+            {/* ─── Network Tab ─── */}
+            {tab === "network" && (
+                <div>
+                    {vpcAssignments.length === 0 ? (
+                        <div style={{ ...card, padding: "48px 24px", textAlign: "center" }}>
+                            <div style={{ width: 52, height: 52, borderRadius: 14, background: t.accentPrimaryMuted, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 14px" }}>
+                                <Globe style={{ width: 26, height: 26, color: t.accentPrimary }} />
+                            </div>
+                            <p style={{ fontWeight: 700, color: t.textPrimary, marginBottom: 4 }}>No VPC Assignment</p>
+                            <p style={{ fontSize: "0.83rem", color: t.textMuted, maxWidth: 380, margin: "0 auto" }}>This VM is not assigned to any VPC network. Contact an administrator for VPC provisioning.</p>
+                        </div>
+                    ) : (
+                        <div style={{ display: "grid", gap: 16 }}>
+                            {vpcAssignments.map(a => (
+                                <div key={a.id} style={card}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+                                        <Network style={{ width: 18, height: 18, color: t.accentPrimary }} />
+                                        <span style={{ fontWeight: 700, color: t.textPrimary, fontSize: "1rem" }}>{a.vpc.name}</span>
+                                        <span style={{ fontSize: "0.68rem", fontWeight: 700, padding: "2px 8px", borderRadius: 4, background: a.vpc.status === "ACTIVE" ? t.statusSuccessBg : t.statusErrorBg, color: a.vpc.status === "ACTIVE" ? t.statusSuccess : t.statusError }}>{a.vpc.status}</span>
+                                    </div>
+                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: "0.85rem" }}>
+                                        {[
+                                            ["VLAN ID", String(a.vpc.vlanId)],
+                                            ["Subnet", a.vpc.subnet],
+                                            ["Gateway", a.vpc.gateway],
+                                            ["Assigned IP", a.ipAddress || "DHCP"],
+                                            ["Bridge", a.bridgeName],
+                                        ].map(([l, v]) => (
+                                            <div key={l as string} style={{ display: "flex", justifyContent: "space-between", padding: "8px 0", borderBottom: `1px solid ${t.borderSecondary}` }}>
+                                                <span style={{ color: t.textMuted }}>{l}</span>
+                                                <span style={{ color: t.accentPrimary, fontFamily: t.fontMono, fontWeight: 600 }}>{v}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
 
