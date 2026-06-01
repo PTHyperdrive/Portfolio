@@ -16,13 +16,21 @@
 
 import { Agent } from "undici";
 
-// ─── Configuration ───────────────────────────────────────────────
+// ─── Configuration (lazy — read at request time) ─────────────────
 
-const MT_HOST = process.env.MIKROTIK_HOST || "";
-const MT_PORT = process.env.MIKROTIK_PORT || "443";
-const MT_USER = process.env.MIKROTIK_USER || "";
-const MT_PASS = process.env.MIKROTIK_PASSWORD || "";
-const MT_INSECURE = process.env.MIKROTIK_TLS_INSECURE === "true";
+function getConfig() {
+    const host = process.env.MIKROTIK_HOST || "";
+    const port = process.env.MIKROTIK_PORT || "443";
+    const user = process.env.MIKROTIK_USER || "";
+    const pass = process.env.MIKROTIK_PASSWORD || "";
+    const insecure = process.env.MIKROTIK_TLS_INSECURE === "true";
+    return {
+        host, port, user, pass, insecure,
+        base: `https://${host}:${port}/rest`,
+        auth: "Basic " + Buffer.from(`${user}:${pass}`).toString("base64"),
+    };
+}
+
 const MT_PARENT_IF = process.env.MIKROTIK_PARENT_INTERFACE || "";
 const MT_WG_IF = process.env.MIKROTIK_WG_INTERFACE || "Customers-WG1";
 const MT_WG_ENDPOINT = process.env.MIKROTIK_WG_ENDPOINT || "";
@@ -30,16 +38,15 @@ const MT_WG_PORT = process.env.MIKROTIK_WG_PORT || "51822";
 const MT_WG_SUBNET = process.env.MIKROTIK_WG_SUBNET || "10.98.0.0/24";
 const MT_WG_GATEWAY = process.env.MIKROTIK_WG_GATEWAY || "10.98.0.1";
 
-const MT_BASE = `https://${MT_HOST}:${MT_PORT}/rest`;
-const MT_AUTH = "Basic " + Buffer.from(`${MT_USER}:${MT_PASS}`).toString("base64");
-
 // ─── TLS Agent ───────────────────────────────────────────────────
 
-const mikrotikAgent = new Agent({
-    connect: {
-        rejectUnauthorized: !MT_INSECURE,
-    },
-});
+function getMikrotikAgent() {
+    return new Agent({
+        connect: {
+            rejectUnauthorized: !(process.env.MIKROTIK_TLS_INSECURE === "true"),
+        },
+    });
+}
 
 // ─── Error Class ─────────────────────────────────────────────────
 
@@ -65,12 +72,13 @@ export async function mikrotikFetch(
     endpoint: string,
     options: RequestInit = {}
 ): Promise<unknown> {
-    if (!MT_HOST) throw new MikroTikApiError(0, "MIKROTIK_HOST not configured");
-    if (!MT_USER) throw new MikroTikApiError(0, "MIKROTIK_USER not configured");
+    const cfg = getConfig();
+    if (!cfg.host) throw new MikroTikApiError(0, "MIKROTIK_HOST not configured");
+    if (!cfg.user) throw new MikroTikApiError(0, "MIKROTIK_USER not configured");
 
-    const url = `${MT_BASE}${endpoint}`;
+    const url = `${cfg.base}${endpoint}`;
     const headers: Record<string, string> = {
-        Authorization: MT_AUTH,
+        Authorization: cfg.auth,
         ...(options.headers as Record<string, string>),
     };
 
@@ -82,7 +90,7 @@ export async function mikrotikFetch(
         ...options,
         headers,
         // @ts-expect-error -- undici dispatcher for TLS configuration
-        dispatcher: mikrotikAgent,
+        dispatcher: getMikrotikAgent(),
     });
 
     if (!res.ok) {
@@ -182,7 +190,8 @@ export interface PingResult {
  * Returns status and latency.
  */
 export async function pingRouter(): Promise<PingResult> {
-    if (!MT_HOST) {
+    const cfg = getConfig();
+    if (!cfg.host) {
         return { reachable: false, latencyMs: 0, status: "error" };
     }
 
@@ -191,13 +200,13 @@ export async function pingRouter(): Promise<PingResult> {
     const timeout = setTimeout(() => controller.abort(), 5000);
 
     try {
-        const url = `${MT_BASE}/system/identity`;
+        const url = `${cfg.base}/system/identity`;
         const res = await fetch(url, {
             method: "GET",
-            headers: { Authorization: MT_AUTH },
+            headers: { Authorization: cfg.auth },
             signal: controller.signal,
             // @ts-expect-error -- undici dispatcher
-            dispatcher: mikrotikAgent,
+            dispatcher: getMikrotikAgent(),
         });
 
         const latencyMs = Math.round(performance.now() - start);
