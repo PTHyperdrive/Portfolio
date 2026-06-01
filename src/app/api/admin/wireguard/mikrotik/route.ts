@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 import { listWgPeers } from "@/lib/mikrotik";
 
 /**
@@ -9,7 +8,7 @@ import { listWgPeers } from "@/lib/mikrotik";
  * Admin-only, read-only.
  */
 export async function GET() {
-    const session = await getServerSession(authOptions);
+    const session = await auth();
     if (!session?.user?.id || session.user.role !== "ADMIN") {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }

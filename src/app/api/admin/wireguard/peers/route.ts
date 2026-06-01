@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
 /**
@@ -8,7 +7,7 @@ import { prisma } from "@/lib/db";
  * Returns all WgPeer records from DB (for admin view).
  */
 export async function GET() {
-    const session = await getServerSession(authOptions);
+    const session = await auth();
     if (!session?.user?.id || session.user.role !== "ADMIN") {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
