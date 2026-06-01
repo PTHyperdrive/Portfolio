@@ -568,7 +568,7 @@ export async function collectHealthSnapshot(): Promise<MikrotikHealthSnapshot> {
  */
 export async function getWgInterfaceInfo(interfaceName = MT_WG_IF) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const ifaces: any[] = await mikrotikFetch("/interface/wireguard");
+    const ifaces: any[] = await mikrotikFetch("/interface/wireguard") as any[];
     const wg = ifaces.find((i) => i.name === interfaceName);
     if (!wg) throw new Error(`WireGuard interface '${interfaceName}' not found`);
     return {
