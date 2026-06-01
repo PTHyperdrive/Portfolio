@@ -97,7 +97,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: "Peer name is required (max 32 chars)" }, { status: 400 });
     }
 
-    const isAdmin = session.user.role === "ADMIN";
+    const isAdmin = (session.user as { role?: string }).role === "ADMIN";
     const maxPeers = isAdmin ? MAX_PEERS_ADMIN : MAX_PEERS_USER;
 
     // Check peer limit

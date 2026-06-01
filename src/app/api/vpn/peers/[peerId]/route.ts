@@ -15,7 +15,7 @@ export async function DELETE(
     }
 
     const { peerId } = await params;
-    const isAdmin = session.user.role === "ADMIN";
+    const isAdmin = (session.user as { role?: string }).role === "ADMIN";
 
     // Find peer — admin can revoke any, user can only revoke their own
     const peer = await prisma.wgPeer.findUnique({ where: { id: peerId } });
