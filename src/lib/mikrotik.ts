@@ -14,7 +14,8 @@
  *   MIKROTIK_PARENT_INTERFACE — Physical interface for VLAN trunking (e.g. "ether2")
  */
 
-import { Agent, fetch as undiciFetch } from "undici";
+import * as https from "node:https";
+import * as http from "node:http";
 
 // ─── Configuration (lazy — read at request time) ─────────────────
 
@@ -24,9 +25,10 @@ function getConfig() {
     const user = process.env.MIKROTIK_USER || "";
     const pass = process.env.MIKROTIK_PASSWORD || "";
     const insecure = process.env.MIKROTIK_TLS_INSECURE === "true";
+    const useHttp = port === "80" || process.env.MIKROTIK_TLS === "false";
     return {
-        host, port, user, pass, insecure,
-        base: `https://${host}:${port}/rest`,
+        host, port, user, pass, insecure, useHttp,
+        base: `${useHttp ? "http" : "https"}://${host}:${port}/rest`,
         auth: "Basic " + Buffer.from(`${user}:${pass}`).toString("base64"),
     };
 }
@@ -38,13 +40,51 @@ const MT_WG_PORT = process.env.MIKROTIK_WG_PORT || "51822";
 const MT_WG_SUBNET = process.env.MIKROTIK_WG_SUBNET || "10.98.0.0/24";
 const MT_WG_GATEWAY = process.env.MIKROTIK_WG_GATEWAY || "10.98.0.1";
 
-// ─── TLS Agent ───────────────────────────────────────────────────
+// ─── Raw HTTPS/HTTP request helper ──────────────────────────────
 
-function getMikrotikAgent() {
-    return new Agent({
-        connect: {
-            rejectUnauthorized: !(process.env.MIKROTIK_TLS_INSECURE === "true"),
-        },
+function rawRequest(
+    url: string,
+    options: { method?: string; headers?: Record<string, string>; body?: string; signal?: AbortSignal; rejectUnauthorized?: boolean }
+): Promise<{ status: number; statusText: string; body: string; headers: Record<string, string> }> {
+    return new Promise((resolve, reject) => {
+        const parsed = new URL(url);
+        const isHttps = parsed.protocol === "https:";
+        const mod = isHttps ? https : http;
+
+        const reqOptions: https.RequestOptions = {
+            hostname: parsed.hostname,
+            port: parsed.port || (isHttps ? 443 : 80),
+            path: parsed.pathname + parsed.search,
+            method: options.method || "GET",
+            headers: options.headers || {},
+            rejectUnauthorized: options.rejectUnauthorized ?? true,
+        };
+
+        const req = mod.request(reqOptions, (res) => {
+            const chunks: Buffer[] = [];
+            res.on("data", (chunk: Buffer) => chunks.push(chunk));
+            res.on("end", () => {
+                resolve({
+                    status: res.statusCode || 0,
+                    statusText: res.statusMessage || "",
+                    body: Buffer.concat(chunks).toString("utf8"),
+                    headers: res.headers as Record<string, string>,
+                });
+            });
+        });
+
+        req.on("error", reject);
+
+        if (options.signal) {
+            options.signal.addEventListener("abort", () => {
+                req.destroy(new Error("AbortError"));
+            });
+        }
+
+        if (options.body) {
+            req.write(options.body);
+        }
+        req.end();
     });
 }
 
@@ -86,17 +126,17 @@ export async function mikrotikFetch(
         headers["Content-Type"] = "application/json";
     }
 
-    const res = await undiciFetch(url, {
-        method: options.method || "GET",
+    const res = await rawRequest(url, {
+        method: (options.method as string) || "GET",
         headers,
         body: options.body as string | undefined,
-        dispatcher: getMikrotikAgent(),
+        rejectUnauthorized: !cfg.insecure,
     });
 
-    if (!res.ok) {
+    if (res.status >= 400) {
         let body: { error?: number; message?: string; detail?: string } = {};
         try {
-            body = (await res.json()) as typeof body;
+            body = JSON.parse(res.body) as typeof body;
         } catch {
             /* response may not be JSON */
         }
@@ -108,13 +148,12 @@ export async function mikrotikFetch(
     }
 
     // Some endpoints return empty body (DELETE success)
-    const text = await res.text();
-    if (!text) return null;
+    if (!res.body) return null;
 
     try {
-        return JSON.parse(text);
+        return JSON.parse(res.body);
     } catch {
-        return text;
+        return res.body;
     }
 }
 
@@ -201,16 +240,16 @@ export async function pingRouter(): Promise<PingResult> {
 
     try {
         const url = `${cfg.base}/system/identity`;
-        const res = await undiciFetch(url, {
+        const res = await rawRequest(url, {
             method: "GET",
             headers: { Authorization: cfg.auth },
             signal: controller.signal,
-            dispatcher: getMikrotikAgent(),
+            rejectUnauthorized: !cfg.insecure,
         });
 
         const latencyMs = Math.round(performance.now() - start);
 
-        if (res.ok) {
+        if (res.status >= 200 && res.status < 300) {
             return { reachable: true, latencyMs, status: "online" };
         }
         if (res.status === 401 || res.status === 403) {
