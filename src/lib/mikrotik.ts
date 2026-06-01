@@ -24,6 +24,11 @@ const MT_USER = process.env.MIKROTIK_USER || "";
 const MT_PASS = process.env.MIKROTIK_PASSWORD || "";
 const MT_INSECURE = process.env.MIKROTIK_TLS_INSECURE === "true";
 const MT_PARENT_IF = process.env.MIKROTIK_PARENT_INTERFACE || "";
+const MT_WG_IF = process.env.MIKROTIK_WG_INTERFACE || "Customers-WG1";
+const MT_WG_ENDPOINT = process.env.MIKROTIK_WG_ENDPOINT || "";
+const MT_WG_PORT = process.env.MIKROTIK_WG_PORT || "51822";
+const MT_WG_SUBNET = process.env.MIKROTIK_WG_SUBNET || "10.98.0.0/24";
+const MT_WG_GATEWAY = process.env.MIKROTIK_WG_GATEWAY || "10.98.0.1";
 
 const MT_BASE = `https://${MT_HOST}:${MT_PORT}/rest`;
 const MT_AUTH = "Basic " + Buffer.from(`${MT_USER}:${MT_PASS}`).toString("base64");
@@ -553,4 +558,96 @@ export async function collectHealthSnapshot(): Promise<MikrotikHealthSnapshot> {
     } catch {
         return { ...empty, status: "error" };
     }
+}
+
+// ─── WireGuard Peer Management ───────────────────────────────────
+
+/**
+ * Get WireGuard interface info (public key, listen port).
+ * Used for building client configs.
+ */
+export async function getWgInterfaceInfo(interfaceName = MT_WG_IF) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ifaces: any[] = await mikrotikFetch("/interface/wireguard");
+    const wg = ifaces.find((i) => i.name === interfaceName);
+    if (!wg) throw new Error(`WireGuard interface '${interfaceName}' not found`);
+    return {
+        name: wg.name,
+        publicKey: wg["public-key"] as string,
+        listenPort: parseInt(wg["listen-port"] ?? "0", 10),
+        running: wg.running === "true",
+        disabled: wg.disabled === "true",
+    };
+}
+
+/**
+ * List all WireGuard peers, optionally filtered by interface.
+ */
+export async function listWgPeers(interfaceName?: string) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const peers: any[] = await mikrotikFetch("/interface/wireguard/peers");
+    const filtered = interfaceName
+        ? peers.filter((p) => p.interface === interfaceName)
+        : peers;
+
+    return filtered.map((p) => ({
+        id: p[".id"] as string,
+        interface: p.interface as string,
+        publicKey: p["public-key"] as string,
+        allowedAddress: p["allowed-address"] as string,
+        comment: (p.comment ?? "") as string,
+        disabled: p.disabled === "true",
+        lastHandshake: (p["last-handshake"] ?? "") as string,
+        rx: parseInt(p.rx ?? "0", 10),
+        tx: parseInt(p.tx ?? "0", 10),
+    }));
+}
+
+/**
+ * Add a WireGuard peer to the specified interface.
+ * Returns the MikroTik `.id` for later deletion.
+ */
+export async function addWgPeer(opts: {
+    publicKey: string;
+    presharedKey?: string;
+    allowedAddress: string;
+    comment?: string;
+    interfaceName?: string;
+}): Promise<string> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body: Record<string, any> = {
+        interface: opts.interfaceName ?? MT_WG_IF,
+        "public-key": opts.publicKey,
+        "allowed-address": opts.allowedAddress,
+    };
+    if (opts.presharedKey) body["preshared-key"] = opts.presharedKey;
+    if (opts.comment) body.comment = opts.comment;
+
+    const result = await mikrotikFetch("/interface/wireguard/peers", {
+        method: "PUT",
+        body: JSON.stringify(body),
+    });
+    return result.ret as string; // MikroTik returns { "ret": "*1A" }
+}
+
+/**
+ * Remove a WireGuard peer by its MikroTik .id
+ */
+export async function removeWgPeer(mikrotikId: string) {
+    await mikrotikFetch(`/interface/wireguard/peers/${mikrotikId}`, {
+        method: "DELETE",
+    });
+}
+
+/**
+ * Returns the WireGuard config constants needed for client config generation.
+ */
+export function getWgConfig() {
+    return {
+        interfaceName: MT_WG_IF,
+        endpoint: MT_WG_ENDPOINT,
+        port: MT_WG_PORT,
+        subnet: MT_WG_SUBNET,
+        gateway: MT_WG_GATEWAY,
+    };
 }

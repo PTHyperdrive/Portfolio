@@ -51,6 +51,7 @@ model User {
   cryptoTopups         CryptoTopup[]
   invitationCodes      InvitationCode[]     @relation("InviteCreator")
   uploads              FileUpload[]
+  wgPeers              WgPeer[]
 }
 
 model Account {
@@ -351,6 +352,30 @@ model VpcAssignment {
   @@index([vpcId])
 }
 
+// ─── Website-Managed WireGuard Peers ─────────────────────────────
+
+/// Tracks WireGuard peers created via the website dashboard.
+/// Peers are pushed to the MikroTik Customers-WG1 interface.
+/// Each user can have up to 3 active peers (phone, laptop, desktop).
+/// Remote-WG1 is never managed by the website.
+model WgPeer {
+  id              String    @id @default(cuid())
+  userId          String
+  name            String                   // "My Laptop", "iPhone"
+  publicKey       String    @unique        // Client WG public key
+  presharedKey    String?   @db.Text       // Optional PSK
+  assignedIp      String    @unique        // 10.98.0.x
+  allowedSubnets  String    @db.Text       // JSON: ["10.50.1.0/28"]
+  mikrotikPeerId  String?                  // MikroTik .id for deletion
+  active          Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  revokedAt       DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
 // ─── Phase 2: Per-User Nextcloud Cloud Storage ─────────────────────
 
 /// One record per user. Tracks their Nextcloud cloud storage quota.
@@ -562,6 +587,9 @@ enum AuditAction {
   VPC_DELETE
   VPC_ASSIGN_VM
   VPC_UNASSIGN_VM
+  // WireGuard
+  WG_PEER_CREATE
+  WG_PEER_REVOKE
   // Misc
   REDIRECT_TO_PLANS
   TRIGGER_UPSELL_FLOW

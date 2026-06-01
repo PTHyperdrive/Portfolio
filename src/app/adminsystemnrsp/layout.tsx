@@ -25,6 +25,7 @@ const SUPPORT_ITEMS: NavItem[] = [
 const INFRA_ITEMS: NavItem[] = [
     { label: "Infrastructure",   href: "/adminsystemnrsp/infrastructure", Icon: Activity        },
     { label: "VPC Networks",     href: "/adminsystemnrsp/vpcs",           Icon: Network         },
+    { label: "WireGuard Peers",  href: "/adminsystemnrsp/wireguard",      Icon: Shield          },
 ];
 
 const ADMIN_ITEMS: NavItem[] = [
