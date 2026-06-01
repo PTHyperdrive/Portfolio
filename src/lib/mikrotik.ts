@@ -627,7 +627,7 @@ export async function addWgPeer(opts: {
         method: "PUT",
         body: JSON.stringify(body),
     });
-    return result.ret as string; // MikroTik returns { "ret": "*1A" }
+    return (result as Record<string, string>).ret; // MikroTik returns { "ret": "*1A" }
 }
 
 /**
