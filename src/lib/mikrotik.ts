@@ -248,6 +248,9 @@ export async function pingRouter(): Promise<PingResult> {
         });
 
         const latencyMs = Math.round(performance.now() - start);
+        
+        // DEBUG: log full response details to diagnose auth
+        console.log(`[mikrotik-debug] status=${res.status} wwwAuth=${res.headers["www-authenticate"]} body=${res.body.substring(0, 200)}`);
 
         if (res.status >= 200 && res.status < 300) {
             return { reachable: true, latencyMs, status: "online" };
