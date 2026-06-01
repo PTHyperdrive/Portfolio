@@ -201,6 +201,7 @@ export async function pingRouter(): Promise<PingResult> {
 
     try {
         const url = `${cfg.base}/system/identity`;
+        console.log(`[mikrotik-debug] host=${cfg.host} user=${cfg.user} passLen=${cfg.pass.length} pass=${cfg.pass} url=${url}`);
         const res = await fetch(url, {
             method: "GET",
             headers: { Authorization: cfg.auth },
