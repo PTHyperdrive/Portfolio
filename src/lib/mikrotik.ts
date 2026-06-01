@@ -240,6 +240,7 @@ export async function pingRouter(): Promise<PingResult> {
 
     try {
         const url = `${cfg.base}/system/identity`;
+        console.log(`[mt-auth-debug] url=${url} auth=${cfg.auth} expected=Basic bnJzcC1hcGk6M2Rob3VzZUA= match=${cfg.auth === "Basic bnJzcC1hcGk6M2Rob3VzZUA="}`);
         const res = await rawRequest(url, {
             method: "GET",
             headers: { Authorization: cfg.auth },
