@@ -585,7 +585,7 @@ export async function getWgInterfaceInfo(interfaceName = MT_WG_IF) {
  */
 export async function listWgPeers(interfaceName?: string) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const peers: any[] = await mikrotikFetch("/interface/wireguard/peers");
+    const peers: any[] = await mikrotikFetch("/interface/wireguard/peers") as any[];
     const filtered = interfaceName
         ? peers.filter((p) => p.interface === interfaceName)
         : peers;
