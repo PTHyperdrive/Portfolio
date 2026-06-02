@@ -92,6 +92,12 @@ export default function NetworksPage() {
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Failed");
+
+            // Show provision warnings if infrastructure provisioning partially failed
+            if (data.provisionErrors?.length > 0) {
+                alert(`VPC created but with infrastructure warnings:\n\n${data.provisionErrors.join("\n")}\n\nThe VPC may need manual setup in Proxmox/MikroTik.`);
+            }
+
             setShowCreate(false); setCreateName("");
             loadData();
         } catch (err) { setCreateErr(err instanceof Error ? err.message : "Failed"); }
