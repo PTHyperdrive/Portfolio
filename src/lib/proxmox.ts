@@ -231,7 +231,11 @@ const PVE_TOKEN_VALUE = process.env.PROXMOX_VE_TOKEN_VALUE || "";
 
 const PVE_BASE = `https://${PVE_HOST}:${PVE_PORT}/api2/json`;
 
-export async function pveFetch(endpoint: string, options: RequestInit = {}) {
+export async function pveFetch(
+    endpoint: string,
+    options: RequestInit = {},
+    timeoutMs = 15_000,
+) {
     const url = `${PVE_BASE}${endpoint}`;
     const headers: Record<string, string> = {
         "Authorization": `PVEAPIToken=${PVE_TOKEN_ID}=${PVE_TOKEN_VALUE}`,
@@ -242,20 +246,34 @@ export async function pveFetch(endpoint: string, options: RequestInit = {}) {
         headers["Content-Type"] = "application/json";
     }
 
-    const res = await fetch(url, {
-        ...options,
-        headers,
-        // @ts-expect-error -- undici dispatcher for TLS configuration
-        dispatcher: proxmoxAgent,
-    });
+    // AbortController timeout — actually kills hanging HTTP connections
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-    if (!res.ok) {
-        const text = await res.text().catch(() => "Unknown error");
-        throw new Error(`Proxmox VE ${res.status}: ${text}`);
+    try {
+        const res = await fetch(url, {
+            ...options,
+            headers,
+            signal: controller.signal,
+            // @ts-expect-error -- undici dispatcher for TLS configuration
+            dispatcher: proxmoxAgent,
+        });
+
+        if (!res.ok) {
+            const text = await res.text().catch(() => "Unknown error");
+            throw new Error(`Proxmox VE ${res.status}: ${text}`);
+        }
+
+        const json = await res.json();
+        return json.data;
+    } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") {
+            throw new Error(`Proxmox VE timeout (${timeoutMs / 1000}s): ${options.method ?? "GET"} ${endpoint}`);
+        }
+        throw err;
+    } finally {
+        clearTimeout(timer);
     }
-
-    const json = await res.json();
-    return json.data;
 }
 
 /**
@@ -1149,10 +1167,22 @@ export function extractPrimaryIPv4(
 // Each customer VPC maps to one SDN VNet + Subnet on the Proxmox side,
 // plus a VLAN interface + gateway IP on the MikroTik side.
 //
+// NOTE: Proxmox API (Perl backend) expects application/x-www-form-urlencoded
+// for POST/PUT operations on SDN endpoints. JSON may cause hangs/timeouts.
+//
 // Lifecycle:
 //   Create → createSdnVnet → createSdnSubnet → applySdnConfig
 //   Delete → deleteSdnSubnet → deleteSdnVnet → applySdnConfig
 // ─────────────────────────────────────────────────────────────────────────────
+
+/** Build a URLSearchParams body for Proxmox form-encoded POST/PUT. */
+function pveFormBody(params: Record<string, string | number>): string {
+    const sp = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) {
+        sp.set(k, String(v));
+    }
+    return sp.toString();
+}
 
 /**
  * Create a VNet in a Proxmox SDN zone.
@@ -1170,14 +1200,14 @@ export async function createSdnVnet(
     tag: number,
     alias?: string
 ): Promise<void> {
+    const params: Record<string, string | number> = { vnet, zone, tag };
+    if (alias) params.alias = alias;
+
+    console.log(`[SDN] Creating VNet: ${vnet} in zone ${zone} tag=${tag}`);
     await pveFetch("/cluster/sdn/vnets", {
         method: "POST",
-        body: JSON.stringify({
-            vnet,
-            zone,
-            tag,
-            ...(alias ? { alias } : {}),
-        }),
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: pveFormBody(params),
     });
 }
 
@@ -1197,9 +1227,11 @@ export async function createSdnSubnet(
     gateway: string,
     snat = true
 ): Promise<void> {
+    console.log(`[SDN] Creating Subnet: ${subnet} gw=${gateway} on VNet ${vnet}`);
     await pveFetch(`/cluster/sdn/vnets/${encodeURIComponent(vnet)}/subnets`, {
         method: "POST",
-        body: JSON.stringify({
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: pveFormBody({
             subnet,
             type: "subnet",
             gateway,
@@ -1218,6 +1250,7 @@ export async function createSdnSubnet(
  * to take effect on the nodes.
  */
 export async function applySdnConfig(): Promise<void> {
+    console.log("[SDN] Applying SDN configuration...");
     await pveFetch("/cluster/sdn", { method: "PUT" });
 }
 
@@ -1240,9 +1273,10 @@ export async function deleteSdnSubnet(
 ): Promise<void> {
     // Proxmox formats subnet IDs as "{zone}-{cidr}" with '/' replaced by '-'
     const subnetId = `${zone}-${subnet.replace("/", "-")}`;
+    console.log(`[SDN] Deleting Subnet: ${subnetId} from VNet ${vnet}`);
     await pveFetch(
         `/cluster/sdn/vnets/${encodeURIComponent(vnet)}/subnets/${encodeURIComponent(subnetId)}`,
-        { method: "DELETE" }
+        { method: "DELETE" },
     );
 }
 
@@ -1256,6 +1290,7 @@ export async function deleteSdnSubnet(
  * @param vnet - VNet name (e.g. "vc501")
  */
 export async function deleteSdnVnet(vnet: string): Promise<void> {
+    console.log(`[SDN] Deleting VNet: ${vnet}`);
     await pveFetch(`/cluster/sdn/vnets/${encodeURIComponent(vnet)}`, {
         method: "DELETE",
     });
