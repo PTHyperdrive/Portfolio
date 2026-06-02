@@ -87,9 +87,9 @@ export async function POST(req: NextRequest) {
         };
 
         // Validate VLAN range
-        if (!vlanId || vlanId < 501 || vlanId > 599) {
+        if (!vlanId || vlanId < 501 || vlanId > 1000) {
             return NextResponse.json(
-                { error: "VLAN ID must be between 501 and 599" },
+                { error: "VLAN ID must be between 501 and 1000" },
                 { status: 400 }
             );
         }
@@ -105,9 +105,8 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Generate Proxmox VNet name: vc001, vc002, ... based on VLAN offset
-        const vnetIndex = String(vlanId - 500).padStart(3, "0");
-        const vnetName = `vc${vnetIndex}`;
+        // Generate Proxmox VNet name: vc501, vc502, ... based on VLAN ID
+        const vnetName = `vc${vlanId}`;
         const vlanIfName = `vlan${vlanId}`;
 
         // ── MikroTik provisioning ────────────────────────────────────

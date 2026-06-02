@@ -301,7 +301,7 @@ export default function AccountSettingsView() {
     };
 
     return (
-        <div style={{ maxWidth: 800 }}>
+        <div style={{ maxWidth: 800, margin: "0 auto" }}>
                 {/* Header */}
                 <div style={{ marginBottom: "40px" }}>
                     <h1 style={{ fontSize: "1.6rem", fontWeight: 800, marginBottom: "8px", color: t.textPrimary }}>

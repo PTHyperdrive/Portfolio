@@ -43,6 +43,14 @@ export async function POST(req: NextRequest) {
         if (typeof creditValue !== "number" || creditValue <= 0) {
             return NextResponse.json({ error: "creditValue must be a positive number" }, { status: 400 });
         }
+        if (!Number.isInteger(creditValue) || creditValue > 2_147_483_647) {
+            return NextResponse.json({ error: "creditValue must be a whole number up to 2,147,483,647" }, { status: 400 });
+        }
+
+        const safeMaxUses = maxUses ?? 1;
+        if (!Number.isInteger(safeMaxUses) || safeMaxUses < 1 || safeMaxUses > 2_147_483_647) {
+            return NextResponse.json({ error: "maxUses must be a whole number between 1 and 2,147,483,647" }, { status: 400 });
+        }
 
         const existing = await prisma.promoCode.findUnique({ where: { code: code.toUpperCase() } });
         if (existing) {
@@ -53,7 +61,7 @@ export async function POST(req: NextRequest) {
             data: {
                 code: code.toUpperCase(),
                 creditValue,
-                maxUses: maxUses ?? 1,
+                maxUses: safeMaxUses,
                 expiresAt: expiresAt ? new Date(expiresAt) : null,
             },
         });

@@ -342,8 +342,8 @@ export default function VpcsPage() {
                                     <input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="customer-prod" style={inputStyle} />
                                 </div>
                                 <div>
-                                    <label style={{ display: "block", fontSize: "0.78rem", color: t.textMuted, marginBottom: 4, fontWeight: 600 }}>VLAN ID (501–599)</label>
-                                    <input required type="number" min={501} max={599} value={form.vlanId} onChange={e => setForm({ ...form, vlanId: e.target.value })} style={inputStyle} />
+                                    <label style={{ display: "block", fontSize: "0.78rem", color: t.textMuted, marginBottom: 4, fontWeight: 600 }}>VLAN ID (501–1000)</label>
+                                    <input required type="number" min={501} max={1000} value={form.vlanId} onChange={e => setForm({ ...form, vlanId: e.target.value })} style={inputStyle} />
                                 </div>
                             </div>
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>

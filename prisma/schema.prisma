@@ -23,6 +23,7 @@ model User {
   twoFactorSecret  String?
   loginWith2FA     Boolean @default(false)
   canInvite     Boolean   @default(false) // Admin toggle: allows user to generate invite codes
+  maxVpcs       Int       @default(3)    // Max VPCs per user (3 default, up to 5 via admin)
   trialExpiresAt DateTime?
   activePlan    String?
   planActivatedAt DateTime?
@@ -52,6 +53,7 @@ model User {
   invitationCodes      InvitationCode[]     @relation("InviteCreator")
   uploads              FileUpload[]
   wgPeers              WgPeer[]
+  vpcs                 Vpc[]
 }
 
 model Account {
@@ -310,14 +312,16 @@ model VmBlockStorageAddon {
 
 // ─── Per-Customer Virtual Private Cloud ──────────────────────────
 
-/// Tracks isolated VPC networks with per-customer VLANs (501-599).
+/// Tracks isolated VPC networks with per-customer VLANs (501-1000).
 /// Each VPC maps to a Proxmox SDN VNet and a MikroTik VLAN interface.
 /// /28 subnets provide 14 usable IPs per customer.
+/// Users can self-provision up to maxVpcs (default 3, max 5).
 model Vpc {
   id              String      @id @default(cuid())
-  name            String      // "VPC-001", "Customer-ABC"
-  vlanId          Int         @unique  // 501-599
-  vnetName        String      @unique  // Proxmox SDN VNet name: "vc001"
+  userId          String?     // Owner — null for legacy admin-created VPCs
+  name            String      // User-chosen display name
+  vlanId          Int         @unique  // 501-1000
+  vnetName        String      @unique  // Proxmox SDN VNet tag: "vc501"
   zoneName        String      @default("vxlan-vpc")  // Proxmox SDN Zone
   mikrotikVlanIf  String?     // MikroTik VLAN interface name (auto-created)
   subnet          String      // "10.50.1.0/28"
@@ -330,8 +334,10 @@ model Vpc {
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
+  user        User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
   assignments VpcAssignment[]
 
+  @@index([userId])
   @@index([vlanId])
   @@index([status])
 }
