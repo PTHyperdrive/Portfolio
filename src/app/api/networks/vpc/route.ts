@@ -10,6 +10,16 @@ import {
     removeIpAddress,
     removeFirewallRulesByComment,
 } from "@/lib/mikrotik";
+import {
+    createSdnVnet,
+    createSdnSubnet,
+    applySdnConfig,
+    deleteSdnSubnet,
+    deleteSdnVnet,
+} from "@/lib/proxmox";
+
+// ─── Constants ───────────────────────────────────────────────────
+const SDN_ZONE = "NRSPVC";
 
 // ─── Subnet calculation ──────────────────────────────────────────
 
@@ -98,7 +108,10 @@ export async function GET() {
  * POST /api/networks/vpc — Create a new VPC.
  * Body: { name: string }
  *
- * Auto-allocates VLAN ID, subnet, and provisions MikroTik resources.
+ * Provisioning order:
+ *   1. Proxmox SDN  → VNet + Subnet + Apply
+ *   2. MikroTik     → VLAN interface + IP + Firewall
+ *   3. Database      → VPC record
  */
 export async function POST(req: NextRequest) {
     try {
@@ -163,15 +176,41 @@ export async function POST(req: NextRequest) {
         const userVpcIndex = currentCount + 1;
         const mikrotikComment = `VPC-${username}-${userVpcIndex}`;
 
+        const provisionErrors: string[] = [];
+
+        // ── Proxmox SDN provisioning ─────────────────────────────────
+        try {
+            await createSdnVnet(vnetName, SDN_ZONE, vlanId, `${name.trim()} (${username})`);
+        } catch (err) {
+            provisionErrors.push(
+                `SDN VNet: ${err instanceof Error ? err.message : "Failed"}`,
+            );
+        }
+
+        try {
+            await createSdnSubnet(vnetName, net.subnet, net.gateway, true);
+        } catch (err) {
+            provisionErrors.push(
+                `SDN Subnet: ${err instanceof Error ? err.message : "Failed"}`,
+            );
+        }
+
+        try {
+            await applySdnConfig();
+        } catch (err) {
+            provisionErrors.push(
+                `SDN Apply: ${err instanceof Error ? err.message : "Failed"}`,
+            );
+        }
+
         // ── MikroTik provisioning ────────────────────────────────────
         let mikrotikVlanIf: string | null = null;
-        const mikrotikErrors: string[] = [];
 
         try {
             await createVlanInterface(vlanId, vlanIfName);
             mikrotikVlanIf = vlanIfName;
         } catch (err) {
-            mikrotikErrors.push(
+            provisionErrors.push(
                 `VLAN interface: ${err instanceof Error ? err.message : "Failed"}`,
             );
         }
@@ -179,7 +218,7 @@ export async function POST(req: NextRequest) {
         try {
             await addIpAddress(`${net.gateway}/28`, vlanIfName, mikrotikComment);
         } catch (err) {
-            mikrotikErrors.push(
+            provisionErrors.push(
                 `IP address: ${err instanceof Error ? err.message : "Failed"}`,
             );
         }
@@ -191,7 +230,7 @@ export async function POST(req: NextRequest) {
                 `NRSP-VPC-${vnetName}-isolation`,
             );
         } catch (err) {
-            mikrotikErrors.push(
+            provisionErrors.push(
                 `Firewall rule: ${err instanceof Error ? err.message : "Failed"}`,
             );
         }
@@ -203,6 +242,7 @@ export async function POST(req: NextRequest) {
                 name: name.trim(),
                 vlanId,
                 vnetName,
+                zoneName: SDN_ZONE,
                 mikrotikVlanIf,
                 subnet: net.subnet,
                 gateway: net.gateway,
@@ -218,12 +258,12 @@ export async function POST(req: NextRequest) {
             action: "VPC_CREATE",
             resourceType: "Network",
             resourceId: vpc.id,
-            metadata: { vlanId, vnetName, subnet: net.subnet, gateway: net.gateway, mikrotikErrors },
+            metadata: { vlanId, vnetName, subnet: net.subnet, gateway: net.gateway, provisionErrors },
             req,
         });
 
         return NextResponse.json(
-            { vpc, mikrotikErrors: mikrotikErrors.length > 0 ? mikrotikErrors : undefined },
+            { vpc, provisionErrors: provisionErrors.length > 0 ? provisionErrors : undefined },
             { status: 201 },
         );
     } catch (error) {
@@ -239,7 +279,12 @@ export async function POST(req: NextRequest) {
  * DELETE /api/networks/vpc — Delete user's own VPC.
  * Body: { vpcId: string }
  *
- * Refuses if VMs are still assigned. Cleans up MikroTik resources.
+ * Cleanup order:
+ *   1. MikroTik     → Firewall + IP + VLAN interface
+ *   2. Proxmox SDN  → Subnet + VNet + Apply
+ *   3. Database      → Delete record
+ *
+ * Refuses if VMs are still assigned.
  */
 export async function DELETE(req: NextRequest) {
     try {
@@ -298,6 +343,27 @@ export async function DELETE(req: NextRequest) {
             } catch (err) {
                 cleanupErrors.push(`VLAN interface: ${err instanceof Error ? err.message : "Failed"}`);
             }
+        }
+
+        // ── Proxmox SDN cleanup ──────────────────────────────────────
+        const zone = vpc.zoneName || SDN_ZONE;
+
+        try {
+            await deleteSdnSubnet(vpc.vnetName, zone, vpc.subnet);
+        } catch (err) {
+            cleanupErrors.push(`SDN Subnet: ${err instanceof Error ? err.message : "Failed"}`);
+        }
+
+        try {
+            await deleteSdnVnet(vpc.vnetName);
+        } catch (err) {
+            cleanupErrors.push(`SDN VNet: ${err instanceof Error ? err.message : "Failed"}`);
+        }
+
+        try {
+            await applySdnConfig();
+        } catch (err) {
+            cleanupErrors.push(`SDN Apply: ${err instanceof Error ? err.message : "Failed"}`);
         }
 
         // ── Database ─────────────────────────────────────────────────

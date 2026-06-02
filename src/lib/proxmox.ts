@@ -1143,3 +1143,121 @@ export function extractPrimaryIPv4(
     return null;
 }
 
+// ── Proxmox SDN (Software Defined Networking) ────────────────────────────────
+//
+// Manages VNets and Subnets in a Proxmox VXLAN zone.
+// Each customer VPC maps to one SDN VNet + Subnet on the Proxmox side,
+// plus a VLAN interface + gateway IP on the MikroTik side.
+//
+// Lifecycle:
+//   Create → createSdnVnet → createSdnSubnet → applySdnConfig
+//   Delete → deleteSdnSubnet → deleteSdnVnet → applySdnConfig
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Create a VNet in a Proxmox SDN zone.
+ *
+ * POST /cluster/sdn/vnets
+ *
+ * @param vnet     - VNet name (e.g. "vc501")
+ * @param zone     - SDN zone name (e.g. "NRSPVC")
+ * @param tag      - VLAN tag for the VXLAN overlay (e.g. 501)
+ * @param alias    - Optional human-readable alias
+ */
+export async function createSdnVnet(
+    vnet: string,
+    zone: string,
+    tag: number,
+    alias?: string
+): Promise<void> {
+    await pveFetch("/cluster/sdn/vnets", {
+        method: "POST",
+        body: JSON.stringify({
+            vnet,
+            zone,
+            tag,
+            ...(alias ? { alias } : {}),
+        }),
+    });
+}
+
+/**
+ * Create a Subnet inside a Proxmox SDN VNet.
+ *
+ * POST /cluster/sdn/vnets/{vnet}/subnets
+ *
+ * @param vnet    - Parent VNet name (e.g. "vc501")
+ * @param subnet  - CIDR notation (e.g. "10.50.1.0/28")
+ * @param gateway - Gateway IP (e.g. "10.50.1.1")
+ * @param snat    - Enable SNAT for outbound traffic
+ */
+export async function createSdnSubnet(
+    vnet: string,
+    subnet: string,
+    gateway: string,
+    snat = true
+): Promise<void> {
+    await pveFetch(`/cluster/sdn/vnets/${encodeURIComponent(vnet)}/subnets`, {
+        method: "POST",
+        body: JSON.stringify({
+            subnet,
+            type: "subnet",
+            gateway,
+            snat: snat ? 1 : 0,
+        }),
+    });
+}
+
+/**
+ * Apply pending SDN configuration changes across the Proxmox cluster.
+ *
+ * PUT /cluster/sdn
+ *
+ * This is the equivalent of clicking "Apply" in the Proxmox SDN UI.
+ * Must be called after creating or deleting VNets/Subnets for changes
+ * to take effect on the nodes.
+ */
+export async function applySdnConfig(): Promise<void> {
+    await pveFetch("/cluster/sdn", { method: "PUT" });
+}
+
+/**
+ * Delete a Subnet from a Proxmox SDN VNet.
+ *
+ * DELETE /cluster/sdn/vnets/{vnet}/subnets/{subnetId}
+ *
+ * The subnet ID in Proxmox uses the format: "{zone}-{cidr_with_dash}"
+ * e.g. "NRSPVC-10.50.1.0-28" for zone "NRSPVC", subnet "10.50.1.0/28".
+ *
+ * @param vnet     - Parent VNet name (e.g. "vc501")
+ * @param zone     - SDN zone name (e.g. "NRSPVC")
+ * @param subnet   - CIDR notation (e.g. "10.50.1.0/28")
+ */
+export async function deleteSdnSubnet(
+    vnet: string,
+    zone: string,
+    subnet: string
+): Promise<void> {
+    // Proxmox formats subnet IDs as "{zone}-{cidr}" with '/' replaced by '-'
+    const subnetId = `${zone}-${subnet.replace("/", "-")}`;
+    await pveFetch(
+        `/cluster/sdn/vnets/${encodeURIComponent(vnet)}/subnets/${encodeURIComponent(subnetId)}`,
+        { method: "DELETE" }
+    );
+}
+
+/**
+ * Delete a VNet from Proxmox SDN.
+ *
+ * DELETE /cluster/sdn/vnets/{vnet}
+ *
+ * All subnets must be removed first or the API will reject the request.
+ *
+ * @param vnet - VNet name (e.g. "vc501")
+ */
+export async function deleteSdnVnet(vnet: string): Promise<void> {
+    await pveFetch(`/cluster/sdn/vnets/${encodeURIComponent(vnet)}`, {
+        method: "DELETE",
+    });
+}
+

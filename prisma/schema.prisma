@@ -322,7 +322,7 @@ model Vpc {
   name            String      // User-chosen display name
   vlanId          Int         @unique  // 501-1000
   vnetName        String      @unique  // Proxmox SDN VNet tag: "vc501"
-  zoneName        String      @default("vxlan-vpc")  // Proxmox SDN Zone
+  zoneName        String      @default("NRSPVC")  // Proxmox SDN Zone (VXLAN)
   mikrotikVlanIf  String?     // MikroTik VLAN interface name (auto-created)
   subnet          String      // "10.50.1.0/28"
   gateway         String      // "10.50.1.1"
