@@ -5,7 +5,8 @@ import { listWgPeers } from "@/lib/mikrotik";
 /**
  * GET /api/admin/wireguard/mikrotik
  * Returns raw MikroTik WireGuard peers from both interfaces.
- * Admin-only, read-only.
+ * Wireguard-VPN = admin/rent combined interface (was Remote-WG1).
+ * Customers-WG1 = website-managed customer VPN.
  */
 export async function GET() {
     const session = await auth();
@@ -16,7 +17,7 @@ export async function GET() {
     try {
         const [customerPeers, remotePeers] = await Promise.all([
             listWgPeers("Customers-WG1").catch(() => []),
-            listWgPeers("Remote-WG1").catch(() => []),
+            listWgPeers("Wireguard-VPN").catch(() => []),
         ]);
 
         return NextResponse.json({ customerPeers, remotePeers });

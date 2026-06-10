@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import speakeasy from "speakeasy";
 import { safeDecryptTotpSecret } from "@/lib/totp-crypto";
+import { checkRateLimit } from "@/lib/security";
 
 /**
  * require2fa — Server-side 2FA enforcement helper
@@ -9,6 +10,8 @@ import { safeDecryptTotpSecret } from "@/lib/totp-crypto";
  * Call this in API routes before critical actions.
  * If the user has 2FA enabled, a valid TOTP token is required.
  * If 2FA is not enabled, this passes through silently.
+ *
+ * Rate limited: 5 attempts per 60 seconds per user (prevents brute-force).
  *
  * Usage:
  *   const check = await require2fa(userId, body.totpToken);
@@ -37,6 +40,12 @@ export async function require2fa(
         return { ok: false, error: "2FA_REQUIRED" };
     }
 
+    // Rate limit: 5 attempts per 60 seconds per user
+    const rl = checkRateLimit(`2fa-action:${userId}`, 5, 60_000);
+    if (!rl.allowed) {
+        return { ok: false, error: "2FA_RATE_LIMITED" };
+    }
+
     // 2FA enabled but no secret stored (broken state)
     if (!user.twoFactorSecret) {
         return { ok: false, error: "2FA_NOT_CONFIGURED" };
@@ -60,18 +69,22 @@ export async function require2fa(
 }
 
 /**
- * Helper to create a 403 NextResponse for 2FA failures.
+ * Helper to create error NextResponse for 2FA failures.
+ * Returns 429 for rate-limited, 403 for all other failures.
  */
 export function twoFactorErrorResponse(error: string) {
     const messages: Record<string, string> = {
         "2FA_REQUIRED": "Two-factor authentication code required for this action.",
         "INVALID_2FA": "Invalid authenticator code. Please try again.",
         "2FA_NOT_CONFIGURED": "2FA is enabled but not properly configured.",
+        "2FA_RATE_LIMITED": "Too many 2FA attempts. Please try again later.",
         "USER_NOT_FOUND": "User not found.",
     };
 
+    const status = error === "2FA_RATE_LIMITED" ? 429 : 403;
+
     return NextResponse.json(
         { error, message: messages[error] || "2FA verification failed." },
-        { status: 403 },
+        { status },
     );
 }

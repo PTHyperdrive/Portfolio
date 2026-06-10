@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import speakeasy from "speakeasy";
 import { audit } from "@/lib/audit";
 import { safeDecryptTotpSecret } from "@/lib/totp-crypto";
+import { checkRateLimit } from "@/lib/security";
 
 /**
  * POST /api/auth/2fa/disable
@@ -11,6 +12,8 @@ import { safeDecryptTotpSecret } from "@/lib/totp-crypto";
  * Disables 2FA for the authenticated user after verifying a valid TOTP
  * token from their authenticator app. Clears both twoFactorEnabled and
  * twoFactorSecret so a fresh key is generated if they re-enable later.
+ *
+ * Rate limited: 5 attempts per 60 seconds per user (prevents brute-force).
  *
  * Body: { token: string }
  */
@@ -22,6 +25,15 @@ export async function POST(req: Request) {
         }
 
         const userId = session.user.id;
+
+        // ── Rate limit: 5 attempts per 60 seconds per user ────────────
+        const rl = checkRateLimit(`2fa-disable:${userId}`, 5, 60_000);
+        if (!rl.allowed) {
+            return NextResponse.json(
+                { error: "Too many attempts. Please try again later.", retryAfterMs: rl.resetIn },
+                { status: 429 },
+            );
+        }
 
         // ── Parse body ───────────────────────────────────────────────────
         let body: Record<string, unknown> = {};

@@ -97,7 +97,7 @@ export default function AdminWireGuardPage() {
                         </div>
                         <div>
                             <h1 style={{ fontSize: "1.5rem", fontWeight: 800, color: t.textPrimary }}>WireGuard Peers</h1>
-                            <p style={{ fontSize: "0.83rem", color: t.textMuted }}>View all WireGuard peers across interfaces. Read-only for Remote-WG1.</p>
+                            <p style={{ fontSize: "0.83rem", color: t.textMuted }}>View all WireGuard peers across interfaces. Wireguard-VPN is read-only.</p>
                         </div>
                     </div>
                     <button onClick={loadData} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: t.isMono ? 4 : 8, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>
@@ -111,7 +111,7 @@ export default function AdminWireGuardPage() {
                 {[
                     { label: "Managed Peers", val: dbPeers.filter(p => p.active).length, color: t.accentPrimary },
                     { label: "Customers-WG1", val: mtPeersCustomer.length, color: t.statusSuccess },
-                    { label: "Remote-WG1", val: mtPeersRemote.length, color: t.statusWarning },
+                    { label: "Wireguard-VPN", val: mtPeersRemote.length, color: t.statusWarning },
                 ].map(s => (
                     <div key={s.label} style={{ padding: "8px 18px", borderRadius: t.isMono ? 4 : 8, background: t.bgCard, border: `1px solid ${t.borderPrimary}`, display: "flex", alignItems: "center", gap: 8 }}>
                         <span style={{ fontSize: "0.72rem", color: t.textMuted, fontWeight: 600 }}>{s.label}</span>
@@ -128,7 +128,7 @@ export default function AdminWireGuardPage() {
                 </button>
                 <button onClick={() => setTab("remote")} style={tabStyle("remote")}>
                     <Shield style={{ width: 13, height: 13, display: "inline", verticalAlign: -2, marginRight: 4 }} />
-                    Remote-WG1 (Read-only)
+                    Wireguard-VPN (Read-only)
                 </button>
                 <button onClick={() => setTab("customer")} style={tabStyle("customer")}>
                     <Wifi style={{ width: 13, height: 13, display: "inline", verticalAlign: -2, marginRight: 4 }} />
@@ -176,13 +176,13 @@ export default function AdminWireGuardPage() {
                         <>
                             <div style={{ padding: "14px 24px", borderBottom: `1px solid ${t.borderSecondary}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                    <span style={{ fontWeight: 700, color: t.textPrimary, fontSize: "0.9rem" }}>Remote-WG1 Peers</span>
+                                    <span style={{ fontWeight: 700, color: t.textPrimary, fontSize: "0.9rem" }}>Wireguard-VPN Peers</span>
                                     <span style={{ fontSize: "0.65rem", padding: "2px 6px", borderRadius: 4, background: t.statusWarningBg, color: t.statusWarning, fontWeight: 700 }}>READ-ONLY</span>
                                 </div>
                                 <span style={{ fontSize: "0.68rem", fontWeight: 700, padding: "2px 8px", borderRadius: 20, background: t.statusWarningBg, color: t.statusWarning }}>{mtPeersRemote.length}</span>
                             </div>
                             {mtPeersRemote.length === 0 ? (
-                                <div style={{ padding: "40px 24px", textAlign: "center", color: t.textMuted, fontSize: "0.88rem" }}>No peers on Remote-WG1.</div>
+                                <div style={{ padding: "40px 24px", textAlign: "center", color: t.textMuted, fontSize: "0.88rem" }}>No peers on Wireguard-VPN.</div>
                             ) : mtPeersRemote.map(p => (
                                 <div key={p.id} style={{ padding: "14px 24px", borderBottom: `1px solid ${t.borderSecondary}` }}>
                                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 3 }}>

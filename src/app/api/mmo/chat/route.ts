@@ -5,9 +5,20 @@ import bcrypt from "bcryptjs";
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
+/** Validate that a value is a non-empty string within a length limit. */
+function isValidString(val: unknown, maxLen: number): val is string {
+    return typeof val === "string" && val.length > 0 && val.length <= maxLen;
+}
+
 /**
  * POST /api/mmo/chat — Initialize a new encrypted chat thread.
  * Body: { pin, userPubKey, userEncPrivKey, userKeyIv }
+ *
+ * Input validation:
+ *   - pin:           numeric digits only, 4–8 chars
+ *   - userPubKey:    JSON string (JWK), max 2KB
+ *   - userEncPrivKey: base64 string, max 10KB
+ *   - userKeyIv:     base64 string, max 64 chars
  *
  * Returns { id, adminPubKey } so the client can derive the ECDH shared key.
  */
@@ -17,9 +28,26 @@ export async function POST(req: NextRequest) {
         if (!session?.user?.id)
             return NextResponse.json({ error: "Authentication required" }, { status: 401 });
 
-        const { pin, userPubKey, userEncPrivKey, userKeyIv } = await req.json();
-        if (!pin || pin.length < 4 || !userPubKey || !userEncPrivKey || !userKeyIv)
-            return NextResponse.json({ error: "PIN (4+ digits), public key, and encrypted private key required" }, { status: 400 });
+        const body = await req.json();
+        const { pin, userPubKey, userEncPrivKey, userKeyIv } = body;
+
+        // ── Input validation ──────────────────────────────────────────
+        if (!isValidString(pin, 8) || !/^\d{4,8}$/.test(pin))
+            return NextResponse.json({ error: "PIN must be 4–8 numeric digits" }, { status: 400 });
+
+        if (!isValidString(userPubKey, 2048))
+            return NextResponse.json({ error: "Invalid public key" }, { status: 400 });
+
+        if (!isValidString(userEncPrivKey, 10_000))
+            return NextResponse.json({ error: "Invalid encrypted private key" }, { status: 400 });
+
+        if (!isValidString(userKeyIv, 64))
+            return NextResponse.json({ error: "Invalid key IV" }, { status: 400 });
+
+        // Validate that userPubKey is valid JSON (JWK format)
+        try { JSON.parse(userPubKey); } catch {
+            return NextResponse.json({ error: "Public key must be valid JSON (JWK)" }, { status: 400 });
+        }
 
         // Fetch admin public key — required for ECDH
         const adminPubRow = await prisma.systemConfig.findUnique({ where: { key: "admin_chat_pub_key" } });

@@ -4,12 +4,15 @@ import { prisma } from "@/lib/db";
 import speakeasy from "speakeasy";
 import { audit } from "@/lib/audit";
 import { safeDecryptTotpSecret } from "@/lib/totp-crypto";
+import { checkRateLimit } from "@/lib/security";
 
 /**
  * POST /api/auth/2fa/verify
  *
  * Verifies a 6-digit TOTP token against the user's stored base32 secret.
  * If valid, permanently enables 2FA on the account.
+ *
+ * Rate limited: 5 attempts per 60 seconds per user (prevents brute-force).
  *
  * Body: { token: string }
  */
@@ -21,6 +24,15 @@ export async function POST(req: Request) {
         }
 
         const userId = session.user.id;
+
+        // ── Rate limit: 5 attempts per 60 seconds per user ────────────
+        const rl = checkRateLimit(`2fa-verify:${userId}`, 5, 60_000);
+        if (!rl.allowed) {
+            return NextResponse.json(
+                { error: "Too many verification attempts. Please try again later.", retryAfterMs: rl.resetIn },
+                { status: 429 },
+            );
+        }
 
         // ── Parse body ───────────────────────────────────────────────────
         let body: Record<string, unknown> = {};

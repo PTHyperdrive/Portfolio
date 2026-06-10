@@ -2,9 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
+/** Validate that a string is plausible base64 and within length limits. */
+function isValidBase64(str: unknown, maxLen: number): str is string {
+    if (typeof str !== "string" || str.length === 0 || str.length > maxLen) return false;
+    return /^[A-Za-z0-9+/=]+$/.test(str);
+}
+
 /**
  * POST /api/mmo/chat/message — Send an encrypted message
  * Body: { ciphertext: string (base64), iv: string (base64) }
+ *
+ * Input validation:
+ *   - ciphertext: base64 string, max 100KB (generous for E2EE messages)
+ *   - iv:         base64 string, max 64 chars (AES-GCM IV is 12 bytes → 16 base64 chars)
  */
 export async function POST(req: NextRequest) {
     try {
@@ -13,9 +23,18 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Authentication required" }, { status: 401 });
         }
 
-        const { ciphertext, iv, chatId } = await req.json();
-        if (!ciphertext || !iv) {
-            return NextResponse.json({ error: "Encrypted message payload required" }, { status: 400 });
+        const body = await req.json();
+        const { ciphertext, iv, chatId } = body;
+
+        // ── Input validation ──────────────────────────────────────────
+        if (!isValidBase64(ciphertext, 100_000)) {
+            return NextResponse.json({ error: "Invalid ciphertext: must be base64, max 100KB" }, { status: 400 });
+        }
+        if (!isValidBase64(iv, 64)) {
+            return NextResponse.json({ error: "Invalid IV: must be base64, max 64 chars" }, { status: 400 });
+        }
+        if (chatId !== undefined && (typeof chatId !== "string" || chatId.length > 100)) {
+            return NextResponse.json({ error: "Invalid chatId" }, { status: 400 });
         }
 
         const isAdmin = (session.user as { role?: string }).role === "ADMIN";

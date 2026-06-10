@@ -44,8 +44,8 @@ export async function POST(req: NextRequest) {
         }
 
         const { pin } = (await req.json()) as { pin?: string };
-        if (!pin) {
-            return NextResponse.json({ error: "PIN is required" }, { status: 400 });
+        if (!pin || typeof pin !== "string" || !/^\d{4,8}$/.test(pin)) {
+            return NextResponse.json({ error: "PIN must be 4–8 numeric digits" }, { status: 400 });
         }
 
         // Fetch the chat record (server-side only — never send pinHash to client)

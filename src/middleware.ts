@@ -8,7 +8,84 @@ function getSessionToken(request: NextRequest): string | undefined {
         || request.cookies.get('__Secure-authjs.session-token')?.value;
 }
 
+/** Allowed origins for CSRF validation. */
+const ALLOWED_ORIGINS = new Set([
+    'https://www.notrespond.com',
+    'https://notrespond.com',
+    'https://lab.notrespond.com',
+]);
+
+/**
+ * CSRF Origin validation for state-changing requests.
+ * Compares Origin (or Referer) header against the set of allowed origins.
+ * Returns true if the request is safe, false if it should be blocked.
+ */
+function validateCsrfOrigin(request: NextRequest): boolean {
+    const method = request.method.toUpperCase();
+    // Only validate state-changing methods
+    if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return true;
+
+    const origin = request.headers.get('origin');
+    const referer = request.headers.get('referer');
+
+    // In development, allow localhost
+    if (process.env.NODE_ENV === 'development') return true;
+
+    // Check Origin header first (preferred)
+    if (origin) {
+        return ALLOWED_ORIGINS.has(origin);
+    }
+
+    // Fall back to Referer header
+    if (referer) {
+        try {
+            const refOrigin = new URL(referer).origin;
+            return ALLOWED_ORIGINS.has(refOrigin);
+        } catch {
+            return false;
+        }
+    }
+
+    // No Origin or Referer — reject (strict mode)
+    return false;
+}
+
 export function middleware(request: NextRequest) {
+    const { pathname } = request.nextUrl;
+
+    // ── Block GET /api/auth/csrf ──
+    // NextAuth exposes a CSRF token via GET. This is only needed internally
+    // by the NextAuth client. Block unauthenticated direct access to prevent
+    // token harvesting for CSRF attacks.
+    if (pathname === '/api/auth/csrf') {
+        const origin = request.headers.get('origin');
+        const referer = request.headers.get('referer');
+        const secFetchSite = request.headers.get('sec-fetch-site');
+
+        // Allow same-origin requests (from our own frontend pages)
+        const isSameOrigin = secFetchSite === 'same-origin'
+            || (origin && ALLOWED_ORIGINS.has(origin))
+            || (referer && (() => {
+                try { return ALLOWED_ORIGINS.has(new URL(referer).origin); }
+                catch { return false; }
+            })());
+
+        if (!isSameOrigin) {
+            return NextResponse.json(
+                { error: 'Forbidden' },
+                { status: 403 },
+            );
+        }
+    }
+
+    // ── CSRF Origin Validation for all API POST/PUT/PATCH/DELETE ──
+    if (pathname.startsWith('/api/') && !validateCsrfOrigin(request)) {
+        return NextResponse.json(
+            { error: 'CSRF validation failed: invalid origin' },
+            { status: 403 },
+        );
+    }
+
     const response = NextResponse.next();
 
     // ── Apply Security Headers ──
@@ -17,7 +94,6 @@ export function middleware(request: NextRequest) {
     });
 
     // Pass pathname so the root layout can conditionally hide Navbar/Footer
-    const { pathname } = request.nextUrl;
     response.headers.set('x-pathname', pathname);
 
     const token = getSessionToken(request);
@@ -46,6 +122,7 @@ export function middleware(request: NextRequest) {
 
 export const config = {
     matcher: [
-        '/((?!_next/static|_next/image|favicon.ico|api/auth).*)',
+        // Include api/auth routes in the matcher now (for CSRF protection)
+        '/((?!_next/static|_next/image|favicon.ico).*)',
     ],
 };
