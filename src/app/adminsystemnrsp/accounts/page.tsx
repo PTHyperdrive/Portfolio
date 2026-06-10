@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, Fragment } from "react";
 import { useThemeTokens } from "@/lib/useThemeTokens";
-import { Users, Search, RefreshCw, ChevronDown, ChevronRight, Monitor, ShoppingBag, X, KeyRound, Eye, EyeOff, Trash2, AlertTriangle } from "lucide-react";
+import { Users, Search, RefreshCw, ChevronDown, ChevronRight, Monitor, ShoppingBag, X, KeyRound, Eye, EyeOff, Trash2, AlertTriangle, Wallet } from "lucide-react";
 
 interface VpsInstance { id: string; vmId: string; node: string; name: string; os: string; status: string; }
 interface AdminUser {
@@ -24,6 +24,12 @@ export default function AdminAccountsPage() {
     const [pwVisible, setPwVisible] = useState(false);
     const [pwSaving, setPwSaving] = useState(false);
     const [pwMsg, setPwMsg] = useState<{ ok: boolean; text: string } | null>(null);
+    // Credit adjustment state (delta only — admins can never SET a balance)
+    const [crModal, setCrModal] = useState<{ userId: string; name: string; email: string; credits: number } | null>(null);
+    const [crDelta, setCrDelta] = useState("");
+    const [crReason, setCrReason] = useState("");
+    const [crSaving, setCrSaving] = useState(false);
+    const [crMsg, setCrMsg] = useState<{ ok: boolean; text: string } | null>(null);
     // Bulk delete state
     const [selected, setSelected] = useState<Set<string>>(new Set());
     const [deleteModal, setDeleteModal] = useState(false);
@@ -65,6 +71,31 @@ export default function AdminAccountsPage() {
             }
         } catch { setPwMsg({ ok: false, text: "Network error" }); }
         finally { setPwSaving(false); }
+    };
+
+    const adjustCredits = async () => {
+        const delta = parseInt(crDelta, 10);
+        if (!crModal || !Number.isInteger(delta) || delta === 0) {
+            setCrMsg({ ok: false, text: "Enter a non-zero amount (use - to remove)" });
+            return;
+        }
+        setCrSaving(true); setCrMsg(null);
+        try {
+            const res = await fetch("/api/admin/users/credits", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ userId: crModal.userId, delta, reason: crReason }),
+            });
+            const d = await res.json();
+            if (res.ok) {
+                setUsers(prev => prev.map(u => u.id === crModal.userId ? { ...u, credits: d.newBalance } : u));
+                setCrMsg({ ok: true, text: `New balance: ${d.newBalance.toLocaleString()}` });
+                setTimeout(() => { setCrModal(null); setCrDelta(""); setCrReason(""); setCrMsg(null); }, 1200);
+            } else {
+                setCrMsg({ ok: false, text: d.error || "Adjustment failed" });
+            }
+        } catch { setCrMsg({ ok: false, text: "Network error" }); }
+        finally { setCrSaving(false); }
     };
 
     const load = useCallback(async () => {
@@ -236,7 +267,16 @@ export default function AdminAccountsPage() {
                                                 {user.role}
                                             </span>
                                         </td>
-                                        <td style={{ padding: "12px 16px", fontFamily: t.fontMono, fontSize: "0.82rem", color: t.statusSuccess }}>{user.credits.toLocaleString()}</td>
+                                        <td style={{ padding: "12px 16px" }}>
+                                            <button
+                                                onClick={e => { e.stopPropagation(); setCrModal({ userId: user.id, name: user.name || user.email, email: user.email, credits: user.credits }); }}
+                                                title="Adjust credits"
+                                                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 8px", borderRadius: t.isMono ? 4 : 6, border: `1px solid ${t.borderPrimary}`, background: "transparent", cursor: "pointer", fontFamily: t.fontMono, fontSize: "0.82rem", color: t.statusSuccess }}
+                                            >
+                                                {user.credits.toLocaleString()}
+                                                <Wallet style={{ width: 12, height: 12, color: t.textMuted }} />
+                                            </button>
+                                        </td>
                                         <td style={{ padding: "12px 16px", fontFamily: t.fontMono, fontSize: "0.875rem", fontWeight: 600, color: t.textSecondary }}>
                                             <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
                                                 <Monitor style={{ width: 11, height: 11, color: t.textMuted }} /> {user._count.vpsInstances}
@@ -321,6 +361,55 @@ export default function AdminAccountsPage() {
                     <p style={{ padding: "40px", textAlign: "center", color: t.textMuted }}>No users found.</p>
                 )}
             </div>
+
+            {/* Credit Adjustment Modal */}
+            {crModal && (
+                <div style={{ position: "fixed", inset: 0, zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.55)", backdropFilter: "blur(4px)" }} onClick={() => setCrModal(null)}>
+                    <div onClick={e => e.stopPropagation()} style={{ ...card, padding: "28px 32px", maxWidth: 420, width: "90%", position: "relative" }}>
+                        <button onClick={() => setCrModal(null)} style={{ position: "absolute", top: 12, right: 12, background: "none", border: "none", color: t.textMuted, cursor: "pointer", display: "flex" }}>
+                            <X style={{ width: 16, height: 16 }} />
+                        </button>
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+                            <div style={{ width: 36, height: 36, borderRadius: 8, background: t.statusSuccessBg, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                <Wallet style={{ width: 18, height: 18, color: t.statusSuccess }} />
+                            </div>
+                            <div>
+                                <p style={{ fontSize: "1rem", fontWeight: 700, color: t.textPrimary }}>Adjust Credits</p>
+                                <p style={{ fontSize: "0.75rem", color: t.textMuted }}>{crModal.name} &bull; balance {crModal.credits.toLocaleString()}</p>
+                            </div>
+                        </div>
+                        <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 600, color: t.textMuted, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>Amount (+ add / − remove)</label>
+                        <input
+                            type="number"
+                            value={crDelta}
+                            onChange={e => setCrDelta(e.target.value)}
+                            placeholder="e.g. 50000 or -20000"
+                            autoFocus
+                            style={{ ...inp, width: "100%", boxSizing: "border-box" as const, marginBottom: 10, fontFamily: t.fontMono }}
+                        />
+                        <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 600, color: t.textMuted, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.06em" }}>Reason (optional)</label>
+                        <input
+                            value={crReason}
+                            onChange={e => setCrReason(e.target.value)}
+                            placeholder="e.g. Refund for outage"
+                            style={{ ...inp, width: "100%", boxSizing: "border-box" as const, marginBottom: 6 }}
+                        />
+                        {crMsg && (
+                            <p style={{ fontSize: "0.75rem", color: crMsg.ok ? t.statusSuccess : t.statusError, marginBottom: 8, fontWeight: 600 }}>{crMsg.text}</p>
+                        )}
+                        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
+                            <button onClick={() => setCrModal(null)} style={{ padding: "7px 16px", borderRadius: t.isMono ? 4 : 8, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>Cancel</button>
+                            <button
+                                onClick={adjustCredits}
+                                disabled={crSaving || !crDelta}
+                                style={{ padding: "7px 16px", borderRadius: t.isMono ? 4 : 8, border: "none", background: crDelta ? t.accentPrimary : `${t.textMuted}40`, color: "#fff", fontSize: "0.8rem", fontWeight: 600, cursor: crDelta ? "pointer" : "not-allowed" }}
+                            >
+                                {crSaving ? "Applying..." : "Apply"}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Password Reset Modal */}
             {pwModal && (
