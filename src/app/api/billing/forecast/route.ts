@@ -22,7 +22,7 @@ export async function GET() {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const [user, vms, plans] = await Promise.all([
+        const [user, vms, plans, hourlySpent] = await Promise.all([
             prisma.user.findUnique({
                 where: { id: session.user.id },
                 select: { credits: true, activePlan: true },
@@ -35,6 +35,10 @@ export async function GET() {
                 },
             }),
             getServerPlanConfigs(),
+            prisma.creditTransaction.findMany({
+                where: { userId: session.user.id, type: "Hourly_Usage" },
+                select: { amount: true, details: true },
+            }),
         ]);
 
         if (!user) {
@@ -62,8 +66,19 @@ export async function GET() {
             ? new Date(Date.now() + runwayHours * 3_600_000).toISOString()
             : null;
 
+        // Lifetime totals from the metering ledger. Each cycle txn records
+        // "Hourly metering: N running VM(s)" — N VM-hours billed that hour.
+        const totalHourlySpent = hourlySpent.reduce((s, r) => s - r.amount, 0);
+        const totalVmHours = hourlySpent.reduce((s, r) => {
+            const m = r.details?.match(/(\d+) running VM/);
+            return s + (m ? parseInt(m[1], 10) : 1);
+        }, 0);
+
         return NextResponse.json({
             credits: user.credits,
+            totalHourlySpent,
+            // Cumulative billed VM-hours (2 VMs for 1h = 2 VM-hours)
+            totalVmHours,
             burn: {
                 hourly: burnPerHour,
                 daily: burnPerHour * PERIOD_HOURS.daily,

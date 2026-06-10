@@ -64,8 +64,16 @@ function planDisplayName(plan: string | null | undefined): string {
 
 /* ─── Component ─── */
 
+interface BurnForecast {
+    totalHourlySpent: number;
+    totalVmHours: number;
+    burn: { hourly: number };
+    runway: { days: number | null; hours: number | null };
+}
+
 export default function ConsoleHubPage() {
     const [data, setData] = useState<OverviewData | null>(null);
+    const [forecast, setForecast] = useState<BurnForecast | null>(null);
     const [loading, setLoading] = useState(true);
     const t = useThemeTokens();
     const { credits: globalCredits } = useCredits();
@@ -76,6 +84,11 @@ export default function ConsoleHubPage() {
             .then(r => r.json())
             .then(d => { if (!d.error) setData(d); })
             .finally(() => setLoading(false));
+
+        fetch("/api/billing/forecast")
+            .then(r => r.json())
+            .then(d => { if (!d.error) setForecast(d); })
+            .catch(() => {});
     }, []);
 
     /* ─── Derived ─── */
@@ -289,6 +302,13 @@ export default function ConsoleHubPage() {
                     <p style={{ fontSize: "1.6rem", fontWeight: 800, color: t.textPrimary, fontFamily: t.fontMono }}>
                         {globalCredits.toLocaleString()}
                     </p>
+                    {forecast && (
+                        <p style={{ fontSize: "0.75rem", color: forecast.burn.hourly > 0 && (forecast.runway.days ?? 99) <= 3 ? t.statusError : t.textMuted, marginTop: 4 }}>
+                            {forecast.burn.hourly > 0
+                                ? `Burning ${forecast.burn.hourly.toLocaleString()}/hr · ${forecast.runway.days}d ${(forecast.runway.hours ?? 0) % 24}h left · ${forecast.totalVmHours.toLocaleString()} VM-hrs used`
+                                : `No hourly charges · ${forecast.totalVmHours.toLocaleString()} VM-hrs used to date`}
+                        </p>
+                    )}
                     <Link href="/dashboard/billing" style={{
                         fontSize: "0.78rem", color: t.accentPrimary, textDecoration: "none",
                         fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 4, marginTop: 6,

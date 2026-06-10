@@ -27,6 +27,8 @@ interface BillingData {
 
 interface ForecastData {
     credits: number;
+    totalHourlySpent: number;
+    totalVmHours: number;
     burn: { hourly: number; daily: number; weekly: number; monthly: number };
     runway: { hours: number | null; days: number | null; depletionAt: string | null };
     vms: { vmId: string; name: string; plan: string | null; status: string; burnPerHour: number }[];
@@ -221,13 +223,22 @@ export default function BillingPage() {
                 </div>
 
                 {/* Usage Forecast */}
-                {forecast && forecast.burn.hourly > 0 && (
+                {forecast && (
                     <div style={{ ...card, padding: "28px", marginBottom: "32px" }}>
-                        <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "6px", color: t.textPrimary }}>
-                            Usage Forecast
-                        </h3>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "6px" }}>
+                            <h3 style={{ fontSize: "1rem", fontWeight: 700, color: t.textPrimary }}>
+                                Usage Forecast
+                            </h3>
+                            <span style={{ fontSize: "0.78rem", color: t.textMuted }}>
+                                <strong style={{ color: t.textPrimary }}>{forecast.totalVmHours.toLocaleString()}</strong> VM-hours used
+                                {" · "}
+                                <strong style={{ color: t.textPrimary }}>{forecast.totalHourlySpent.toLocaleString()}</strong> credits spent
+                            </span>
+                        </div>
                         <p style={{ fontSize: "0.82rem", color: t.textMuted, marginBottom: "20px" }}>
-                            Based on your {forecast.vms.filter((v) => v.status === "running").length} running VM(s), billed hourly.
+                            {forecast.burn.hourly > 0
+                                ? `Based on your ${forecast.vms.filter((v) => v.status === "running").length} running VM(s), billed hourly.`
+                                : "No metered VMs running right now — hourly billing is paused."}
                         </p>
 
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px", marginBottom: "20px" }}>
@@ -253,7 +264,7 @@ export default function BillingPage() {
                             fontSize: "0.88rem",
                         }}>
                             {forecast.runway.hours === null ? (
-                                "Add credits to start metering."
+                                "No active hourly charges — start a VM and metering begins."
                             ) : (
                                 <>
                                     <strong>{forecast.runway.days}d {forecast.runway.hours % 24}h</strong> of runway left

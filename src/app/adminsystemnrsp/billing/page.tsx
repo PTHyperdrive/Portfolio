@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useThemeTokens } from "@/lib/useThemeTokens";
-import { Receipt, Search, RefreshCw, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { Receipt, Search, RefreshCw, X, ChevronLeft, ChevronRight, Users } from "lucide-react";
 
 interface Transaction {
     id: string; plan: string; amount: number; method: string;
@@ -11,6 +11,14 @@ interface Transaction {
 }
 interface PageMeta { page: number; limit: number; total: number; totalPages: number; hasNextPage: boolean; hasPrevPage: boolean; }
 interface Summary { totalRevenue: number; completedCount: number; }
+
+interface UserUsage {
+    id: string; name: string | null; email: string; role: string;
+    credits: number; activePlan: string | null;
+    vmCount: number; runningVms: number;
+    burnPerHour: number; runwayHours: number | null;
+    totalVmHours: number; totalHourlySpent: number;
+}
 
 const STATUS_META: Record<string, { color: string; bg: string }> = {
     completed: { color: "#81c995", bg: "rgba(129,201,149,0.12)" },
@@ -28,8 +36,22 @@ export default function AdminBillingPage() {
     const [search, setSearch] = useState("");
     const [status, setStatus] = useState("");
     const [page, setPage] = useState(1);
+    // Display mode: "invoices" (transaction list) | "users" (per-user metering)
+    const [mode, setMode] = useState<"invoices" | "users">("invoices");
+    const [usage, setUsage] = useState<UserUsage[]>([]);
+    const [usageLoading, setUsageLoading] = useState(false);
 
     useEffect(() => { setPage(1); }, [search, status]);
+
+    useEffect(() => {
+        if (mode !== "users") return;
+        setUsageLoading(true);
+        fetch("/api/admin/billing/usage")
+            .then(r => r.json())
+            .then(d => { if (!d.error) setUsage(d.users ?? []); })
+            .catch(() => {})
+            .finally(() => setUsageLoading(false));
+    }, [mode]);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -60,14 +82,29 @@ export default function AdminBillingPage() {
                             <p style={{ fontSize: "0.82rem", color: t.textMuted }}>All platform transactions across all users.</p>
                         </div>
                     </div>
-                    <button onClick={load} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: t.isMono ? 4 : 8, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>
-                        <RefreshCw style={{ width: 13, height: 13 }} /> Refresh
-                    </button>
+                    <div style={{ display: "flex", gap: 8 }}>
+                        {/* Display mode toggle */}
+                        <div style={{ display: "flex", borderRadius: t.isMono ? 4 : 8, border: `1px solid ${t.borderPrimary}`, overflow: "hidden" }}>
+                            {([["invoices", "Invoices", Receipt], ["users", "Users", Users]] as const).map(([m, label, Icon]) => (
+                                <button key={m} onClick={() => setMode(m)} style={{
+                                    display: "flex", alignItems: "center", gap: 6, padding: "7px 14px",
+                                    border: "none", cursor: "pointer", fontSize: "0.8rem", fontWeight: 600,
+                                    background: mode === m ? t.accentPrimary : "transparent",
+                                    color: mode === m ? t.textInverse : t.textMuted,
+                                }}>
+                                    <Icon style={{ width: 13, height: 13 }} /> {label}
+                                </button>
+                            ))}
+                        </div>
+                        <button onClick={load} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: t.isMono ? 4 : 8, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>
+                            <RefreshCw style={{ width: 13, height: 13 }} /> Refresh
+                        </button>
+                    </div>
                 </div>
             </div>
 
             {/* Summary stats */}
-            {summary && (
+            {mode === "invoices" && summary && (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 20 }}>
                     {[
                         { label: "Total Revenue", val: `${(summary.totalRevenue ?? 0).toLocaleString()} VND`, color: t.statusSuccess },
@@ -82,7 +119,51 @@ export default function AdminBillingPage() {
                 </div>
             )}
 
+            {/* Users display mode — per-user metering overview */}
+            {mode === "users" && (
+                <div style={card}>
+                    {usageLoading ? (
+                        <div style={{ padding: "40px", textAlign: "center", color: t.textMuted }}>Loading user usage...</div>
+                    ) : usage.length === 0 ? (
+                        <div style={{ padding: "48px", textAlign: "center", color: t.textMuted }}>No users found.</div>
+                    ) : (
+                        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                            <thead><tr style={{ background: t.bgSecondary }}>
+                                {["User", "Credits", "Plan", "VMs (running)", "Burn /hr", "Runway", "VM-hours", "Spent (hourly)"].map(h => (
+                                    <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontSize: "0.68rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.07em", borderBottom: `1px solid ${t.borderSecondary}`, whiteSpace: "nowrap" }}>{h}</th>
+                                ))}
+                            </tr></thead>
+                            <tbody>
+                                {usage.map((u, idx) => (
+                                    <tr key={u.id} style={{ borderBottom: idx < usage.length - 1 ? `1px solid ${t.borderSecondary}` : "none" }}
+                                        onMouseEnter={e => (e.currentTarget.style.background = t.bgCardHover)}
+                                        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
+                                        <td style={{ padding: "11px 16px" }}>
+                                            <p style={{ fontWeight: 600, fontSize: "0.84rem", color: t.textPrimary }}>
+                                                {u.name || u.email}
+                                                {u.role === "ADMIN" && <span style={{ marginLeft: 6, padding: "1px 6px", borderRadius: 4, fontSize: "0.62rem", fontWeight: 700, background: t.statusWarningBg, color: t.statusWarning }}>ADMIN</span>}
+                                            </p>
+                                            <p style={{ fontSize: "0.68rem", color: t.textMuted }}>{u.email}</p>
+                                        </td>
+                                        <td style={{ padding: "11px 16px", fontFamily: t.fontMono, fontSize: "0.84rem", fontWeight: 700, color: t.textPrimary }}>{u.credits.toLocaleString()}</td>
+                                        <td style={{ padding: "11px 16px", fontSize: "0.8rem", color: t.textSecondary }}>{u.activePlan ?? "—"}</td>
+                                        <td style={{ padding: "11px 16px", fontFamily: t.fontMono, fontSize: "0.84rem", color: t.textSecondary }}>{u.vmCount} ({u.runningVms})</td>
+                                        <td style={{ padding: "11px 16px", fontFamily: t.fontMono, fontSize: "0.84rem", color: u.burnPerHour > 0 ? t.statusWarning : t.textMuted }}>{u.burnPerHour.toLocaleString()}</td>
+                                        <td style={{ padding: "11px 16px", fontSize: "0.8rem", color: u.runwayHours !== null && u.runwayHours <= 72 ? t.statusError : t.textSecondary }}>
+                                            {u.runwayHours === null ? "—" : `${Math.floor(u.runwayHours / 24)}d ${u.runwayHours % 24}h`}
+                                        </td>
+                                        <td style={{ padding: "11px 16px", fontFamily: t.fontMono, fontSize: "0.84rem", color: t.textSecondary }}>{u.totalVmHours.toLocaleString()}</td>
+                                        <td style={{ padding: "11px 16px", fontFamily: t.fontMono, fontSize: "0.84rem", color: t.statusSuccess }}>{u.totalHourlySpent.toLocaleString()}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+            )}
+
             {/* Filters */}
+            {mode === "invoices" && (
             <div style={{ display: "flex", gap: 10, marginBottom: 14, flexWrap: "wrap" }}>
                 <div style={{ position: "relative", flex: "1 1 220px" }}>
                     <Search style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", width: 13, height: 13, color: t.textMuted, pointerEvents: "none" }} />
@@ -97,8 +178,10 @@ export default function AdminBillingPage() {
                     <option value="refunded">Refunded</option>
                 </select>
             </div>
+            )}
 
             {/* Table */}
+            {mode === "invoices" && (
             <div style={card}>
                 {loading ? (
                     <div style={{ padding: "40px", textAlign: "center", color: t.textMuted }}>Loading transactions...</div>
@@ -149,6 +232,7 @@ export default function AdminBillingPage() {
                     </>
                 )}
             </div>
+            )}
         </div>
     );
 }
