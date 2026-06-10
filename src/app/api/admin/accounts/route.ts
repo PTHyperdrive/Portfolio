@@ -157,12 +157,8 @@ export async function DELETE(req: NextRequest) {
         const targetIds = targets.map(u => u.id);
         const notFound = userIds.filter(id => !targetIds.includes(id));
 
-        // Delete all valid targets
-        const result = await prisma.user.deleteMany({
-            where: { id: { in: targetIds } },
-        });
-
-        // Audit-log each deletion individually
+        // Audit-log each deletion BEFORE the transaction so we have
+        // a record attributed to the admin (audit logs use the admin's userId)
         for (const target of targets) {
             void audit({
                 userId: adminId!,
@@ -174,9 +170,15 @@ export async function DELETE(req: NextRequest) {
             });
         }
 
+        // Transaction: clear FK-restricted audit logs first, then delete users
+        const result = await prisma.$transaction([
+            prisma.auditLog.deleteMany({ where: { userId: { in: targetIds } } }),
+            prisma.user.deleteMany({ where: { id: { in: targetIds } } }),
+        ]);
+
         return NextResponse.json({
             success: true,
-            deleted: result.count,
+            deleted: result[1].count,
             notFound: notFound.length > 0 ? notFound : undefined,
         });
     } catch (error) {
