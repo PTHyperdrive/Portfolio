@@ -25,9 +25,17 @@ interface BillingData {
     transactions: Transaction[];
 }
 
+interface ForecastData {
+    credits: number;
+    burn: { hourly: number; daily: number; weekly: number; monthly: number };
+    runway: { hours: number | null; days: number | null; depletionAt: string | null };
+    vms: { vmId: string; name: string; plan: string | null; status: string; burnPerHour: number }[];
+}
+
 export default function BillingPage() {
     const t = useThemeTokens();
     const [data, setData] = useState<BillingData | null>(null);
+    const [forecast, setForecast] = useState<ForecastData | null>(null);
     const [loading, setLoading] = useState(true);
     const { credits: globalCredits } = useCredits();
     const [error, setError] = useState("");
@@ -41,6 +49,11 @@ export default function BillingPage() {
             })
             .catch((e) => setError(e.message))
             .finally(() => setLoading(false));
+
+        fetch("/api/billing/forecast")
+            .then((r) => r.json())
+            .then((d) => { if (!d.error) setForecast(d); })
+            .catch(() => {});
     }, []);
 
     const fmtDate = (s: string) =>
@@ -206,6 +219,50 @@ export default function BillingPage() {
                         </Link>
                     </div>
                 </div>
+
+                {/* Usage Forecast */}
+                {forecast && forecast.burn.hourly > 0 && (
+                    <div style={{ ...card, padding: "28px", marginBottom: "32px" }}>
+                        <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "6px", color: t.textPrimary }}>
+                            Usage Forecast
+                        </h3>
+                        <p style={{ fontSize: "0.82rem", color: t.textMuted, marginBottom: "20px" }}>
+                            Based on your {forecast.vms.filter((v) => v.status === "running").length} running VM(s), billed hourly.
+                        </p>
+
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px", marginBottom: "20px" }}>
+                            {([
+                                ["Per hour", forecast.burn.hourly],
+                                ["Per day", forecast.burn.daily],
+                                ["Per week", forecast.burn.weekly],
+                                ["Per month", forecast.burn.monthly],
+                            ] as const).map(([label, val]) => (
+                                <div key={label}>
+                                    <p style={{ fontSize: "0.72rem", color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "4px" }}>{label}</p>
+                                    <p style={{ fontSize: "1.05rem", fontWeight: 800, color: t.textPrimary }}>
+                                        {Math.round(val).toLocaleString()}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div style={{
+                            padding: "14px 18px", borderRadius: t.isMono ? 4 : 8,
+                            background: (forecast.runway.days ?? 99) <= 3 ? t.statusErrorBg : t.accentPrimaryMuted,
+                            color: (forecast.runway.days ?? 99) <= 3 ? t.statusError : t.textSecondary,
+                            fontSize: "0.88rem",
+                        }}>
+                            {forecast.runway.hours === null ? (
+                                "Add credits to start metering."
+                            ) : (
+                                <>
+                                    <strong>{forecast.runway.days}d {forecast.runway.hours % 24}h</strong> of runway left
+                                    {forecast.runway.depletionAt && ` — credits run out ${fmtDate(forecast.runway.depletionAt)}`}.
+                                </>
+                            )}
+                        </div>
+                    </div>
+                )}
 
                 {/* Invoices Table */}
                 <div style={{ ...card, padding: "28px" }}>
