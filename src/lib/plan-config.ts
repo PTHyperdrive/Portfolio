@@ -22,6 +22,12 @@ export interface PlanConfig {
     priceInCredits: number;
     /** Whether this plan requires a physical GPU slot (PCIe passthrough) */
     requiresGpu: boolean;
+    /**
+     * Admin-pinned prices per billing period (credits). Any period left
+     * unset is derived from priceInCredits — see lib/billing-periods.ts.
+     * Set via the admin pricing dashboard (stored in pricing_overrides).
+     */
+    periodPrices?: Partial<Record<"hourly" | "daily" | "weekly" | "monthly", number>>;
 }
 
 export const PLAN_CONFIGS: Record<string, PlanConfig> = {
