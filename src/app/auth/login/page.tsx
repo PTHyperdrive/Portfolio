@@ -16,7 +16,7 @@ export default function LoginPage() {
     const router = useRouter();
     const searchParams = useSearchParams();
     // Honour callbackUrl from middleware, default to Console overview
-    const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
+    const callbackUrl = searchParams?.get("callbackUrl") || "/dashboard";
 
     // Completes the NextAuth sign-in. `authorize()` re-validates everything
     // server-side (including the TOTP code), so this is the real gate.

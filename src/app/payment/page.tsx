@@ -6,7 +6,7 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import {
     Wallet, Clock, CheckCircle2, AlertTriangle, ShieldCheck, ShieldAlert,
-    Copy, Loader2, ArrowLeft, Zap, Wrench, ChevronDown,
+    Copy, Loader2, ArrowLeft, Zap, ChevronDown,
 } from "lucide-react";
 
 /* ── Types ────────────────────────────────────────────────────── */
