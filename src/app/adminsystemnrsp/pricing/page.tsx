@@ -19,6 +19,8 @@ interface PlanData {
     defaultOs: string;
     priceInCredits: number;
     requiresGpu: boolean;
+    periodPrices?: { hourly?: number };
+    resolvedPeriodPrices?: { hourly: number; daily: number; weekly: number; monthly: number };
 }
 
 interface PricingState {
@@ -234,6 +236,28 @@ export default function AdminPricingPage() {
         });
     };
 
+    /** Edit the pinned hourly rate locally; forecasts re-derive on render. */
+    const updateHourly = (name: string, hourly: number) => {
+        if (!data) return;
+        const plan = data.plans[name];
+        setData({
+            ...data,
+            plans: {
+                ...data.plans,
+                [name]: {
+                    ...plan,
+                    periodPrices: { ...plan.periodPrices, hourly },
+                    resolvedPeriodPrices: {
+                        hourly,
+                        daily: hourly * 24,
+                        weekly: hourly * 168,
+                        monthly: hourly * 720,
+                    },
+                },
+            },
+        });
+    };
+
     /* ── Styles ───────────────────────────────────────────────── */
 
     const card: React.CSSProperties = {
@@ -395,7 +419,7 @@ export default function AdminPricingPage() {
                         <table style={{ width: "100%", borderCollapse: "collapse" }}>
                             <thead>
                                 <tr style={{ background: t.bgSecondary }}>
-                                    {["Plan", "vCPU", "RAM (MB)", "Disk (GB)", "BW (Mbit/s)", "Storage", "Price (Credits)", "GPU", "Action"].map(h => (
+                                    {["Plan", "vCPU", "RAM (MB)", "Disk (GB)", "BW (Mbit/s)", "Storage", "Hourly (Credits/h)", "Day / Week / Month (forecast)", "GPU", "Action"].map(h => (
                                         <th key={h} style={thStyle}>{h}</th>
                                     ))}
                                 </tr>
@@ -418,10 +442,15 @@ export default function AdminPricingPage() {
                                         <td style={tdStyle}>
                                             <input
                                                 type="number"
-                                                value={plan.priceInCredits}
-                                                onChange={e => updatePlan(name, "priceInCredits", parseInt(e.target.value) || 0)}
+                                                value={plan.resolvedPeriodPrices?.hourly ?? 0}
+                                                onChange={e => updateHourly(name, parseInt(e.target.value) || 0)}
                                                 style={inp}
                                             />
+                                        </td>
+                                        <td style={{ ...tdStyle, fontFamily: t.fontMono, fontSize: "0.76rem", color: t.textMuted }}>
+                                            {(plan.resolvedPeriodPrices?.daily ?? 0).toLocaleString()}
+                                            {" / "}{(plan.resolvedPeriodPrices?.weekly ?? 0).toLocaleString()}
+                                            {" / "}{(plan.resolvedPeriodPrices?.monthly ?? 0).toLocaleString()}
                                         </td>
                                         <td style={tdStyle}>
                                             <span style={{
@@ -434,7 +463,7 @@ export default function AdminPricingPage() {
                                         </td>
                                         <td style={tdStyle}>
                                             <button
-                                                onClick={() => savePlan(name, { priceInCredits: plan.priceInCredits })}
+                                                onClick={() => savePlan(name, { periodPrices: { hourly: plan.resolvedPeriodPrices?.hourly ?? 0 } })}
                                                 disabled={saving === `plan-${name}`}
                                                 style={btnSave}
                                             >

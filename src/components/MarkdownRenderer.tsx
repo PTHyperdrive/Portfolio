@@ -47,13 +47,34 @@ export default function MarkdownRenderer({ content }: { content: string }) {
             }
         );
 
+        // ── URL sanitization ──
+        // Block javascript:/vbscript:/etc. URIs — only http(s)/mailto and
+        // relative paths are allowed. Returns null for unsafe URLs.
+        const safeUrl = (raw: string, allowDataImage = false): string | null => {
+            // Strip control chars + spaces so "java\tscript:" can't slip past.
+            const u = raw.replace(/[\u0000-\u0020]/g, "");
+            const scheme = u.match(/^([a-z][a-z0-9+.\-]*):/i)?.[1]?.toLowerCase();
+            if (scheme) {
+                if (["http", "https", "mailto"].includes(scheme)) return u;
+                if (allowDataImage && /^data:image\//i.test(u)) return u;
+                return null;
+            }
+            return u; // relative path / anchor
+        };
+
         // ── Images ──
-        text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g,
-            '<img class="md-img" src="$2" alt="$1" />');
+        text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_m, alt, src) => {
+            const safe = safeUrl(src, true);
+            return safe ? `<img class="md-img" src="${safe}" alt="${alt}" />` : "";
+        });
 
         // ── Links ──
-        text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g,
-            '<a class="md-link" href="$2" target="_blank" rel="noopener">$1</a>');
+        text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label, href) => {
+            const safe = safeUrl(href);
+            return safe
+                ? `<a class="md-link" href="${safe}" target="_blank" rel="noopener noreferrer">${label}</a>`
+                : label;
+        });
 
         // ── Headings ──
         text = text.replace(/^#### (.+)$/gm, (_m, h) => {

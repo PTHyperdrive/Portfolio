@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/admin-guard";
 import { audit } from "@/lib/audit";
 import { PLAN_CONFIGS } from "@/lib/plan-config";
+import { resolvePeriodPrices } from "@/lib/billing-periods";
 import {
     getServerPlanConfigs,
     savePricingOverrides,
@@ -24,8 +25,16 @@ export async function GET() {
         const exchangeRate = await getUsdtExchangeRate();
         const confirmations = await getRequiredConfirmations();
 
+        // Attach resolved hourly/daily/weekly/monthly prices per plan
+        const plansWithPeriods = Object.fromEntries(
+            Object.entries(plans).map(([name, cfg]) => [
+                name,
+                { ...cfg, resolvedPeriodPrices: resolvePeriodPrices(cfg) },
+            ])
+        );
+
         return NextResponse.json({
-            plans,
+            plans: plansWithPeriods,
             exchangeRate,
             confirmations,
         });
@@ -71,6 +80,21 @@ export async function PUT(req: NextRequest) {
                     { error: `Unknown plan: "${planName}"` },
                     { status: 400 }
                 );
+            }
+
+            // Validate manual period prices if supplied.
+            // Only HOURLY is a real, pinnable price — daily/weekly/monthly
+            // are derived forecasts and must not be set directly.
+            if (updates.periodPrices !== undefined) {
+                const pp = updates.periodPrices as Record<string, unknown>;
+                if (typeof pp !== "object" || pp === null ||
+                    Object.entries(pp).some(([k, v]) =>
+                        k !== "hourly" || typeof v !== "number" || v < 0 || !Number.isFinite(v))) {
+                    return NextResponse.json(
+                        { error: "periodPrices may only pin { hourly: number ≥ 0 } — other periods are forecast-derived" },
+                        { status: 400 }
+                    );
+                }
             }
 
             // Load existing overrides, merge the new change, save back

@@ -6,13 +6,16 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import {
     Wallet, Clock, CheckCircle2, AlertTriangle, ShieldCheck, ShieldAlert,
-    Copy, Loader2, ArrowLeft, Zap, Wrench, ChevronDown,
+    Copy, Loader2, ArrowLeft, Zap, ChevronDown,
 } from "lucide-react";
 
 /* ── Types ────────────────────────────────────────────────────── */
 
 interface PricingData {
-    plans: Record<string, { priceInCredits: number }>;
+    plans: Record<string, {
+        priceInCredits: number;
+        resolvedPeriodPrices?: { hourly: number; daily: number; weekly: number; monthly: number };
+    }>;
     exchangeRate: number;
 }
 
@@ -95,13 +98,17 @@ export default function PaymentPage() {
         };
     }, []);
 
-    /* ── Computed price ───────────────────────────────────────── */
-    const planPrice = pricing?.plans?.[plan]?.priceInCredits ?? 0;
+    /* ── Computed price (hourly is the only real charge) ──────── */
+    const periods = pricing?.plans?.[plan]?.resolvedPeriodPrices;
+    const hourlyRate = periods?.hourly ?? 0;
+    const monthlyForecast = periods?.monthly ?? 0;
     const exchangeRate = pricing?.exchangeRate ?? 26305;
-    const planPriceUsdt = planPrice > 0 ? (planPrice / exchangeRate).toFixed(2) : "0";
+    const monthlyUsdt = monthlyForecast > 0 ? (monthlyForecast / exchangeRate).toFixed(2) : "0";
 
-    /* ── Dev Bypass ───────────────────────────────────────────── */
-    const handleDevBypass = async () => {
+    /* ── Activate with credits ────────────────────────────────── */
+    // The server resolves the price and charges the prepaid credit wallet —
+    // the amount is never trusted from the client.
+    const handleActivateWithCredits = async () => {
         setLoading(true);
         setStatus("processing");
         setMsg("");
@@ -109,7 +116,7 @@ export default function PaymentPage() {
             const res = await fetch("/api/payment/activate", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ plan, amount: planPrice }),
+                body: JSON.stringify({ plan }),
             });
             const data = await res.json();
 
@@ -121,7 +128,7 @@ export default function PaymentPage() {
             }
 
             setStatus("success");
-            setMsg("Payment recorded! Redirecting to billing...");
+            setMsg("Plan activated! Redirecting to billing...");
             setTimeout(() => { window.location.href = "/dashboard/billing"; }, 1500);
         } catch {
             setStatus("error");
@@ -253,15 +260,15 @@ export default function PaymentPage() {
                             </p>
                         </div>
                         <span className="gradient-text" style={{ fontSize: "1.4rem", fontWeight: 800 }}>
-                            {pricingLoading ? "..." : planPrice === 0 ? "Free" : `${planPrice.toLocaleString()} Credits`}
+                            {pricingLoading ? "..." : hourlyRate === 0 ? "Free" : `${hourlyRate.toLocaleString()} Credits/hr`}
                         </span>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", paddingTop: "16px" }}>
-                        <span style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>Total Due</span>
+                        <span style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>Est. monthly (forecast)</span>
                         <span style={{ fontWeight: 800, fontSize: "1.1rem" }}>
-                            {pricingLoading ? "..." : planPrice === 0
+                            {pricingLoading ? "..." : hourlyRate === 0
                                 ? "$0.00"
-                                : `~$${planPriceUsdt} USDT`}
+                                : `${monthlyForecast.toLocaleString()} Credits (~$${monthlyUsdt})`}
                         </span>
                     </div>
                 </div>
@@ -525,7 +532,7 @@ export default function PaymentPage() {
                     )}
                 </div>
 
-                {/* Dev Bypass */}
+                {/* Pay with credit balance */}
                 <div style={{
                     padding: "20px 24px", borderRadius: "var(--radius-sm)",
                     border: "1px dashed rgba(0,240,255,0.2)",
@@ -536,14 +543,16 @@ export default function PaymentPage() {
                         textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "10px",
                         display: "flex", alignItems: "center", gap: 6,
                     }}>
-                        <Wrench style={{ width: 14, height: 14 }} />
-                        Development Mode
+                        <Wallet style={{ width: 14, height: 14 }} />
+                        Pay with Credit Balance
                     </p>
                     <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "14px" }}>
-                        Skip payment processing and mark this order as paid immediately.
+                        {hourlyRate === 0
+                            ? "Activate this plan instantly — no charge."
+                            : `No upfront cost — ${hourlyRate.toLocaleString()} credits/hour metered from your wallet only while your VM runs.`}
                     </p>
                     <button
-                        onClick={handleDevBypass}
+                        onClick={handleActivateWithCredits}
                         disabled={loading || isTrialLocked}
                         className="btn btn-primary"
                         style={{ width: "100%", padding: "14px", fontSize: "0.95rem" }}
@@ -551,7 +560,7 @@ export default function PaymentPage() {
                         {isTrialLocked ? "Trial Activated" : loading ? "Processing..." : (
                             <>
                                 <Zap style={{ width: 16, height: 16 }} />
-                                Dev Bypass: Mark as Paid
+                                {hourlyRate === 0 ? "Activate Plan" : "Start Hourly Billing"}
                             </>
                         )}
                     </button>

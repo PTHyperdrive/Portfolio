@@ -144,6 +144,25 @@ app.prepare().then(() => {
             console.log(`> VNC proxy: /novnc/* → wss://${pveHost}:${pvePort}/*`);
         }
     });
+
+    // ── Hourly metered billing ──────────────────────────────────
+    // Triggers the billing-cycle API every hour. The route itself is
+    // idempotent (55-min gate), so restarts can't double-charge.
+    const billingSecret = process.env.BILLING_CRON_SECRET;
+    if (billingSecret) {
+        const runCycle = () =>
+            fetch(`http://127.0.0.1:${port}/api/billing/cycle`, {
+                method: "POST",
+                headers: { "x-billing-cron-secret": billingSecret },
+            })
+                .then(async (r) => console.log("[billing-cron]", r.status, await r.text()))
+                .catch((e) => console.error("[billing-cron] failed:", e.message));
+        setInterval(runCycle, 60 * 60 * 1000);
+        setTimeout(runCycle, 30 * 1000); // catch-up shortly after boot
+        console.log("> Hourly billing cron: enabled");
+    } else {
+        console.warn("> Hourly billing cron: DISABLED (set BILLING_CRON_SECRET)");
+    }
 });
 
 /** Capitalize header names: sec-websocket-key → Sec-Websocket-Key */

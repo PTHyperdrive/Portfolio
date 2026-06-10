@@ -2,7 +2,14 @@
  * Create or reset an ADMIN account.
  * Uses direct mysql2 + bcrypt — no Prisma client needed.
  *
- * Usage:  npx tsx scripts/create-admin.ts
+ * Credentials are read from the environment — NEVER hardcode them, this file
+ * is committed to a public repository. Set them inline for a one-off run:
+ *
+ *   ADMIN_EMAIL=you@example.com ADMIN_PASSWORD='<strong-password>' \
+ *     npx tsx scripts/create-admin.ts
+ *
+ * If ADMIN_PASSWORD is omitted, a strong random password is generated and
+ * printed once below — copy it immediately, it is not stored anywhere else.
  */
 
 import bcrypt from "bcryptjs";
@@ -12,9 +19,12 @@ import dotenv from "dotenv";
 
 dotenv.config({ path: ".env" });
 
-const ADMIN_EMAIL    = "admin@notrespond.com";
-const ADMIN_PASSWORD = "NRSP3dhouse@#$";
-const ADMIN_NAME     = "Administrator";
+const ADMIN_EMAIL    = process.env.ADMIN_EMAIL || "admin@notrespond.com";
+// Generated if not supplied via env, so no secret ever lives in source.
+const GENERATED_PASSWORD = crypto.randomBytes(18).toString("base64url");
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || GENERATED_PASSWORD;
+const PASSWORD_WAS_GENERATED = !process.env.ADMIN_PASSWORD;
+const ADMIN_NAME     = process.env.ADMIN_NAME || "Administrator";
 const SALT_ROUNDS    = 12;
 
 async function main() {
@@ -52,7 +62,11 @@ async function main() {
 
     console.log(`  Email: ${ADMIN_EMAIL}`);
     console.log(`  Role:  ADMIN`);
-    console.log(`  Pass:  ${ADMIN_PASSWORD}`);
+    if (PASSWORD_WAS_GENERATED) {
+        console.log(`  Pass:  ${ADMIN_PASSWORD}   <-- GENERATED. Copy it now; it is not stored.`);
+    } else {
+        console.log(`  Pass:  (set from ADMIN_PASSWORD env)`);
+    }
 
     await conn.end();
 }

@@ -236,6 +236,10 @@ export async function pveFetch(
     options: RequestInit = {},
     timeoutMs = 15_000,
 ) {
+    if (!PVE_HOST || !PVE_PORT) {
+        throw new Error("Proxmox VE not configured: set PROXMOX_VE_HOST and PROXMOX_VE_PORT");
+    }
+
     const url = `${PVE_BASE}${endpoint}`;
     const headers: Record<string, string> = {
         "Authorization": `PVEAPIToken=${PVE_TOKEN_ID}=${PVE_TOKEN_VALUE}`,
@@ -269,6 +273,13 @@ export async function pveFetch(
     } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") {
             throw new Error(`Proxmox VE timeout (${timeoutMs / 1000}s): ${options.method ?? "GET"} ${endpoint}`);
+        }
+        // undici reports connectivity/TLS failures as a generic "fetch failed";
+        // the actionable reason (ECONNREFUSED, ENOTFOUND, cert error) is in .cause.
+        if (err instanceof TypeError && (err as { cause?: unknown }).cause) {
+            const cause = (err as { cause?: { code?: string; message?: string } }).cause;
+            const detail = cause?.code || cause?.message || String(cause);
+            throw new Error(`Proxmox VE unreachable at ${PVE_HOST}:${PVE_PORT} (${detail})`);
         }
         throw err;
     } finally {
@@ -424,6 +435,8 @@ export interface StoragePool {
     type: string;
     active: number;
     enabled: number;
+    /** Node memory utilisation 0–1, annotated by getAllNodesStorage(). */
+    nodeMemUsage?: number;
 }
 
 /**
@@ -437,15 +450,24 @@ export async function getNodeStorage(node: string): Promise<StoragePool[]> {
 
 /**
  * Fetch storage from all available nodes and collate into one flat list.
+ * Each pool is annotated with its node's current memory utilisation so the
+ * selector can balance VM placement across nodes, not just across disks.
  */
 export async function getAllNodesStorage(): Promise<StoragePool[]> {
     try {
-        const nodesRaw = await pveFetch("/nodes");
-        const nodes: string[] = (nodesRaw as { node: string }[]).map((n) => n.node);
-        const results = await Promise.allSettled(nodes.map((n) => getNodeStorage(n)));
+        const nodesRaw = await pveFetch("/nodes") as {
+            node: string; status: string; mem?: number; maxmem?: number;
+        }[];
+        const online = nodesRaw.filter((n) => n.status === "online");
+        const memUsage = new Map(online.map((n) => [
+            n.node,
+            n.maxmem ? (n.mem ?? 0) / n.maxmem : 0,
+        ]));
+        const results = await Promise.allSettled(online.map((n) => getNodeStorage(n.node)));
         return results
             .filter((r): r is PromiseFulfilledResult<StoragePool[]> => r.status === "fulfilled")
-            .flatMap((r) => r.value);
+            .flatMap((r) => r.value)
+            .map((p) => ({ ...p, nodeMemUsage: memUsage.get(p.node) ?? 0 }));
     } catch {
         return [];
     }
@@ -477,7 +499,11 @@ export function selectBestStorage(
     const candidates = filtered.length > 0
         ? filtered
         : pools.filter((p) => p.active === 1 && p.enabled === 1 && p.avail > 0);
-    candidates.sort((a, b) => b.avail - a.avail);
+    // Balance across nodes, not just disks: free space discounted by the
+    // node's RAM pressure, so a busy node loses to a quieter one even if
+    // its pool is slightly larger.
+    const score = (p: StoragePool) => p.avail * (1 - (p.nodeMemUsage ?? 0));
+    candidates.sort((a, b) => score(b) - score(a));
 
     if (candidates.length === 0) return null;
     return { node: candidates[0].node, storage: candidates[0].storage };

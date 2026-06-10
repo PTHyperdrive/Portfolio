@@ -99,50 +99,65 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        // Find unsold items FIFO
-        const availableItems = await prisma.mmoInventoryItem.findMany({
-            where: { categoryId, sold: false },
-            orderBy: { createdAt: "asc" },
-            take: qty,
-            select: { id: true },
-        });
-
-        if (availableItems.length < qty) {
-            return NextResponse.json({
-                error: "Not enough stock",
-                requested: qty,
-                available: availableItems.length,
-            }, { status: 409 });
-        }
-
         const now = new Date();
         const expiresAt = new Date(now.getTime() + RETENTION_DAYS * 24 * 60 * 60 * 1000);
-        const itemIds = availableItems.map((i: { id: string }) => i.id);
 
-        // Atomic transaction: deduct credits + mark items as sold
-        await prisma.$transaction([
-            prisma.user.update({
-                where: { id: user.id },
-                data: { credits: { decrement: totalCost } },
-            }),
-            prisma.mmoInventoryItem.updateMany({
-                where: { id: { in: itemIds } },
-                data: {
-                    sold: true,
-                    soldAt: now,
-                    soldToId: user.id,
-                    expiresAt,
-                },
-            }),
-            prisma.creditTransaction.create({
-                data: {
-                    userId: user.id,
-                    type: "MMO_Purchase",
-                    amount: -totalCost,
-                    details: `${qty}x ${category.name}`,
-                },
-            }),
-        ]);
+        // ── Atomic claim + charge ───────────────────────────────────────
+        // Everything below runs in one transaction with guarded writes so
+        // concurrent buyers can't double-spend credits or be sold the same
+        // item twice:
+        //   • credit decrement is conditional (credits >= cost) → 0 rows if short
+        //   • item claim is conditional (sold = false) → only unsold rows flip;
+        //     if a racing request grabbed some, our count < qty and we roll back
+        let itemIds: string[];
+        try {
+            itemIds = await prisma.$transaction(async (tx) => {
+                const charged = await tx.user.updateMany({
+                    where: { id: user.id, credits: { gte: totalCost } },
+                    data: { credits: { decrement: totalCost } },
+                });
+                if (charged.count === 0) throw new InsufficientCreditsError();
+
+                const available = await tx.mmoInventoryItem.findMany({
+                    where: { categoryId, sold: false },
+                    orderBy: { createdAt: "asc" },
+                    take: qty,
+                    select: { id: true },
+                });
+                if (available.length < qty) throw new OutOfStockError(available.length);
+
+                const ids = available.map((i: { id: string }) => i.id);
+                const claimed = await tx.mmoInventoryItem.updateMany({
+                    where: { id: { in: ids }, sold: false },
+                    data: { sold: true, soldAt: now, soldToId: user.id, expiresAt },
+                });
+                // A concurrent buyer claimed one of our rows first → abort cleanly.
+                if (claimed.count !== qty) throw new OutOfStockError(claimed.count);
+
+                await tx.creditTransaction.create({
+                    data: {
+                        userId: user.id,
+                        type: "MMO_Purchase",
+                        amount: -totalCost,
+                        details: `${qty}x ${category.name}`,
+                    },
+                });
+
+                return ids;
+            });
+        } catch (e) {
+            if (e instanceof InsufficientCreditsError) {
+                return NextResponse.json({
+                    error: "Insufficient credits", required: totalCost, available: user.credits,
+                }, { status: 402 });
+            }
+            if (e instanceof OutOfStockError) {
+                return NextResponse.json({
+                    error: "Not enough stock", requested: qty, available: e.available,
+                }, { status: 409 });
+            }
+            throw e;
+        }
 
         // Fetch the purchased items' data to return to user
         const purchasedItems = await prisma.mmoInventoryItem.findMany({
@@ -167,4 +182,10 @@ export async function POST(req: NextRequest) {
         console.error("[POST /api/mmo/purchase]", err);
         return NextResponse.json({ error: "Purchase failed" }, { status: 500 });
     }
+}
+
+/** Sentinels used to map transaction rollbacks to HTTP responses. */
+class InsufficientCreditsError extends Error {}
+class OutOfStockError extends Error {
+    constructor(public available: number) { super(); }
 }
