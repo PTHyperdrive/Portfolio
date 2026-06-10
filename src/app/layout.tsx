@@ -66,7 +66,7 @@ export default async function RootLayout({
             {children}
           </main>
           {!isBare && <Footer />}
-          {!isBare && <ContactSalesWidget />}
+          <ContactSalesWidget />
         </Providers>
       </body>
     </html>
