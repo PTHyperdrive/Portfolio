@@ -12,7 +12,10 @@ import {
 /* ── Types ────────────────────────────────────────────────────── */
 
 interface PricingData {
-    plans: Record<string, { priceInCredits: number }>;
+    plans: Record<string, {
+        priceInCredits: number;
+        resolvedPeriodPrices?: { hourly: number; daily: number; weekly: number; monthly: number };
+    }>;
     exchangeRate: number;
 }
 
@@ -95,10 +98,12 @@ export default function PaymentPage() {
         };
     }, []);
 
-    /* ── Computed price ───────────────────────────────────────── */
-    const planPrice = pricing?.plans?.[plan]?.priceInCredits ?? 0;
+    /* ── Computed price (hourly is the only real charge) ──────── */
+    const periods = pricing?.plans?.[plan]?.resolvedPeriodPrices;
+    const hourlyRate = periods?.hourly ?? 0;
+    const monthlyForecast = periods?.monthly ?? 0;
     const exchangeRate = pricing?.exchangeRate ?? 26305;
-    const planPriceUsdt = planPrice > 0 ? (planPrice / exchangeRate).toFixed(2) : "0";
+    const monthlyUsdt = monthlyForecast > 0 ? (monthlyForecast / exchangeRate).toFixed(2) : "0";
 
     /* ── Activate with credits ────────────────────────────────── */
     // The server resolves the price and charges the prepaid credit wallet —
@@ -255,15 +260,15 @@ export default function PaymentPage() {
                             </p>
                         </div>
                         <span className="gradient-text" style={{ fontSize: "1.4rem", fontWeight: 800 }}>
-                            {pricingLoading ? "..." : planPrice === 0 ? "Free" : `${planPrice.toLocaleString()} Credits`}
+                            {pricingLoading ? "..." : hourlyRate === 0 ? "Free" : `${hourlyRate.toLocaleString()} Credits/hr`}
                         </span>
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", paddingTop: "16px" }}>
-                        <span style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>Total Due</span>
+                        <span style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>Est. monthly (forecast)</span>
                         <span style={{ fontWeight: 800, fontSize: "1.1rem" }}>
-                            {pricingLoading ? "..." : planPrice === 0
+                            {pricingLoading ? "..." : hourlyRate === 0
                                 ? "$0.00"
-                                : `~$${planPriceUsdt} USDT`}
+                                : `${monthlyForecast.toLocaleString()} Credits (~$${monthlyUsdt})`}
                         </span>
                     </div>
                 </div>
@@ -542,9 +547,9 @@ export default function PaymentPage() {
                         Pay with Credit Balance
                     </p>
                     <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "14px" }}>
-                        {planPrice === 0
+                        {hourlyRate === 0
                             ? "Activate this plan instantly — no charge."
-                            : `Charge ${planPrice.toLocaleString()} credits from your wallet to activate this plan instantly.`}
+                            : `No upfront cost — ${hourlyRate.toLocaleString()} credits/hour metered from your wallet only while your VM runs.`}
                     </p>
                     <button
                         onClick={handleActivateWithCredits}
@@ -555,7 +560,7 @@ export default function PaymentPage() {
                         {isTrialLocked ? "Trial Activated" : loading ? "Processing..." : (
                             <>
                                 <Zap style={{ width: 16, height: 16 }} />
-                                {planPrice === 0 ? "Activate Plan" : "Pay with Credits"}
+                                {hourlyRate === 0 ? "Activate Plan" : "Start Hourly Billing"}
                             </>
                         )}
                     </button>

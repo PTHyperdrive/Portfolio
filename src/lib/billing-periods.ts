@@ -1,15 +1,15 @@
 /**
- * Billing Period Math — hourly / daily / weekly / monthly
+ * Billing Period Math — hourly-anchored
  *
- * Monthly `priceInCredits` (from plan-config + admin overrides) stays the
- * anchor price. Shorter periods are derived from it pro-rata with a small
- * flexibility premium (shorter commitment = slightly higher unit cost),
- * unless the admin has manually pinned a price for that period via the
- * pricing dashboard (`periodPrices` override on the plan).
+ * The platform bills HOURLY only (metered by /api/billing/cycle). The
+ * hourly rate is the single real price:
  *
- * Resolution order per period:
- *   1. plan.periodPrices[period]  — admin manual price (wins)
- *   2. priceInCredits × (hours/720) × premium — derived default
+ *   hourly = plan.periodPrices.hourly (admin-pinned)
+ *          ?? plan.priceInCredits / 720   (legacy monthly anchor ÷ 720h)
+ *
+ * Daily / weekly / monthly are NOT charges — they are forecast values
+ * derived from the hourly rate (hourly × 24 / 168 / 720) for display in
+ * pricing pages and the user's usage forecast.
  */
 
 import type { PlanConfig } from "@/lib/plan-config";
@@ -23,39 +23,25 @@ export const PERIOD_HOURS: Record<BillingPeriod, number> = {
     monthly: 720,
 };
 
-/** Flexibility premium applied to derived (non-pinned) prices. */
-export const PERIOD_PREMIUM: Record<BillingPeriod, number> = {
-    hourly: 1.2,
-    daily: 1.1,
-    weekly: 1.05,
-    monthly: 1.0,
-};
-
 export type PeriodPrices = Record<BillingPeriod, number>;
 
-/**
- * Resolve all four period prices for a plan.
- * `periodPrices` (admin-pinned) values win; the rest derive from monthly.
- */
-export function resolvePeriodPrices(plan: PlanConfig): PeriodPrices {
-    const monthly = plan.priceInCredits;
-    const pinned = plan.periodPrices ?? {};
-    const out = {} as PeriodPrices;
-
-    for (const period of Object.keys(PERIOD_HOURS) as BillingPeriod[]) {
-        const manual = pinned[period];
-        if (typeof manual === "number" && manual >= 0) {
-            out[period] = Math.round(manual);
-        } else {
-            out[period] = Math.round(
-                monthly * (PERIOD_HOURS[period] / PERIOD_HOURS.monthly) * PERIOD_PREMIUM[period]
-            );
-        }
-    }
-    return out;
+/** The one real price: credits charged per hour of VM runtime. */
+export function hourlyBurnRate(plan: PlanConfig): number {
+    const pinned = plan.periodPrices?.hourly;
+    if (typeof pinned === "number" && pinned >= 0) return Math.round(pinned);
+    return Math.round(plan.priceInCredits / PERIOD_HOURS.monthly);
 }
 
-/** Effective credits-per-hour burn rate for a plan (used by forecasts). */
-export function hourlyBurnRate(plan: PlanConfig): number {
-    return resolvePeriodPrices(plan).hourly;
+/**
+ * Hourly rate + pure forecasts for the other periods.
+ * Only `hourly` is ever charged; the rest are projections.
+ */
+export function resolvePeriodPrices(plan: PlanConfig): PeriodPrices {
+    const hourly = hourlyBurnRate(plan);
+    return {
+        hourly,
+        daily: hourly * PERIOD_HOURS.daily,
+        weekly: hourly * PERIOD_HOURS.weekly,
+        monthly: hourly * PERIOD_HOURS.monthly,
+    };
 }

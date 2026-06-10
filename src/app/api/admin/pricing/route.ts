@@ -82,15 +82,16 @@ export async function PUT(req: NextRequest) {
                 );
             }
 
-            // Validate manual period prices if supplied
+            // Validate manual period prices if supplied.
+            // Only HOURLY is a real, pinnable price — daily/weekly/monthly
+            // are derived forecasts and must not be set directly.
             if (updates.periodPrices !== undefined) {
                 const pp = updates.periodPrices as Record<string, unknown>;
-                const valid = ["hourly", "daily", "weekly", "monthly"];
                 if (typeof pp !== "object" || pp === null ||
                     Object.entries(pp).some(([k, v]) =>
-                        !valid.includes(k) || typeof v !== "number" || v < 0 || !Number.isFinite(v))) {
+                        k !== "hourly" || typeof v !== "number" || v < 0 || !Number.isFinite(v))) {
                     return NextResponse.json(
-                        { error: "periodPrices must map hourly/daily/weekly/monthly to non-negative numbers" },
+                        { error: "periodPrices may only pin { hourly: number ≥ 0 } — other periods are forecast-derived" },
                         { status: 400 }
                     );
                 }
