@@ -28,7 +28,8 @@ dotenv.config({ path: ".env.local" });
 // ── Config ───────────────────────────────────────────────────────
 const SHARED_VNET = process.env.PROXMOX_VPC_VNET || "vmcust50";
 const SDN_ZONE = process.env.PROXMOX_SDN_ZONE || "NRSPVC";
-const CUSTOMER_VLAN_IF = process.env.MIKROTIK_CUSTOMER_VLAN_IF || "vlan50-customers";
+// Gateways go on the bridge (br-vlan50), not the vlan50-customers slave port.
+const CUSTOMER_VLAN_IF = process.env.MIKROTIK_CUSTOMER_VLAN_IF || "br-vlan50";
 const VLAN_ID = 50;
 const TOTAL_SUBNETS = 4096; // /28 blocks in 10.50.0.0/16
 

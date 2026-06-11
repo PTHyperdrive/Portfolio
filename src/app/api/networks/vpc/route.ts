@@ -24,7 +24,9 @@ import {
 const SDN_ZONE = process.env.PROXMOX_SDN_ZONE || "NRSPVC";
 // All customer VPCs share ONE SDN VNet (tag 50) and ONE MikroTik VLAN iface.
 const SHARED_VNET = process.env.PROXMOX_VPC_VNET || "vmcust50";
-const CUSTOMER_VLAN_IF = process.env.MIKROTIK_CUSTOMER_VLAN_IF || "vlan50-customers";
+// L3 gateways must live on the BRIDGE (br-vlan50), not the vlan50-customers
+// slave port — Proxmox Timox-1 VMs arrive via RTL-ether1-2.5G into br-vlan50.
+const CUSTOMER_VLAN_IF = process.env.MIKROTIK_CUSTOMER_VLAN_IF || "br-vlan50";
 const PROVISION_TIMEOUT = 10_000; // 10s per infrastructure call
 
 // ─── Helpers ─────────────────────────────────────────────────────
