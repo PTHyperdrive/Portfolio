@@ -41,22 +41,24 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 if (!isValid) return null;
 
                 // ── Login 2FA gate ───────────────────────────────────────
-                // When the user has 2FA enabled AND opted into login 2FA, a
-                // valid TOTP code is mandatory. This is the real enforcement
-                // point — the precheck endpoint only decides whether the UI
-                // shows the code field; it cannot be bypassed by skipping it.
-                // We require a stored secret too, so a stray `loginWith2FA`
-                // flag without a configured authenticator never locks anyone out.
-                if (user.twoFactorEnabled && user.loginWith2FA && user.twoFactorSecret) {
+                // Login 2FA gate — the REAL enforcement point (precheck only
+                // decides what the UI shows; it can't be bypassed by skipping
+                // it). Enabling the authenticator makes a valid TOTP mandatory.
+                // A stored secret is required too, so a half-set-up flag never
+                // locks anyone out.
+                if (user.twoFactorEnabled && user.twoFactorSecret) {
                     const totp =
                         typeof (credentials as Record<string, unknown>).totp === 'string'
                             ? ((credentials as Record<string, unknown>).totp as string).trim()
                             : '';
                     if (!/^\d{6}$/.test(totp)) return null;
 
-                    // Throttle code guessing: 5 attempts / 60s per account.
-                    const rl = checkRateLimit(`login-2fa:${user.id}`, 5, 60_000);
-                    if (!rl.allowed) return null;
+                    // Throttle code guessing. A short burst window plus a
+                    // wider lockout: 5 tries/60s, and at most 15 tries/15min
+                    // per account — slows a pentester to a crawl.
+                    const burst = checkRateLimit(`login-2fa:${user.id}`, 5, 60_000);
+                    const sustained = checkRateLimit(`login-2fa-15m:${user.id}`, 15, 15 * 60_000);
+                    if (!burst.allowed || !sustained.allowed) return null;
 
                     const secret = safeDecryptTotpSecret(user.twoFactorSecret);
                     const ok = speakeasy.totp.verify({
