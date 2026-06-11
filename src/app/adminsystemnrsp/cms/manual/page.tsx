@@ -47,7 +47,7 @@ export default function ManualDashboard() {
     const inputStyle: React.CSSProperties = {
         width: "100%", boxSizing: "border-box" as const,
         background: t.bgInput, border: `1px solid ${t.borderPrimary}`,
-        borderRadius: t.isMono ? 4 : 8, color: t.textPrimary,
+        borderRadius: t.isMono ? 0 : 8, color: t.textPrimary,
         fontSize: "0.88rem", padding: "10px 14px", outline: "none",
     };
 
@@ -274,7 +274,7 @@ export default function ManualDashboard() {
 
                                     <div style={{ display: "flex", gap: 6 }}>
                                         <Link href={`/adminsystemnrsp/cms/manual/${ch.id}`} title="Edit sections" style={{
-                                            width: 32, height: 32, borderRadius: t.isMono ? 4 : 7,
+                                            width: 32, height: 32, borderRadius: t.isMono ? 0 : 7,
                                             display: "flex", alignItems: "center", justifyContent: "center",
                                             border: `1px solid ${t.borderPrimary}`, color: t.statusWarning,
                                             textDecoration: "none",
@@ -283,7 +283,7 @@ export default function ManualDashboard() {
                                         </Link>
                                         <button onClick={() => handleTogglePublish(ch.id, ch.published)}
                                             title={ch.published ? "Unpublish" : "Publish"} style={{
-                                            width: 32, height: 32, borderRadius: t.isMono ? 4 : 7,
+                                            width: 32, height: 32, borderRadius: t.isMono ? 0 : 7,
                                             display: "flex", alignItems: "center", justifyContent: "center",
                                             border: `1px solid ${t.borderPrimary}`, background: "transparent",
                                             color: ch.published ? t.statusSuccess : t.textMuted, cursor: "pointer",
@@ -291,7 +291,7 @@ export default function ManualDashboard() {
                                             {ch.published ? <Eye style={{ width: 13, height: 13 }} /> : <EyeOff style={{ width: 13, height: 13 }} />}
                                         </button>
                                         <button onClick={() => handleDeleteChapter(ch.id)} title="Delete" style={{
-                                            width: 32, height: 32, borderRadius: t.isMono ? 4 : 7,
+                                            width: 32, height: 32, borderRadius: t.isMono ? 0 : 7,
                                             display: "flex", alignItems: "center", justifyContent: "center",
                                             border: `1px solid ${t.borderPrimary}`, background: "transparent",
                                             color: t.statusError, cursor: "pointer",

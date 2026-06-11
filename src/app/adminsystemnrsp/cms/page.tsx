@@ -76,7 +76,7 @@ export default function CmsDashboard() {
 
     const inputStyle: React.CSSProperties = {
         background: t.bgInput, border: `1px solid ${t.borderPrimary}`,
-        borderRadius: t.isMono ? 4 : 8, color: t.textPrimary, fontSize: "0.85rem",
+        borderRadius: t.isMono ? 0 : 8, color: t.textPrimary, fontSize: "0.85rem",
         padding: "8px 12px", outline: "none", cursor: "pointer",
     };
 
@@ -211,7 +211,7 @@ export default function CmsDashboard() {
                                     <td style={{ padding: "14px 20px" }}>
                                         <div style={{ display: "flex", gap: 6 }}>
                                             <Link href={`/adminsystemnrsp/cms/${post.id}/edit`} title="Edit" style={{
-                                                width: 32, height: 32, borderRadius: t.isMono ? 4 : 7,
+                                                width: 32, height: 32, borderRadius: t.isMono ? 0 : 7,
                                                 display: "flex", alignItems: "center", justifyContent: "center",
                                                 border: `1px solid ${t.borderPrimary}`, color: t.textSecondary,
                                                 textDecoration: "none",
@@ -219,7 +219,7 @@ export default function CmsDashboard() {
                                                 <Pencil style={{ width: 13, height: 13 }} />
                                             </Link>
                                             <button onClick={() => handleTogglePublish(post.id, post.published)} title={post.published ? "Unpublish" : "Publish"} style={{
-                                                width: 32, height: 32, borderRadius: t.isMono ? 4 : 7,
+                                                width: 32, height: 32, borderRadius: t.isMono ? 0 : 7,
                                                 display: "flex", alignItems: "center", justifyContent: "center",
                                                 border: `1px solid ${t.borderPrimary}`, background: "transparent",
                                                 color: post.published ? t.statusSuccess : t.textMuted, cursor: "pointer",
@@ -227,7 +227,7 @@ export default function CmsDashboard() {
                                                 {post.published ? <Eye style={{ width: 13, height: 13 }} /> : <EyeOff style={{ width: 13, height: 13 }} />}
                                             </button>
                                             <button onClick={() => handleDelete(post.id)} disabled={deleting === post.id} title="Delete" style={{
-                                                width: 32, height: 32, borderRadius: t.isMono ? 4 : 7,
+                                                width: 32, height: 32, borderRadius: t.isMono ? 0 : 7,
                                                 display: "flex", alignItems: "center", justifyContent: "center",
                                                 border: `1px solid ${t.borderPrimary}`, background: "transparent",
                                                 color: t.statusError, cursor: "pointer",

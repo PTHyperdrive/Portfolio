@@ -14,7 +14,7 @@ const CYCLE_ORDER: ThemeId[] = ["slop", "mono-dark", "mono-light"];
 const STORAGE_KEY = "nrsp-theme";
 
 const ThemeContext = createContext<ThemeContextValue>({
-    theme: "slop",
+    theme: "mono-dark",
     setTheme: () => {},
     cycleTheme: () => {},
 });
@@ -27,11 +27,11 @@ function getInitialTheme(): ThemeId {
     if (typeof window === "undefined") return "slop";
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored && CYCLE_ORDER.includes(stored as ThemeId)) return stored as ThemeId;
-    return "slop";
+    return "mono-dark";
 }
 
 export default function ThemeProvider({ children }: { children: ReactNode }) {
-    const [theme, setThemeState] = useState<ThemeId>("slop");
+    const [theme, setThemeState] = useState<ThemeId>("mono-dark");
     const [mounted, setMounted] = useState(false);
 
     // Read from localStorage on mount

@@ -68,7 +68,7 @@ export default function MmoAdminPage() {
     const inputStyle: React.CSSProperties = {
         width: "100%", boxSizing: "border-box", padding: "9px 12px",
         background: t.bgInput, border: `1px solid ${t.borderPrimary}`,
-        borderRadius: t.isMono ? 4 : 8, color: t.textPrimary,
+        borderRadius: t.isMono ? 0 : 8, color: t.textPrimary,
         fontSize: "0.85rem", fontFamily: t.fontFamily, outline: "none",
     };
     const labelStyle: React.CSSProperties = {
@@ -181,10 +181,10 @@ export default function MmoAdminPage() {
                         </div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <button onClick={openCreate} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: t.isMono ? 4 : 8, border: "none", background: t.accentPrimary, color: t.isMono ? t.bgPrimary : "#fff", fontWeight: 700, fontSize: "0.82rem", cursor: "pointer" }}>
+                        <button onClick={openCreate} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: t.isMono ? 0 : 8, border: "none", background: t.accentPrimary, color: t.isMono ? t.bgPrimary : "#fff", fontWeight: 700, fontSize: "0.82rem", cursor: "pointer" }}>
                             <Plus style={{ width: 14, height: 14 }} /> New Category
                         </button>
-                        <button onClick={loadCategories} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: t.isMono ? 4 : 8, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>
+                        <button onClick={loadCategories} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: t.isMono ? 0 : 8, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>
                             <RefreshCw style={{ width: 13, height: 13 }} /> Refresh
                         </button>
                     </div>
@@ -245,11 +245,11 @@ export default function MmoAdminPage() {
                             </div>
                             {formErr && <p style={{ fontSize: "0.75rem", color: t.statusError, marginTop: 10 }}>{formErr}</p>}
                             <div style={{ marginTop: 16, display: "flex", gap: 8 }}>
-                                <button onClick={submitForm} disabled={formBusy} style={{ padding: "9px 20px", borderRadius: t.isMono ? 4 : 8, border: "none", background: t.accentPrimary, color: t.isMono ? t.bgPrimary : "#fff", fontWeight: 700, fontSize: "0.82rem", cursor: formBusy ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 6 }}>
+                                <button onClick={submitForm} disabled={formBusy} style={{ padding: "9px 20px", borderRadius: t.isMono ? 0 : 8, border: "none", background: t.accentPrimary, color: t.isMono ? t.bgPrimary : "#fff", fontWeight: 700, fontSize: "0.82rem", cursor: formBusy ? "not-allowed" : "pointer", display: "flex", alignItems: "center", gap: 6 }}>
                                     {formBusy ? <Loader2 style={{ width: 14, height: 14, animation: "spin 1s linear infinite" }} /> : <CheckCircle2 style={{ width: 14, height: 14 }} />}
                                     {formMode === "create" ? "Create" : "Save Changes"}
                                 </button>
-                                <button onClick={resetForm} style={{ padding: "9px 16px", borderRadius: t.isMono ? 4 : 8, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.82rem", cursor: "pointer" }}>Cancel</button>
+                                <button onClick={resetForm} style={{ padding: "9px 16px", borderRadius: t.isMono ? 0 : 8, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.82rem", cursor: "pointer" }}>Cancel</button>
                             </div>
                         </div>
                     )}
@@ -305,10 +305,10 @@ export default function MmoAdminPage() {
                                         {/* Expanded Detail */}
                                         {expandedCat === cat.id && (
                                             <div style={{ padding: "0 20px 14px", display: "flex", gap: 8 }}>
-                                                <button onClick={() => openEdit(cat)} style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: t.isMono ? 4 : 6, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textSecondary, fontSize: "0.75rem", fontWeight: 600, cursor: "pointer" }}>
+                                                <button onClick={() => openEdit(cat)} style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: t.isMono ? 0 : 6, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textSecondary, fontSize: "0.75rem", fontWeight: 600, cursor: "pointer" }}>
                                                     <Edit3 style={{ width: 12, height: 12 }} /> Edit
                                                 </button>
-                                                <button onClick={() => deactivateCat(cat.id)} style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: t.isMono ? 4 : 6, border: `1px solid ${t.statusError}44`, background: t.statusErrorBg, color: t.statusError, fontSize: "0.75rem", fontWeight: 600, cursor: "pointer" }}>
+                                                <button onClick={() => deactivateCat(cat.id)} style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", borderRadius: t.isMono ? 0 : 6, border: `1px solid ${t.statusError}44`, background: t.statusErrorBg, color: t.statusError, fontSize: "0.75rem", fontWeight: 600, cursor: "pointer" }}>
                                                     <Trash2 style={{ width: 12, height: 12 }} /> Deactivate
                                                 </button>
                                                 <div style={{ marginLeft: "auto", fontSize: "0.68rem", color: t.textMuted, display: "flex", alignItems: "center", gap: 6 }}>
@@ -344,7 +344,7 @@ export default function MmoAdminPage() {
 
                         {/* Schema preview */}
                         {selectedSchema && (
-                            <div style={{ padding: "8px 12px", borderRadius: t.isMono ? 4 : 6, background: t.bgSecondary, border: `1px solid ${t.borderSecondary}` }}>
+                            <div style={{ padding: "8px 12px", borderRadius: t.isMono ? 0 : 6, background: t.bgSecondary, border: `1px solid ${t.borderSecondary}` }}>
                                 <p style={{ fontSize: "0.68rem", color: t.textMuted, fontWeight: 700, marginBottom: 4 }}>Expected Format</p>
                                 <p style={{ fontSize: "0.8rem", fontFamily: t.fontMono, color: t.accentPrimary, letterSpacing: "0.04em" }}>{selectedSchema}</p>
                             </div>
@@ -370,7 +370,7 @@ export default function MmoAdminPage() {
 
                         {/* Import button */}
                         <button onClick={handleImport} disabled={importBusy || !importCatId || !importData.trim()} style={{
-                            width: "100%", padding: "10px", borderRadius: t.isMono ? 4 : 8,
+                            width: "100%", padding: "10px", borderRadius: t.isMono ? 0 : 8,
                             border: "none", fontWeight: 700, fontSize: "0.85rem", cursor: importBusy ? "not-allowed" : "pointer",
                             display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
                             background: !importCatId || !importData.trim() ? t.bgTertiary : t.statusWarning,
@@ -383,7 +383,7 @@ export default function MmoAdminPage() {
                         {/* Result */}
                         {importResult && (
                             <div style={{
-                                padding: "10px 14px", borderRadius: t.isMono ? 4 : 8,
+                                padding: "10px 14px", borderRadius: t.isMono ? 0 : 8,
                                 background: importResult.errors ? t.statusErrorBg : t.statusSuccessBg,
                                 border: `1px solid ${importResult.errors ? t.statusError : t.statusSuccess}44`,
                             }}>

@@ -191,7 +191,7 @@ export default function ConsoleHubPage() {
                             href={link.href}
                             id={`nav-${link.label.toLowerCase()}`}
                             style={{
-                                padding: "8px 16px", borderRadius: t.isMono ? 4 : 8,
+                                padding: "8px 16px", borderRadius: t.isMono ? 0 : 8,
                                 fontSize: "0.85rem", fontWeight: 600,
                                 color: t.textSecondary, textDecoration: "none",
                                 transition: "all 0.15s",
@@ -290,7 +290,7 @@ export default function ConsoleHubPage() {
                 <div style={{ ...card, padding: "20px 24px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                         <div style={{
-                            width: 36, height: 36, borderRadius: t.isMono ? 6 : 10,
+                            width: 36, height: 36, borderRadius: t.isMono ? 0 : 10,
                             background: t.statusWarningBg, display: "flex",
                             alignItems: "center", justifyContent: "center",
                         }}>
@@ -322,7 +322,7 @@ export default function ConsoleHubPage() {
                 <div style={{ ...card, padding: "20px 24px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                         <div style={{
-                            width: 36, height: 36, borderRadius: t.isMono ? 6 : 10,
+                            width: 36, height: 36, borderRadius: t.isMono ? 0 : 10,
                             background: t.accentPrimaryMuted, display: "flex",
                             alignItems: "center", justifyContent: "center",
                         }}>
@@ -344,7 +344,7 @@ export default function ConsoleHubPage() {
                 <div style={{ ...card, padding: "20px 24px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                         <div style={{
-                            width: 36, height: 36, borderRadius: t.isMono ? 6 : 10,
+                            width: 36, height: 36, borderRadius: t.isMono ? 0 : 10,
                             background: t.statusSuccessBg, display: "flex",
                             alignItems: "center", justifyContent: "center",
                         }}>
@@ -392,7 +392,7 @@ export default function ConsoleHubPage() {
             >
                 <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                     <div style={{
-                        width: 40, height: 40, borderRadius: t.isMono ? 6 : 10,
+                        width: 40, height: 40, borderRadius: t.isMono ? 0 : 10,
                         background: `${t.statusError}1a`,
                         display: "flex", alignItems: "center", justifyContent: "center",
                     }}>
@@ -475,7 +475,7 @@ export default function ConsoleHubPage() {
                             }}
                         >
                             <div style={{
-                                width: 40, height: 40, borderRadius: t.isMono ? 6 : 10,
+                                width: 40, height: 40, borderRadius: t.isMono ? 0 : 10,
                                 background: svc.color + "18",
                                 display: "flex", alignItems: "center", justifyContent: "center",
                                 flexShrink: 0,

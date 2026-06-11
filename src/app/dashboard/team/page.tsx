@@ -18,7 +18,7 @@ export default function TeamPage() {
     const [role, setRole] = useState("member");
 
     const card: React.CSSProperties = { background: t.bgCard, border: `1px solid ${t.borderPrimary}`, borderRadius: t.cardRadius, boxShadow: t.shadow };
-    const inputStyle: React.CSSProperties = { background: t.bgInput, border: `1px solid ${t.borderPrimary}`, borderRadius: t.isMono ? 4 : 8, color: t.textPrimary, fontSize: "0.875rem", outline: "none", padding: "9px 13px" };
+    const inputStyle: React.CSSProperties = { background: t.bgInput, border: `1px solid ${t.borderPrimary}`, borderRadius: t.isMono ? 0 : 8, color: t.textPrimary, fontSize: "0.875rem", outline: "none", padding: "9px 13px" };
 
     return (
         <div style={{ padding: "32px 36px", minHeight: "100vh", backgroundColor: t.bgPrimary }}>

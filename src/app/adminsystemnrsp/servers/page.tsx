@@ -55,7 +55,7 @@ export default function AdminServersPage() {
     useEffect(() => { load(); }, [load]);
 
     const card: React.CSSProperties = { background: t.bgCard, border: `1px solid ${t.borderPrimary}`, borderRadius: t.cardRadius, boxShadow: t.shadow };
-    const inp: React.CSSProperties = { background: t.bgInput, border: `1px solid ${t.borderPrimary}`, borderRadius: t.isMono ? 4 : 8, color: t.textPrimary, fontSize: "0.84rem", outline: "none", padding: "7px 11px", fontFamily: t.fontFamily };
+    const inp: React.CSSProperties = { background: t.bgInput, border: `1px solid ${t.borderPrimary}`, borderRadius: t.isMono ? 0 : 8, color: t.textPrimary, fontSize: "0.84rem", outline: "none", padding: "7px 11px", fontFamily: t.fontFamily };
 
     return (
         <div style={{ padding: "32px 36px", minHeight: "100vh", backgroundColor: t.bgPrimary }}>
@@ -72,7 +72,7 @@ export default function AdminServersPage() {
                             <p style={{ fontSize: "0.82rem", color: t.textMuted }}>All virtual machines across all users.</p>
                         </div>
                     </div>
-                    <button onClick={load} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: t.isMono ? 4 : 8, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>
+                    <button onClick={load} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: t.isMono ? 0 : 8, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>
                         <RefreshCw style={{ width: 13, height: 13 }} /> Refresh
                     </button>
                 </div>
@@ -86,7 +86,7 @@ export default function AdminServersPage() {
                         { label: "Running", val: instances.filter(i => i.status === "running").length, color: t.statusSuccess },
                         { label: "Stopped", val: instances.filter(i => i.status === "stopped").length, color: t.statusError },
                     ].map(chip => (
-                        <div key={chip.label} style={{ padding: "6px 14px", borderRadius: t.isMono ? 4 : 8, background: t.bgCard, border: `1px solid ${t.borderPrimary}`, display: "flex", alignItems: "center", gap: 6 }}>
+                        <div key={chip.label} style={{ padding: "6px 14px", borderRadius: t.isMono ? 0 : 8, background: t.bgCard, border: `1px solid ${t.borderPrimary}`, display: "flex", alignItems: "center", gap: 6 }}>
                             <span style={{ fontSize: "0.72rem", color: t.textMuted, fontWeight: 600 }}>{chip.label}</span>
                             <span style={{ fontSize: "0.9rem", fontWeight: 800, color: chip.color }}>{chip.val}</span>
                         </div>
@@ -172,10 +172,10 @@ export default function AdminServersPage() {
                                     {((meta.page - 1) * meta.limit) + 1}–{Math.min(meta.page * meta.limit, meta.total)} of {meta.total}
                                 </span>
                                 <div style={{ display: "flex", gap: 4 }}>
-                                    <button disabled={!meta.hasPrevPage} onClick={() => setPage(p => p - 1)} style={{ width: 30, height: 30, borderRadius: t.isMono ? 4 : 6, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: meta.hasPrevPage ? t.textSecondary : t.borderPrimary, cursor: meta.hasPrevPage ? "pointer" : "not-allowed", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                    <button disabled={!meta.hasPrevPage} onClick={() => setPage(p => p - 1)} style={{ width: 30, height: 30, borderRadius: t.isMono ? 0 : 6, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: meta.hasPrevPage ? t.textSecondary : t.borderPrimary, cursor: meta.hasPrevPage ? "pointer" : "not-allowed", display: "flex", alignItems: "center", justifyContent: "center" }}>
                                         <ChevronLeft style={{ width: 14, height: 14 }} />
                                     </button>
-                                    <button disabled={!meta.hasNextPage} onClick={() => setPage(p => p + 1)} style={{ width: 30, height: 30, borderRadius: t.isMono ? 4 : 6, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: meta.hasNextPage ? t.textSecondary : t.borderPrimary, cursor: meta.hasNextPage ? "pointer" : "not-allowed", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                    <button disabled={!meta.hasNextPage} onClick={() => setPage(p => p + 1)} style={{ width: 30, height: 30, borderRadius: t.isMono ? 0 : 6, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: meta.hasNextPage ? t.textSecondary : t.borderPrimary, cursor: meta.hasNextPage ? "pointer" : "not-allowed", display: "flex", alignItems: "center", justifyContent: "center" }}>
                                         <ChevronRight style={{ width: 14, height: 14 }} />
                                     </button>
                                 </div>

@@ -152,7 +152,7 @@ export default function DocsSection() {
                 {prev ? (
                     <Link href={`/docs/${prev.chapterSlug}/${prev.slug}`} style={{
                         display: "flex", alignItems: "center", gap: 8,
-                        padding: "12px 20px", borderRadius: t.isMono ? 4 : 8,
+                        padding: "12px 20px", borderRadius: t.isMono ? 0 : 8,
                         border: `1px solid ${t.borderPrimary}`,
                         color: t.textSecondary, textDecoration: "none",
                         fontSize: "0.85rem", fontWeight: 600,
@@ -165,7 +165,7 @@ export default function DocsSection() {
                 {next ? (
                     <Link href={`/docs/${next.chapterSlug}/${next.slug}`} style={{
                         display: "flex", alignItems: "center", gap: 8,
-                        padding: "12px 20px", borderRadius: t.isMono ? 4 : 8,
+                        padding: "12px 20px", borderRadius: t.isMono ? 0 : 8,
                         border: `1px solid ${t.borderPrimary}`,
                         color: t.textSecondary, textDecoration: "none",
                         fontSize: "0.85rem", fontWeight: 600,

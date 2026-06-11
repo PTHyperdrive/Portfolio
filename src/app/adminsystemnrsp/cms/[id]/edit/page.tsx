@@ -86,7 +86,7 @@ export default function CmsEditPost() {
     const inputStyle: React.CSSProperties = {
         width: "100%", boxSizing: "border-box" as const,
         background: t.bgInput, border: `1px solid ${t.borderPrimary}`,
-        borderRadius: t.isMono ? 4 : 8, color: t.textPrimary,
+        borderRadius: t.isMono ? 0 : 8, color: t.textPrimary,
         fontSize: "0.9rem", padding: "10px 14px", outline: "none",
     };
 
@@ -120,7 +120,7 @@ export default function CmsEditPost() {
 
             {error && (
                 <div style={{
-                    padding: "12px 18px", borderRadius: t.isMono ? 4 : 8,
+                    padding: "12px 18px", borderRadius: t.isMono ? 0 : 8,
                     background: t.statusErrorBg, color: t.statusError,
                     fontSize: "0.88rem", marginBottom: 20,
                 }}>

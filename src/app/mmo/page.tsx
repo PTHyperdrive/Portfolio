@@ -789,7 +789,7 @@ export default function MmoStorePage() {
                                         )}
 
                                         {chatResetStep === "warn" && (
-                                            <div style={{ background: t.statusErrorBg, border: `1px solid ${t.statusError}44`, borderRadius: t.isMono ? 4 : 8, padding: "14px" }}>
+                                            <div style={{ background: t.statusErrorBg, border: `1px solid ${t.statusError}44`, borderRadius: t.isMono ? 0 : 8, padding: "14px" }}>
                                                 <p style={{ fontSize: "0.8rem", color: t.statusError, fontWeight: 700, marginBottom: 8 }}>
                                                     This will permanently delete all your chat messages and close this thread.
                                                 </p>
@@ -808,7 +808,7 @@ export default function MmoStorePage() {
                                         )}
 
                                         {chatResetStep === "confirm" && (
-                                            <div style={{ background: t.statusErrorBg, border: `1px solid ${t.statusError}44`, borderRadius: t.isMono ? 4 : 8, padding: "14px" }}>
+                                            <div style={{ background: t.statusErrorBg, border: `1px solid ${t.statusError}44`, borderRadius: t.isMono ? 0 : 8, padding: "14px" }}>
                                                 <p style={{ fontSize: "0.8rem", color: t.statusError, fontWeight: 700, marginBottom: 10 }}>
                                                     Final confirmation — cannot be undone.
                                                 </p>

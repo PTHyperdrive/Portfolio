@@ -25,7 +25,7 @@ export default function OrdersPage() {
                 <span style={{ color: t.textMuted, fontSize: "0.85rem", fontWeight: 600 }}>Status:</span>
                 {["All", "Active", "Pending", "Completed", "Cancelled"].map((filter, i) => (
                     <button key={filter} style={{
-                        padding: "6px 14px", fontSize: "0.82rem", borderRadius: t.isMono ? 4 : 6,
+                        padding: "6px 14px", fontSize: "0.82rem", borderRadius: t.isMono ? 0 : 6,
                         border: `1px solid ${i === 0 ? `${t.accentPrimary}44` : t.borderPrimary}`,
                         background: i === 0 ? t.accentPrimaryMuted : "transparent",
                         color: i === 0 ? t.accentPrimary : t.textSecondary,

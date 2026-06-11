@@ -92,7 +92,7 @@ interface Ticket {
 function SectionHeader({ icon, title, sub, t }: { icon: React.ReactNode; title: string; sub: string; t: ReturnType<typeof useThemeTokens> }) {
     return (
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
-            <div style={{ width: 36, height: 36, borderRadius: t.isMono ? 8 : 9, background: t.accentPrimaryMuted, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <div style={{ width: 36, height: 36, borderRadius: t.isMono ? 0 : 9, background: t.accentPrimaryMuted, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                 {icon}
             </div>
             <div>

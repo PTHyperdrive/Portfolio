@@ -171,7 +171,7 @@ export default function VpsDashboard() {
     const card: React.CSSProperties = { background: t.bgCard, border: `1px solid ${t.borderPrimary}`, borderRadius: t.cardRadius, boxShadow: t.shadow };
     const inputStyle: React.CSSProperties = {
         background: t.bgInput, border: `1px solid ${t.borderPrimary}`,
-        borderRadius: t.isMono ? 4 : 8, color: t.textPrimary, fontSize: "0.85rem", outline: "none",
+        borderRadius: t.isMono ? 0 : 8, color: t.textPrimary, fontSize: "0.85rem", outline: "none",
         padding: "8px 12px", transition: "border-color 0.15s",
     };
 
@@ -184,7 +184,7 @@ export default function VpsDashboard() {
         else { pages.push(1); if (cur > 3) pages.push("…"); for (let i = Math.max(2, cur - 1); i <= Math.min(total - 1, cur + 1); i++) pages.push(i); if (cur < total - 2) pages.push("…"); pages.push(total); }
 
         const pb = (active: boolean, disabled?: boolean): React.CSSProperties => ({
-            minWidth: 34, height: 34, padding: "0 10px", borderRadius: t.isMono ? 4 : 8,
+            minWidth: 34, height: 34, padding: "0 10px", borderRadius: t.isMono ? 0 : 8,
             border: `1px solid ${active ? t.accentPrimary : t.borderPrimary}`,
             background: active ? t.accentPrimaryMuted : "transparent",
             color: active ? t.accentPrimary : disabled ? t.borderSecondary : t.textMuted,
@@ -239,26 +239,26 @@ export default function VpsDashboard() {
 
             {/* ── Trial Banners ── */}
             {trialStatus?.isPastGrace && (
-                <div style={{ padding: "14px 20px", borderRadius: t.isMono ? 4 : 10, background: t.statusErrorBg, border: `1px solid ${t.statusError}33`, color: t.statusError, marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ padding: "14px 20px", borderRadius: t.isMono ? 0 : 10, background: t.statusErrorBg, border: `1px solid ${t.statusError}33`, color: t.statusError, marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ display: "flex", alignItems: "center", gap: 6 }}><AlertTriangle style={{ width: 14, height: 14, flexShrink: 0 }} /> Trial data permanently deleted (33-day limit exceeded).</span>
                     <Link href="/services/vps" style={{ padding: "6px 16px", borderRadius: t.buttonRadius, background: t.statusError, color: "#fff", fontWeight: 700, fontSize: "0.8rem", textDecoration: "none" }}>View Plans</Link>
                 </div>
             )}
             {trialStatus?.isExpired && !trialStatus.isPastGrace && (
-                <div style={{ padding: "14px 20px", borderRadius: t.isMono ? 4 : 10, background: t.statusWarningBg, border: `1px solid ${t.statusWarning}33`, color: t.statusWarning, marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ padding: "14px 20px", borderRadius: t.isMono ? 0 : 10, background: t.statusWarningBg, border: `1px solid ${t.statusWarning}33`, color: t.statusWarning, marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ display: "flex", alignItems: "center", gap: 6 }}><Clock style={{ width: 14, height: 14, flexShrink: 0 }} /> <strong>Trial Expired.</strong> VM deletes in <strong>{trialStatus.daysUntilDeletion} day(s)</strong>.</span>
                     <Link href="/payment?plan=Cloud+Starter" style={{ padding: "6px 16px", borderRadius: t.buttonRadius, background: t.accentPrimary, color: t.textInverse, fontWeight: 700, fontSize: "0.8rem", textDecoration: "none" }}>Upgrade Now</Link>
                 </div>
             )}
             {trialStatus?.isActive && (
-                <div style={{ padding: "12px 20px", borderRadius: t.isMono ? 4 : 10, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}22`, color: t.statusSuccess, marginBottom: 20, fontSize: "0.85rem" }}>
+                <div style={{ padding: "12px 20px", borderRadius: t.isMono ? 0 : 10, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}22`, color: t.statusSuccess, marginBottom: 20, fontSize: "0.85rem" }}>
                     <span style={{ display: "flex", alignItems: "center", gap: 6 }}><CheckCircle2 style={{ width: 14, height: 14, flexShrink: 0 }} /> Trial active — <strong>{trialStatus.daysRemaining} day(s)</strong> remaining.</span>
                 </div>
             )}
 
             {/* ── Error Banner ── */}
             {error && (
-                <div style={{ padding: "12px 16px", borderRadius: t.isMono ? 4 : 9, background: t.statusErrorBg, border: `1px solid ${t.statusError}33`, color: t.statusError, marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between" }}>
+                <div style={{ padding: "12px 16px", borderRadius: t.isMono ? 0 : 9, background: t.statusErrorBg, border: `1px solid ${t.statusError}33`, color: t.statusError, marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between" }}>
                     {error}
                     <button onClick={() => setError("")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", display: "flex", alignItems: "center" }}><X style={{ width: 14, height: 14 }} /></button>
                 </div>
@@ -294,7 +294,7 @@ export default function VpsDashboard() {
                         <button onClick={clearFilters} style={{ ...inputStyle, cursor: "pointer", color: t.statusWarning, borderColor: `${t.statusWarning}33`, background: t.statusWarningBg, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 4 }}><X style={{ width: 12, height: 12 }} /> Clear</button>
                     )}
                     <div style={{ flex: "0 0 auto", marginLeft: "auto" }}>
-                        <button onClick={() => loadInstances()} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: t.isMono ? 4 : 7, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>
+                        <button onClick={() => loadInstances()} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: t.isMono ? 0 : 7, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: loading ? "spin 1s linear infinite" : "none" }}>
                                 <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
                             </svg> Refresh
@@ -316,7 +316,7 @@ export default function VpsDashboard() {
                     </div>
                 ) : instances.length === 0 ? (
                     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "50vh", textAlign: "center", padding: "60px 40px" }}>
-                        <div style={{ width: 96, height: 96, borderRadius: t.isMono ? 12 : 24, background: t.accentPrimaryMuted, border: `1px solid ${t.accentPrimary}33`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 28px" }}>
+                        <div style={{ width: 96, height: 96, borderRadius: t.isMono ? 0 : 24, background: t.accentPrimaryMuted, border: `1px solid ${t.accentPrimary}33`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 28px" }}>
                             {hasFilters
                                 ? <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke={t.accentPrimary} strokeWidth="1.5"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
                                 : <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke={t.accentPrimary} strokeWidth="1.5"><rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" /><circle cx="12" cy="10" r="2" /></svg>
@@ -392,7 +392,7 @@ export default function VpsDashboard() {
                                                 {/* Name */}
                                                 <td style={{ padding: "16px 20px" }}>
                                                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                                        <div style={{ width: 24, height: 24, borderRadius: t.isMono ? 4 : 5, background: t.accentPrimaryMuted, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                                                        <div style={{ width: 24, height: 24, borderRadius: t.isMono ? 0 : 5, background: t.accentPrimaryMuted, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                                                             <svg width="12" height="12" viewBox="0 0 24 24" fill={t.accentPrimary}><circle cx="12" cy="12" r="9" /></svg>
                                                         </div>
                                                         <div>
@@ -434,30 +434,30 @@ export default function VpsDashboard() {
                                                         {isRunning ? (
                                                             <>
                                                                 <Link href={`/dashboard/vps/${vm.vmId}?node=${vm.node}&tab=console`} title="Console"
-                                                                    style={{ width: 32, height: 32, borderRadius: t.isMono ? 4 : 7, display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid ${t.accentPrimary}44`, background: t.accentPrimaryMuted, color: t.accentPrimary, textDecoration: "none" }}>
+                                                                    style={{ width: 32, height: 32, borderRadius: t.isMono ? 0 : 7, display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid ${t.accentPrimary}44`, background: t.accentPrimaryMuted, color: t.accentPrimary, textDecoration: "none" }}>
                                                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="4 17 10 11 4 5" /><line x1="12" y1="19" x2="20" y2="19" /></svg>
                                                                 </Link>
                                                                 <button title="Restart (graceful reboot)" disabled={actionLoading === `${vm.vmId}-restart`} onClick={() => handleAction(vm.vmId, vm.node, "restart")}
-                                                                    style={{ width: 32, height: 32, borderRadius: t.isMono ? 4 : 7, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textSecondary, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                                                    style={{ width: 32, height: 32, borderRadius: t.isMono ? 0 : 7, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textSecondary, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
                                                                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /></svg>
                                                                 </button>
                                                                 <button title="Hard reset (power-cycle)" disabled={actionLoading === `${vm.vmId}-reset`} onClick={() => { if (confirm("Hard reset will power-cycle the VM immediately. Continue?")) handleAction(vm.vmId, vm.node, "reset"); }}
-                                                                    style={{ width: 32, height: 32, borderRadius: t.isMono ? 4 : 7, border: `1px solid ${t.statusWarning}55`, background: "transparent", color: t.statusWarning, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                                                    style={{ width: 32, height: 32, borderRadius: t.isMono ? 0 : 7, border: `1px solid ${t.statusWarning}55`, background: "transparent", color: t.statusWarning, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
                                                                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12a9 9 0 1 1-3-6.7L21 8" /><path d="M21 3v5h-5" /><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" /></svg>
                                                                 </button>
                                                                 <button title="Hard power-off" disabled={actionLoading === `${vm.vmId}-stop`} onClick={() => handleAction(vm.vmId, vm.node, "stop")}
-                                                                    style={{ width: 32, height: 32, borderRadius: t.isMono ? 4 : 7, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textSecondary, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                                                    style={{ width: 32, height: 32, borderRadius: t.isMono ? 0 : 7, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textSecondary, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
                                                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2" /></svg>
                                                                 </button>
                                                             </>
                                                         ) : (
                                                             <button title="Start" disabled={actionLoading === `${vm.vmId}-start`} onClick={() => handleAction(vm.vmId, vm.node, "start")}
-                                                                style={{ width: 32, height: 32, borderRadius: t.isMono ? 4 : 7, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textSecondary, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                                                style={{ width: 32, height: 32, borderRadius: t.isMono ? 0 : 7, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textSecondary, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
                                                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3" /></svg>
                                                             </button>
                                                         )}
                                                         <Link href={`/dashboard/vps/${vm.vmId}?node=${vm.node}`} title="Settings"
-                                                            style={{ width: 32, height: 32, borderRadius: t.isMono ? 4 : 7, display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid ${t.borderPrimary}`, color: t.textMuted, textDecoration: "none" }}>
+                                                            style={{ width: 32, height: 32, borderRadius: t.isMono ? 0 : 7, display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid ${t.borderPrimary}`, color: t.textMuted, textDecoration: "none" }}>
                                                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="3" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14" /></svg>
                                                         </Link>
                                                     </div>

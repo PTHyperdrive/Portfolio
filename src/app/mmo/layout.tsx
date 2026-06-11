@@ -149,7 +149,7 @@ export default function MmoLayout({ children }: { children: React.ReactNode }) {
                     }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
                             <div style={{
-                                width: 34, height: 34, borderRadius: t.isMono ? 6 : 10,
+                                width: 34, height: 34, borderRadius: t.isMono ? 0 : 10,
                                 background: t.accentPrimaryMuted, border: `1px solid ${t.accentPrimary}33`,
                                 display: "flex", alignItems: "center", justifyContent: "center",
                                 fontSize: "0.82rem", fontWeight: 800, color: t.accentPrimary,
