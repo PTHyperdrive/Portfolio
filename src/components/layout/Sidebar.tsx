@@ -143,7 +143,7 @@ export default function Sidebar() {
             height: "100%",
             display: "flex",
             flexDirection: "column",
-            backgroundColor: t.isMono ? t.bgSecondary : "#0d1117",
+            backgroundColor: t.bgSecondary,
             borderRight: `1px solid ${t.borderPrimary}`,
             flexShrink: 0,
             fontFamily: t.fontFamily,

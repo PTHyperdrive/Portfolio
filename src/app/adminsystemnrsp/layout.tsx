@@ -120,7 +120,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <aside style={{
                 width: 264, minWidth: 264, height: "100vh", overflowY: "auto",
                 display: "flex", flexDirection: "column",
-                background: t.isMono ? (t.isLight ? "#fafafa" : "#000000") : "rgba(8,8,12,0.99)",
+                background: t.bgSecondary,
                 borderRight: `1px solid ${t.borderPrimary}`,
             }}>
                 {/* Brand */}
