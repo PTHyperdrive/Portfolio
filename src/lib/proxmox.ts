@@ -356,10 +356,26 @@ export async function stopVM(node: string, vmId: string, vmType: "qemu" | "lxc" 
 }
 
 /**
- * Restart (reboot) a VM
+ * Restart (graceful reboot via ACPI/guest agent) a VM
  */
 export async function restartVM(node: string, vmId: string, vmType: "qemu" | "lxc" = "qemu") {
     return pveFetch(`/nodes/${node}/${vmType}/${vmId}/status/reboot`, { method: "POST" });
+}
+
+/**
+ * Hard reset a VM — immediate power-cycle (like the physical reset button).
+ * Does not wait for the guest; use when a reboot hangs.
+ */
+export async function resetVM(node: string, vmId: string, vmType: "qemu" | "lxc" = "qemu") {
+    return pveFetch(`/nodes/${node}/${vmType}/${vmId}/status/reset`, { method: "POST" });
+}
+
+/**
+ * Graceful shutdown via ACPI/guest agent (clean OS shutdown).
+ * `stopVM` (status/stop) is the hard power-off equivalent.
+ */
+export async function shutdownVM(node: string, vmId: string, vmType: "qemu" | "lxc" = "qemu") {
+    return pveFetch(`/nodes/${node}/${vmType}/${vmId}/status/shutdown`, { method: "POST" });
 }
 
 /**
