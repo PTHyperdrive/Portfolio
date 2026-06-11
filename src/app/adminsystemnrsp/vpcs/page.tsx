@@ -7,6 +7,9 @@ import {
     Link as LinkIcon, Unlink, ChevronRight,
 } from "lucide-react";
 
+// Mirror of lib/vpc-subnet VLAN range (kept local — that module is server-only).
+const VLAN_MIN = 1001, VLAN_MAX = 2000;
+
 /* ─── Types ─── */
 
 interface VpcVm {
@@ -70,7 +73,7 @@ export default function VpcsPage() {
 
     // Form state
     const [form, setForm] = useState({
-        name: "", vlanId: "501", subnet: "", gateway: "",
+        name: "", vlanId: "", subnet: "", gateway: "",
         dhcpStart: "", dhcpEnd: "", description: "", isolate: true,
     });
 
@@ -97,14 +100,17 @@ export default function VpcsPage() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    ...form,
-                    vlanId: parseInt(form.vlanId, 10),
+                    name: form.name,
+                    // Optional override — omitted = auto-allocate.
+                    vlanId: form.vlanId ? parseInt(form.vlanId, 10) : undefined,
+                    description: form.description,
+                    isolate: form.isolate,
                 }),
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Failed");
             setShowCreate(false);
-            setForm({ name: "", vlanId: "501", subnet: "", gateway: "", dhcpStart: "", dhcpEnd: "", description: "", isolate: true });
+            setForm({ name: "", vlanId: "", subnet: "", gateway: "", dhcpStart: "", dhcpEnd: "", description: "", isolate: true });
             loadVpcs();
         } catch (err) { setCreateErr(err instanceof Error ? err.message : "Failed"); }
         finally { setCreating(false); }
@@ -342,20 +348,13 @@ export default function VpcsPage() {
                                     <input required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="customer-prod" style={inputStyle} />
                                 </div>
                                 <div>
-                                    <label style={{ display: "block", fontSize: "0.78rem", color: t.textMuted, marginBottom: 4, fontWeight: 600 }}>VLAN ID (501–1000)</label>
-                                    <input required type="number" min={501} max={1000} value={form.vlanId} onChange={e => setForm({ ...form, vlanId: e.target.value })} style={inputStyle} />
+                                    <label style={{ display: "block", fontSize: "0.78rem", color: t.textMuted, marginBottom: 4, fontWeight: 600 }}>VLAN ID (optional, {VLAN_MIN}–{VLAN_MAX})</label>
+                                    <input type="number" min={VLAN_MIN} max={VLAN_MAX} value={form.vlanId} onChange={e => setForm({ ...form, vlanId: e.target.value })} placeholder="auto-allocate" style={inputStyle} />
                                 </div>
                             </div>
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-                                <div>
-                                    <label style={{ display: "block", fontSize: "0.78rem", color: t.textMuted, marginBottom: 4, fontWeight: 600 }}>Subnet (CIDR)</label>
-                                    <input required value={form.subnet} onChange={e => setForm({ ...form, subnet: e.target.value })} placeholder="10.50.1.0/28" style={inputStyle} />
-                                </div>
-                                <div>
-                                    <label style={{ display: "block", fontSize: "0.78rem", color: t.textMuted, marginBottom: 4, fontWeight: 600 }}>Gateway IP</label>
-                                    <input required value={form.gateway} onChange={e => setForm({ ...form, gateway: e.target.value })} placeholder="10.50.1.1" style={inputStyle} />
-                                </div>
-                            </div>
+                            <p style={{ fontSize: "0.74rem", color: t.textMuted, marginBottom: 12 }}>
+                                Subnet (/28), gateway and DHCP range are auto-allocated from <code>10.50.0.0/16</code>. The VLAN gets its own MikroTik DHCP server.
+                            </p>
                             <div>
                                 <label style={{ display: "block", fontSize: "0.78rem", color: t.textMuted, marginBottom: 4, fontWeight: 600 }}>Description (optional)</label>
                                 <input value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} placeholder="Customer production network" style={{ ...inputStyle, marginBottom: 12 }} />
