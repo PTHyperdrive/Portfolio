@@ -3,10 +3,8 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { audit } from "@/lib/audit";
 import {
-    createVlanInterface,
     addIpAddress,
     addFirewallIsolationRule,
-    deleteVlanInterface,
     removeIpAddress,
     removeFirewallRulesByComment,
 } from "@/lib/mikrotik";
@@ -15,11 +13,18 @@ import {
     createSdnSubnet,
     applySdnConfig,
     deleteSdnSubnet,
-    deleteSdnVnet,
 } from "@/lib/proxmox";
+import {
+    CUSTOMER_VLAN_ID,
+    VPC_POOL_CIDR,
+    allocateVpcNet,
+} from "@/lib/vpc-subnet";
 
 // ─── Constants ───────────────────────────────────────────────────
-const SDN_ZONE = "NRSPVC";
+const SDN_ZONE = process.env.PROXMOX_SDN_ZONE || "NRSPVC";
+// All customer VPCs share ONE SDN VNet (tag 50) and ONE MikroTik VLAN iface.
+const SHARED_VNET = process.env.PROXMOX_VPC_VNET || "vmcust50";
+const CUSTOMER_VLAN_IF = process.env.MIKROTIK_CUSTOMER_VLAN_IF || "vlan50-customers";
 const PROVISION_TIMEOUT = 10_000; // 10s per infrastructure call
 
 // ─── Helpers ─────────────────────────────────────────────────────
@@ -40,31 +45,6 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
 /** Format an error for the provisionErrors array. */
 function errMsg(err: unknown): string {
     return err instanceof Error ? err.message : "Failed";
-}
-
-// ─── Subnet calculation ──────────────────────────────────────────
-
-/**
- * Compute subnet + gateway from VLAN ID.
- *
- * Mapping (VLAN range 501-1000, /28 subnets):
- *   VLAN 501 → 10.50.1.0/28,  gateway 10.50.1.1
- *   VLAN 755 → 10.50.255.0/28
- *   VLAN 756 → 10.51.1.0/28
- *   VLAN 1000 → 10.51.245.0/28
- *
- * IP pool: 10.50.0.0/16 – 10.254.0.0/16 (ample headroom)
- */
-function computeSubnet(vlanId: number) {
-    const offset = vlanId - 500; // 1-500
-    const octet2 = 50 + Math.floor((offset - 1) / 255);
-    const octet3 = ((offset - 1) % 255) + 1;
-    return {
-        subnet: `10.${octet2}.${octet3}.0/28`,
-        gateway: `10.${octet2}.${octet3}.1`,
-        dhcpStart: `10.${octet2}.${octet3}.2`,
-        dhcpEnd: `10.${octet2}.${octet3}.14`,
-    };
 }
 
 /**
@@ -165,56 +145,51 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // ── Auto-allocate VLAN ID ────────────────────────────────────
-        const usedVlans = await prisma.vpc.findMany({
-            select: { vlanId: true },
-            orderBy: { vlanId: "asc" },
+        // ── Allocate a /28 hashed from the owner id ──────────────────
+        // VLAN is fixed at 50; the subnet is derived from a hash of the
+        // user id (per-VPC seed) with linear probing against taken blocks.
+        const usedRows = await prisma.vpc.findMany({
+            where: { networkIndex: { not: null } },
+            select: { networkIndex: true },
         });
-        const usedSet = new Set(usedVlans.map((v) => v.vlanId));
+        const usedIndexes = new Set(usedRows.map((v) => v.networkIndex as number));
 
-        let vlanId: number | null = null;
-        for (let id = 501; id <= 1000; id++) {
-            if (!usedSet.has(id)) {
-                vlanId = id;
-                break;
-            }
-        }
-
-        if (vlanId === null) {
+        let net;
+        try {
+            net = allocateVpcNet(`${userId}:${currentCount}`, usedIndexes);
+        } catch {
             return NextResponse.json(
-                { error: "No available VLAN IDs. Contact an administrator." },
+                { error: `VPC subnet pool exhausted (${VPC_POOL_CIDR}). Contact an administrator.` },
                 { status: 503 },
             );
         }
 
-        // ── Compute network addresses ────────────────────────────────
-        const net = computeSubnet(vlanId);
-        const vnetName = `vc${vlanId}`;
-        const vlanIfName = `vlan${vlanId}`;
+        const vlanId = CUSTOMER_VLAN_ID;
         const username = user?.name || user?.email?.split("@")[0] || "user";
-        const userVpcIndex = currentCount + 1;
-        const mikrotikComment = `VPC-${username}-${userVpcIndex}`;
+        const mikrotikComment = `NRSP-VPC-${net.networkId}`;
+        const isolationComment = `NRSP-VPC-${net.networkId}-isolation`;
 
         // ── Parallel provisioning: Proxmox SDN + MikroTik ────────────
         const provisionErrors: string[] = [];
-        let mikrotikVlanIf: string | null = null;
 
         await Promise.allSettled([
-            // ── Group 1: Proxmox SDN (sequential within group) ───────
+            // ── Group 1: Proxmox SDN — add this /28 to the shared VNet ─
             (async () => {
+                // Ensure the shared VNet exists (idempotent — ignore "exists").
                 try {
                     await withTimeout(
-                        createSdnVnet(vnetName, SDN_ZONE, vlanId, `${name.trim()} (${username})`),
+                        createSdnVnet(SHARED_VNET, SDN_ZONE, vlanId, "NRSP Customer VPCs (VLAN 50)"),
                         PROVISION_TIMEOUT, "SDN VNet",
                     );
                 } catch (err) {
-                    provisionErrors.push(`SDN VNet: ${errMsg(err)}`);
-                    return; // Skip subnet + apply — VNet doesn't exist
+                    const m = errMsg(err);
+                    if (!/exist/i.test(m)) provisionErrors.push(`SDN VNet: ${m}`);
                 }
 
                 try {
+                    // snat=false — MikroTik (vlan50 gateway) does the routing/NAT.
                     await withTimeout(
-                        createSdnSubnet(vnetName, net.subnet, net.gateway, true),
+                        createSdnSubnet(SHARED_VNET, net.subnet, net.gateway, false),
                         PROVISION_TIMEOUT, "SDN Subnet",
                     );
                 } catch (err) {
@@ -228,34 +203,21 @@ export async function POST(req: NextRequest) {
                 }
             })(),
 
-            // ── Group 2: MikroTik (sequential within group) ──────────
+            // ── Group 2: MikroTik — gateway IP on the shared vlan50 iface ─
             (async () => {
                 try {
                     await withTimeout(
-                        createVlanInterface(vlanId, vlanIfName),
-                        PROVISION_TIMEOUT, "VLAN interface",
-                    );
-                    mikrotikVlanIf = vlanIfName;
-                } catch (err) {
-                    provisionErrors.push(`VLAN interface: ${errMsg(err)}`);
-                    return; // Skip IP + firewall — interface doesn't exist
-                }
-
-                try {
-                    await withTimeout(
-                        addIpAddress(`${net.gateway}/28`, vlanIfName, mikrotikComment),
+                        addIpAddress(`${net.gateway}/28`, CUSTOMER_VLAN_IF, mikrotikComment),
                         PROVISION_TIMEOUT, "IP address",
                     );
                 } catch (err) {
                     provisionErrors.push(`IP address: ${errMsg(err)}`);
                 }
 
+                // Isolate this /28 from every other customer /28 (forward drop).
                 try {
                     await withTimeout(
-                        addFirewallIsolationRule(
-                            net.subnet, "10.0.0.0/23",
-                            `NRSP-VPC-${vnetName}-isolation`,
-                        ),
+                        addFirewallIsolationRule(net.subnet, VPC_POOL_CIDR, isolationComment),
                         PROVISION_TIMEOUT, "Firewall rule",
                     );
                 } catch (err) {
@@ -275,14 +237,16 @@ export async function POST(req: NextRequest) {
                 userId,
                 name: name.trim(),
                 vlanId,
-                vnetName,
+                networkId: net.networkId,
+                networkIndex: net.index,
+                vnetName: SHARED_VNET,
                 zoneName: SDN_ZONE,
-                mikrotikVlanIf,
+                mikrotikVlanIf: CUSTOMER_VLAN_IF,
                 subnet: net.subnet,
                 gateway: net.gateway,
                 dhcpStart: net.dhcpStart,
                 dhcpEnd: net.dhcpEnd,
-                description: mikrotikComment,
+                description: `${name.trim()} (${username})`,
             },
         });
 
@@ -292,7 +256,7 @@ export async function POST(req: NextRequest) {
             action: "VPC_CREATE",
             resourceType: "Network",
             resourceId: vpc.id,
-            metadata: { vlanId, vnetName, subnet: net.subnet, gateway: net.gateway, provisionErrors },
+            metadata: { vlanId, networkId: net.networkId, subnet: net.subnet, gateway: net.gateway, provisionErrors },
             req,
         });
 
@@ -353,14 +317,20 @@ export async function DELETE(req: NextRequest) {
         }
 
         // ── Parallel cleanup: MikroTik + Proxmox SDN ─────────────────
+        // NOTE: the shared VNet and the vlan50-customers interface are NEVER
+        // torn down — only this VPC's /28 gateway IP, isolation rule, and
+        // SDN subnet are removed.
         const cleanupErrors: string[] = [];
+        const isoComment = vpc.networkId
+            ? `NRSP-VPC-${vpc.networkId}-isolation`
+            : `NRSP-VPC-${vpc.vnetName}-isolation`; // legacy fallback
 
         await Promise.allSettled([
             // ── Group 1: MikroTik cleanup ────────────────────────────
             (async () => {
                 try {
                     await withTimeout(
-                        removeFirewallRulesByComment(`NRSP-VPC-${vpc.vnetName}-isolation`),
+                        removeFirewallRulesByComment(isoComment),
                         PROVISION_TIMEOUT, "Firewall cleanup",
                     );
                 } catch (err) {
@@ -377,19 +347,10 @@ export async function DELETE(req: NextRequest) {
                     } catch (err) {
                         cleanupErrors.push(`IP removal: ${errMsg(err)}`);
                     }
-
-                    try {
-                        await withTimeout(
-                            deleteVlanInterface(vpc.mikrotikVlanIf),
-                            PROVISION_TIMEOUT, "VLAN interface",
-                        );
-                    } catch (err) {
-                        cleanupErrors.push(`VLAN interface: ${errMsg(err)}`);
-                    }
                 }
             })(),
 
-            // ── Group 2: Proxmox SDN cleanup ─────────────────────────
+            // ── Group 2: Proxmox SDN cleanup (subnet only) ───────────
             (async () => {
                 const zone = vpc.zoneName || SDN_ZONE;
 
@@ -400,15 +361,6 @@ export async function DELETE(req: NextRequest) {
                     );
                 } catch (err) {
                     cleanupErrors.push(`SDN Subnet: ${errMsg(err)}`);
-                }
-
-                try {
-                    await withTimeout(
-                        deleteSdnVnet(vpc.vnetName),
-                        PROVISION_TIMEOUT, "SDN VNet",
-                    );
-                } catch (err) {
-                    cleanupErrors.push(`SDN VNet: ${errMsg(err)}`);
                 }
 
                 try {

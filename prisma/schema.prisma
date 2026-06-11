@@ -320,14 +320,16 @@ model Vpc {
   id              String      @id @default(cuid())
   userId          String?     // Owner — null for legacy admin-created VPCs
   name            String      // User-chosen display name
-  vlanId          Int         @unique  // 501-1000
-  vnetName        String      @unique  // Proxmox SDN VNet tag: "vc501"
-  zoneName        String      @default("NRSPVC")  // Proxmox SDN Zone (VXLAN)
-  mikrotikVlanIf  String?     // MikroTik VLAN interface name (auto-created)
-  subnet          String      // "10.50.1.0/28"
-  gateway         String      // "10.50.1.1"
-  dhcpStart       String?     // "10.50.1.2"
-  dhcpEnd         String?     // "10.50.1.14"
+  vlanId          Int         @default(50)  // All customer VPCs ride VLAN 50
+  networkId       String?     // 8-hex hash label of the owner id (per /28)
+  networkIndex    Int?        @unique  // /28 block index in 10.50.0.0/16 (0-4095)
+  vnetName        String      // Shared Proxmox SDN VNet name (e.g. "vmcust50")
+  zoneName        String      @default("NRSPVC")  // Proxmox SDN Zone
+  mikrotikVlanIf  String?     // MikroTik VLAN interface (shared "vlan50-customers")
+  subnet          String      @unique  // "10.50.3.16/28" — one /28 per VPC
+  gateway         String      // "10.50.3.17"
+  dhcpStart       String?     // "10.50.3.18"
+  dhcpEnd         String?     // "10.50.3.30"
   isolate         Boolean     @default(true)  // Proxmox "Isolate Ports"
   status          String      @default("ACTIVE")  // ACTIVE | DISABLED
   description     String?     @db.Text
@@ -339,6 +341,7 @@ model Vpc {
 
   @@index([userId])
   @@index([vlanId])
+  @@index([networkIndex])
   @@index([status])
 }
 

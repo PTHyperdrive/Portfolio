@@ -6,6 +6,7 @@ import Image from "next/image";
 import { useSession } from "next-auth/react";
 import { useThemeTokens } from "@/lib/useThemeTokens";
 import { useCredits } from "@/components/CreditProvider";
+import { useViewMode } from "@/components/ViewModeProvider";
 import AccountDropdown from "@/components/layout/AccountDropdown";
 import {
     Server, HardDrive, Globe, Wallet, ShoppingBag,
@@ -100,7 +101,7 @@ export default function ConsoleHubPage() {
         user?.activePlan
         ?? (session?.user as Record<string, unknown>)?.activePlan as string | null
     );
-    const isAdmin = (session?.user as Record<string, unknown>)?.role === "ADMIN";
+    const { effectiveAdmin: isAdmin } = useViewMode();
 
     /* ─── Style helpers ─── */
     const card = {

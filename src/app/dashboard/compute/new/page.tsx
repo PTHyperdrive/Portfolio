@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useViewMode } from "@/components/ViewModeProvider";
 import Link from "next/link";
 import Image from "next/image";
 import { Gift, Ticket, Tag, AlertTriangle, Sparkles, Key, Terminal, Cloud, User, RefreshCw, Settings } from "lucide-react";
@@ -115,10 +115,9 @@ function Check({ t }: { t: ReturnType<typeof useThemeTokens> }) {
 
 export default function ComputeNewPage() {
     const router = useRouter();
-    const { data: session } = useSession();
     const t = useThemeTokens();
     const { adjust: adjustCredits, refresh: refreshCredits } = useCredits();
-    const isAdmin = (session?.user as { role?: string } | undefined)?.role === "ADMIN";
+    const { effectiveAdmin: isAdmin } = useViewMode();
 
     // Admin provisioning mode toggle:
     // When true, admin uses Cloud-Init flow; when false, uses legacy ISO flow.

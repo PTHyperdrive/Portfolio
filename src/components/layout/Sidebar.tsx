@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useThemeTokens } from "@/lib/useThemeTokens";
+import { useViewMode } from "@/components/ViewModeProvider";
 
 type SubItem = { label: string; href: string };
 type NavItem = {
@@ -79,6 +80,7 @@ export default function Sidebar() {
     const pathname = usePathname();
     const router = useRouter();
     const { data: session } = useSession();
+    const { realAdmin, viewAsUser, effectiveAdmin, setViewAsUser } = useViewMode();
     const t = useThemeTokens();
     const [expanded, setExpanded] = useState<Record<string, boolean>>({ Compute: true });
     const [hoveredItem, setHoveredItem] = useState<string | null>(null);
@@ -281,8 +283,8 @@ export default function Sidebar() {
                     </div>
                 ))}
 
-                {/* Admin Panel link — only rendered for ADMIN role */}
-                {(session?.user as { role?: string })?.role === "ADMIN" && (
+                {/* Admin Panel link — hidden while previewing as a user */}
+                {effectiveAdmin && (
                     <div style={{ marginTop: 8, paddingTop: 16, borderTop: `1px solid ${t.borderSecondary}` }}>
                         <span style={{
                             fontSize: "0.68rem", fontWeight: 700,
@@ -319,6 +321,40 @@ export default function Sidebar() {
                     </div>
                 )}
             </nav>
+
+            {/* ── View Mode switch (admins only) ── */}
+            {realAdmin && (
+                <div style={{ padding: "8px 16px 0" }}>
+                    <button
+                        onClick={() => setViewAsUser(!viewAsUser)}
+                        title={viewAsUser ? "Currently viewing as a user — click to return to admin view" : "Preview the dashboard as a regular user"}
+                        style={{
+                            width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
+                            gap: 10, padding: "8px 12px", cursor: "pointer",
+                            borderRadius: t.isMono ? 4 : 8,
+                            border: `1px solid ${viewAsUser ? t.accentPrimary : t.borderPrimary}`,
+                            background: viewAsUser ? t.accentPrimaryMuted : "transparent",
+                            color: viewAsUser ? t.accentPrimary : t.textSecondary,
+                            fontSize: "0.8rem", fontWeight: 600,
+                        }}
+                    >
+                        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <User style={{ width: 15, height: 15 }} />
+                            {viewAsUser ? "Viewing as User" : "View as User"}
+                        </span>
+                        {/* Toggle pill */}
+                        <span style={{
+                            width: 34, height: 18, borderRadius: 20, flexShrink: 0, position: "relative",
+                            background: viewAsUser ? t.accentPrimary : `${t.textMuted}55`, transition: "background 0.15s",
+                        }}>
+                            <span style={{
+                                position: "absolute", top: 2, left: viewAsUser ? 18 : 2,
+                                width: 14, height: 14, borderRadius: "50%", background: "#fff", transition: "left 0.15s",
+                            }} />
+                        </span>
+                    </button>
+                </div>
+            )}
 
             {/* ── Theme Toggle ── */}
             <div style={{ padding: "8px 16px 0" }}>
