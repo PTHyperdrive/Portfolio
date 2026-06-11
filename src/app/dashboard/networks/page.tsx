@@ -58,7 +58,7 @@ export default function NetworksPage() {
     };
 
     const inputStyle: React.CSSProperties = {
-        width: "100%", padding: "9px 12px", borderRadius: t.isMono ? 4 : 8,
+        width: "100%", padding: "9px 12px", borderRadius: t.cardRadius,
         background: t.bgInput, border: `1px solid ${t.borderPrimary}`,
         color: t.textPrimary, fontSize: "0.85rem", outline: "none", boxSizing: "border-box",
     };
@@ -172,10 +172,10 @@ export default function NetworksPage() {
                         </div>
                     </div>
                     <div style={{ display: "flex", gap: 8 }}>
-                        <button id="networks-refresh" onClick={loadData} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: t.isMono ? 4 : 8, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>
+                        <button id="networks-refresh" onClick={loadData} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: t.cardRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>
                             <RefreshCw style={{ width: 13, height: 13 }} /> Refresh
                         </button>
-                        <button id="networks-create-vpc" onClick={() => setShowCreate(true)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 16px", borderRadius: t.isMono ? 4 : 8, border: "none", background: t.accentPrimary, color: t.textInverse, fontSize: "0.8rem", fontWeight: 700, cursor: "pointer" }}>
+                        <button id="networks-create-vpc" onClick={() => setShowCreate(true)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 16px", borderRadius: t.cardRadius, border: "none", background: t.accentPrimary, color: t.textInverse, fontSize: "0.8rem", fontWeight: 700, cursor: "pointer" }}>
                             <Plus style={{ width: 13, height: 13 }} /> New VPC
                         </button>
                     </div>
@@ -189,7 +189,7 @@ export default function NetworksPage() {
                     { label: "Assigned VMs", val: String(totalVMs), color: t.statusSuccess },
                     { label: "Unassigned VMs", val: String(unassignedVMs.length), color: t.statusWarning },
                 ].map(chip => (
-                    <div key={chip.label} style={{ padding: "8px 18px", borderRadius: t.isMono ? 4 : 8, background: t.bgCard, border: `1px solid ${t.borderPrimary}`, display: "flex", alignItems: "center", gap: 8 }}>
+                    <div key={chip.label} style={{ padding: "8px 18px", borderRadius: t.cardRadius, background: t.bgCard, border: `1px solid ${t.borderPrimary}`, display: "flex", alignItems: "center", gap: 8 }}>
                         <span style={{ fontSize: "0.72rem", color: t.textMuted, fontWeight: 600 }}>{chip.label}</span>
                         <span style={{ fontSize: "1rem", fontWeight: 800, color: chip.color, fontFamily: t.fontMono }}>{chip.val}</span>
                     </div>
@@ -208,7 +208,7 @@ export default function NetworksPage() {
                     <p style={{ fontSize: "0.83rem", color: t.textMuted, maxWidth: 400, margin: "0 auto 20px" }}>
                         Create a VPC to get an isolated private network with its own VLAN, subnet, and gateway. Then assign your VMs to it.
                     </p>
-                    <button onClick={() => setShowCreate(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 22px", borderRadius: t.isMono ? 4 : 8, border: "none", background: t.accentPrimary, color: t.textInverse, fontSize: "0.85rem", fontWeight: 700, cursor: "pointer" }}>
+                    <button onClick={() => setShowCreate(true)} style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "10px 22px", borderRadius: t.cardRadius, border: "none", background: t.accentPrimary, color: t.textInverse, fontSize: "0.85rem", fontWeight: 700, cursor: "pointer" }}>
                         <Plus style={{ width: 14, height: 14 }} /> Create Your First VPC
                     </button>
                 </div>
@@ -236,10 +236,10 @@ export default function NetworksPage() {
                                         </div>
                                     </div>
                                     <div style={{ display: "flex", gap: 6 }}>
-                                        <button onClick={() => { setShowAssign(vpc.id); setAssignVmId(""); setAssignIp(""); }} style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 12px", borderRadius: t.isMono ? 4 : 6, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.accentPrimary, fontSize: "0.75rem", fontWeight: 600, cursor: "pointer" }}>
+                                        <button onClick={() => { setShowAssign(vpc.id); setAssignVmId(""); setAssignIp(""); }} style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 12px", borderRadius: t.buttonRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.accentPrimary, fontSize: "0.75rem", fontWeight: 600, cursor: "pointer" }}>
                                             <LinkIcon style={{ width: 12, height: 12 }} /> Assign VM
                                         </button>
-                                        <button onClick={() => handleDelete(vpc.id)} disabled={deleting === vpc.id} style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 12px", borderRadius: t.isMono ? 4 : 6, border: `1px solid ${t.statusError}33`, background: t.statusErrorBg, color: t.statusError, fontSize: "0.75rem", fontWeight: 600, cursor: "pointer", opacity: deleting === vpc.id ? 0.5 : 1 }}>
+                                        <button onClick={() => handleDelete(vpc.id)} disabled={deleting === vpc.id} style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 12px", borderRadius: t.buttonRadius, border: `1px solid ${t.statusError}33`, background: t.statusErrorBg, color: t.statusError, fontSize: "0.75rem", fontWeight: 600, cursor: "pointer", opacity: deleting === vpc.id ? 0.5 : 1 }}>
                                             <Trash2 style={{ width: 12, height: 12 }} /> {deleting === vpc.id ? "…" : "Delete"}
                                         </button>
                                     </div>
@@ -251,7 +251,7 @@ export default function NetworksPage() {
                                         <p style={{ fontSize: "0.82rem", color: t.textMuted, padding: "8px 0" }}>No VMs assigned. Click &quot;Assign VM&quot; to add one.</p>
                                     ) : (
                                         vpcAssigns.map(a => (
-                                            <div key={a.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", borderRadius: t.isMono ? 4 : 8, background: t.bgSecondary, marginBottom: 6 }}>
+                                            <div key={a.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "8px 12px", borderRadius: t.cardRadius, background: t.bgSecondary, marginBottom: 6 }}>
                                                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                                     <Server style={{ width: 14, height: 14, color: t.textMuted }} />
                                                     <div>
@@ -321,8 +321,8 @@ export default function NetworksPage() {
                         <input value={createName} onChange={e => setCreateName(e.target.value)} placeholder="e.g. Production, Dev, Staging" maxLength={50} style={{ ...inputStyle, marginBottom: 16 }} onKeyDown={e => e.key === "Enter" && handleCreate()} />
                         {createErr && <p style={{ color: t.statusError, fontSize: "0.82rem", marginBottom: 12 }}>{createErr}</p>}
                         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-                            <button onClick={() => { setShowCreate(false); setCreateErr(""); }} style={{ padding: "9px 18px", borderRadius: t.isMono ? 4 : 8, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textSecondary, cursor: "pointer", fontWeight: 600 }}>Cancel</button>
-                            <button onClick={handleCreate} disabled={creating || !createName.trim()} style={{ padding: "9px 20px", borderRadius: t.isMono ? 4 : 8, border: "none", background: t.accentPrimary, color: t.textInverse, fontWeight: 700, cursor: "pointer", opacity: creating || !createName.trim() ? 0.5 : 1 }}>{creating ? "Creating…" : "Create VPC"}</button>
+                            <button onClick={() => { setShowCreate(false); setCreateErr(""); }} style={{ padding: "9px 18px", borderRadius: t.cardRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textSecondary, cursor: "pointer", fontWeight: 600 }}>Cancel</button>
+                            <button onClick={handleCreate} disabled={creating || !createName.trim()} style={{ padding: "9px 20px", borderRadius: t.cardRadius, border: "none", background: t.accentPrimary, color: t.textInverse, fontWeight: 700, cursor: "pointer", opacity: creating || !createName.trim() ? 0.5 : 1 }}>{creating ? "Creating…" : "Create VPC"}</button>
                         </div>
                     </div>
                 </div>
@@ -354,7 +354,7 @@ export default function NetworksPage() {
                                     <div style={{ display: "flex", gap: 8, marginBottom: assignDhcp ? 0 : 10 }}>
                                         {([[true, "Automatic (DHCP)"], [false, "Manual (static)"]] as const).map(([val, lbl]) => (
                                             <button key={lbl} onClick={() => setAssignDhcp(val)} style={{
-                                                flex: 1, padding: "8px", borderRadius: t.isMono ? 4 : 8, cursor: "pointer", fontSize: "0.78rem", fontWeight: 600,
+                                                flex: 1, padding: "8px", borderRadius: t.cardRadius, cursor: "pointer", fontSize: "0.78rem", fontWeight: 600,
                                                 border: `1px solid ${assignDhcp === val ? t.accentPrimary : t.borderPrimary}`,
                                                 background: assignDhcp === val ? t.accentPrimaryMuted : "transparent",
                                                 color: assignDhcp === val ? t.accentPrimary : t.textSecondary,
@@ -368,9 +368,9 @@ export default function NetworksPage() {
                             </>
                         )}
                         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-                            <button onClick={() => setShowAssign(null)} style={{ padding: "9px 18px", borderRadius: t.isMono ? 4 : 8, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textSecondary, cursor: "pointer", fontWeight: 600 }}>Cancel</button>
+                            <button onClick={() => setShowAssign(null)} style={{ padding: "9px 18px", borderRadius: t.cardRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textSecondary, cursor: "pointer", fontWeight: 600 }}>Cancel</button>
                             {unassignedVMs.length > 0 && (
-                                <button onClick={() => handleAssign(showAssign)} disabled={assigning || !assignVmId} style={{ padding: "9px 20px", borderRadius: t.isMono ? 4 : 8, border: "none", background: t.accentPrimary, color: t.textInverse, fontWeight: 700, cursor: "pointer", opacity: assigning || !assignVmId ? 0.5 : 1 }}>{assigning ? "Assigning…" : "Assign"}</button>
+                                <button onClick={() => handleAssign(showAssign)} disabled={assigning || !assignVmId} style={{ padding: "9px 20px", borderRadius: t.cardRadius, border: "none", background: t.accentPrimary, color: t.textInverse, fontWeight: 700, cursor: "pointer", opacity: assigning || !assignVmId ? 0.5 : 1 }}>{assigning ? "Assigning…" : "Assign"}</button>
                             )}
                         </div>
                     </div>

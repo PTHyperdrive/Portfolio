@@ -156,7 +156,7 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
                                 key={link.href}
                                 href={link.href}
                                 style={{
-                                    padding: "7px 14px", borderRadius: t.isMono ? 4 : 8,
+                                    padding: "7px 14px", borderRadius: t.cardRadius,
                                     fontSize: "0.82rem", fontWeight: 600,
                                     color: pathname.startsWith(link.href) ? t.textPrimary : t.textSecondary,
                                     textDecoration: "none", transition: "all 0.15s",

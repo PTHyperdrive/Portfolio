@@ -88,12 +88,12 @@ export default function AdminAuditLogsPage() {
                 <div style={{ padding: "14px 20px", borderBottom: `1px solid ${t.borderSecondary}`, display: "flex", alignItems: "center", gap: 10 }}>
                     <div style={{ position: "relative", flex: 1, maxWidth: 420 }}>
                         <Search style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", width: 13, height: 13, color: t.textMuted, pointerEvents: "none" }} />
-                        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Filter by action, resource, user, outcome…" style={{ width: "100%", paddingLeft: 30, padding: "8px 12px 8px 30px", background: t.bgInput, border: `1px solid ${t.borderPrimary}`, borderRadius: t.isMono ? 4 : 8, color: t.textPrimary, fontSize: "0.84rem", outline: "none", boxSizing: "border-box", fontFamily: t.fontFamily }} />
+                        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Filter by action, resource, user, outcome…" style={{ width: "100%", paddingLeft: 30, padding: "8px 12px 8px 30px", background: t.bgInput, border: `1px solid ${t.borderPrimary}`, borderRadius: t.cardRadius, color: t.textPrimary, fontSize: "0.84rem", outline: "none", boxSizing: "border-box", fontFamily: t.fontFamily }} />
                     </div>
                     <span style={{ marginLeft: "auto", fontSize: "0.75rem", color: t.textMuted }}>{total.toLocaleString()} entries</span>
                 </div>
 
-                {error && <div style={{ margin: 16, padding: "10px 14px", background: t.statusErrorBg, borderRadius: t.isMono ? 4 : 8, color: t.statusError, fontSize: "0.84rem" }}>{error}</div>}
+                {error && <div style={{ margin: 16, padding: "10px 14px", background: t.statusErrorBg, borderRadius: t.cardRadius, color: t.statusError, fontSize: "0.84rem" }}>{error}</div>}
 
                 {loading ? (
                     <div style={{ padding: 60, textAlign: "center", color: t.textMuted }}>Loading audit log...</div>
@@ -140,14 +140,14 @@ export default function AdminAuditLogsPage() {
                                         {isOpen && (
                                             <tr>
                                                 <td colSpan={6} style={{ padding: "0 18px 14px", background: t.accentPrimaryMuted }}>
-                                                    <div style={{ padding: 16, background: t.bgSecondary, borderRadius: t.isMono ? 4 : 10, border: `1px solid ${t.borderSecondary}` }}>
+                                                    <div style={{ padding: 16, background: t.bgSecondary, borderRadius: t.cardRadius, border: `1px solid ${t.borderSecondary}` }}>
                                                         <p style={{ fontSize: "0.68rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>Detail</p>
                                                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 10 }}>
                                                             <div><span style={{ display: "block", fontSize: "0.65rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>IP Address</span><BlurredIP ip={log.ipAddress} color={t.textPrimary} /></div>
                                                             <div><span style={{ display: "block", fontSize: "0.65rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>User Agent</span><span style={{ fontSize: "0.78rem", color: t.textSecondary, wordBreak: "break-all", lineHeight: 1.5 }}>{log.userAgent || "N/A"}</span></div>
                                                         </div>
                                                         {log.metadata && (
-                                                            <pre style={{ padding: 12, background: t.bgTertiary, borderRadius: t.isMono ? 4 : 8, fontSize: "0.75rem", color: t.textSecondary, overflowX: "auto", fontFamily: t.fontMono }}>{JSON.stringify(log.metadata, null, 2)}</pre>
+                                                            <pre style={{ padding: 12, background: t.bgTertiary, borderRadius: t.cardRadius, fontSize: "0.75rem", color: t.textSecondary, overflowX: "auto", fontFamily: t.fontMono }}>{JSON.stringify(log.metadata, null, 2)}</pre>
                                                         )}
                                                     </div>
                                                 </td>
@@ -164,8 +164,8 @@ export default function AdminAuditLogsPage() {
                     <div style={{ padding: "12px 20px", borderTop: `1px solid ${t.borderSecondary}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                         <span style={{ fontSize: "0.75rem", color: t.textMuted }}>{(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total}</span>
                         <div style={{ display: "flex", gap: 6 }}>
-                            <button disabled={page <= 1} onClick={() => load(page - 1)} style={{ display: "flex", alignItems: "center", padding: "5px 10px", borderRadius: t.isMono ? 4 : 7, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: page <= 1 ? t.textMuted : t.textSecondary, cursor: page <= 1 ? "not-allowed" : "pointer" }}><ChevronLeft style={{ width: 14, height: 14 }} /></button>
-                            <button disabled={page >= totalPages} onClick={() => load(page + 1)} style={{ display: "flex", alignItems: "center", padding: "5px 10px", borderRadius: t.isMono ? 4 : 7, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: page >= totalPages ? t.textMuted : t.textSecondary, cursor: page >= totalPages ? "not-allowed" : "pointer" }}><ChevronRight style={{ width: 14, height: 14 }} /></button>
+                            <button disabled={page <= 1} onClick={() => load(page - 1)} style={{ display: "flex", alignItems: "center", padding: "5px 10px", borderRadius: t.buttonRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: page <= 1 ? t.textMuted : t.textSecondary, cursor: page <= 1 ? "not-allowed" : "pointer" }}><ChevronLeft style={{ width: 14, height: 14 }} /></button>
+                            <button disabled={page >= totalPages} onClick={() => load(page + 1)} style={{ display: "flex", alignItems: "center", padding: "5px 10px", borderRadius: t.buttonRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: page >= totalPages ? t.textMuted : t.textSecondary, cursor: page >= totalPages ? "not-allowed" : "pointer" }}><ChevronRight style={{ width: 14, height: 14 }} /></button>
                         </div>
                     </div>
                 )}

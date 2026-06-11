@@ -66,7 +66,7 @@ export default function AdminBillingPage() {
     useEffect(() => { load(); }, [load]);
 
     const card: React.CSSProperties = { background: t.bgCard, border: `1px solid ${t.borderPrimary}`, borderRadius: t.cardRadius, boxShadow: t.shadow };
-    const inp: React.CSSProperties = { background: t.bgInput, border: `1px solid ${t.borderPrimary}`, borderRadius: t.isMono ? 4 : 8, color: t.textPrimary, fontSize: "0.84rem", outline: "none", padding: "7px 11px", fontFamily: t.fontFamily };
+    const inp: React.CSSProperties = { background: t.bgInput, border: `1px solid ${t.borderPrimary}`, borderRadius: t.cardRadius, color: t.textPrimary, fontSize: "0.84rem", outline: "none", padding: "7px 11px", fontFamily: t.fontFamily };
 
     return (
         <div style={{ padding: "32px 36px", minHeight: "100vh", backgroundColor: t.bgPrimary }}>
@@ -84,7 +84,7 @@ export default function AdminBillingPage() {
                     </div>
                     <div style={{ display: "flex", gap: 8 }}>
                         {/* Display mode toggle */}
-                        <div style={{ display: "flex", borderRadius: t.isMono ? 4 : 8, border: `1px solid ${t.borderPrimary}`, overflow: "hidden" }}>
+                        <div style={{ display: "flex", borderRadius: t.cardRadius, border: `1px solid ${t.borderPrimary}`, overflow: "hidden" }}>
                             {([["invoices", "Invoices", Receipt], ["users", "Users", Users]] as const).map(([m, label, Icon]) => (
                                 <button key={m} onClick={() => setMode(m)} style={{
                                     display: "flex", alignItems: "center", gap: 6, padding: "7px 14px",
@@ -96,7 +96,7 @@ export default function AdminBillingPage() {
                                 </button>
                             ))}
                         </div>
-                        <button onClick={load} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: t.isMono ? 4 : 8, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>
+                        <button onClick={load} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: t.cardRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>
                             <RefreshCw style={{ width: 13, height: 13 }} /> Refresh
                         </button>
                     </div>
@@ -224,8 +224,8 @@ export default function AdminBillingPage() {
                             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 16px", borderTop: `1px solid ${t.borderSecondary}` }}>
                                 <span style={{ fontSize: "0.75rem", color: t.textMuted }}>{((meta.page - 1) * meta.limit) + 1}–{Math.min(meta.page * meta.limit, meta.total)} of {meta.total}</span>
                                 <div style={{ display: "flex", gap: 4 }}>
-                                    <button disabled={!meta.hasPrevPage} onClick={() => setPage(p => p - 1)} style={{ width: 30, height: 30, borderRadius: t.isMono ? 4 : 6, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: meta.hasPrevPage ? t.textSecondary : t.borderPrimary, cursor: meta.hasPrevPage ? "pointer" : "not-allowed", display: "flex", alignItems: "center", justifyContent: "center" }}><ChevronLeft style={{ width: 14, height: 14 }} /></button>
-                                    <button disabled={!meta.hasNextPage} onClick={() => setPage(p => p + 1)} style={{ width: 30, height: 30, borderRadius: t.isMono ? 4 : 6, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: meta.hasNextPage ? t.textSecondary : t.borderPrimary, cursor: meta.hasNextPage ? "pointer" : "not-allowed", display: "flex", alignItems: "center", justifyContent: "center" }}><ChevronRight style={{ width: 14, height: 14 }} /></button>
+                                    <button disabled={!meta.hasPrevPage} onClick={() => setPage(p => p - 1)} style={{ width: 30, height: 30, borderRadius: t.buttonRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: meta.hasPrevPage ? t.textSecondary : t.borderPrimary, cursor: meta.hasPrevPage ? "pointer" : "not-allowed", display: "flex", alignItems: "center", justifyContent: "center" }}><ChevronLeft style={{ width: 14, height: 14 }} /></button>
+                                    <button disabled={!meta.hasNextPage} onClick={() => setPage(p => p + 1)} style={{ width: 30, height: 30, borderRadius: t.buttonRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: meta.hasNextPage ? t.textSecondary : t.borderPrimary, cursor: meta.hasNextPage ? "pointer" : "not-allowed", display: "flex", alignItems: "center", justifyContent: "center" }}><ChevronRight style={{ width: 14, height: 14 }} /></button>
                                 </div>
                             </div>
                         )}

@@ -75,7 +75,7 @@ export default function AdminWireGuardPage() {
     const fmt = (bytes: number) => bytes > 1048576 ? `${(bytes / 1048576).toFixed(1)} MB` : `${(bytes / 1024).toFixed(0)} KB`;
 
     const tabStyle = (id: string): React.CSSProperties => ({
-        padding: "8px 18px", borderRadius: t.isMono ? 4 : 8,
+        padding: "8px 18px", borderRadius: t.cardRadius,
         border: tab === id ? `2px solid ${t.accentPrimary}` : `1px solid ${t.borderPrimary}`,
         background: tab === id ? t.accentPrimaryMuted : "transparent",
         color: tab === id ? t.accentPrimary : t.textMuted,
@@ -100,7 +100,7 @@ export default function AdminWireGuardPage() {
                             <p style={{ fontSize: "0.83rem", color: t.textMuted }}>View all WireGuard peers across interfaces. Wireguard-VPN is read-only.</p>
                         </div>
                     </div>
-                    <button onClick={loadData} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: t.isMono ? 4 : 8, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>
+                    <button onClick={loadData} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: t.cardRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>
                         <RefreshCw style={{ width: 13, height: 13 }} /> Refresh
                     </button>
                 </div>
@@ -113,7 +113,7 @@ export default function AdminWireGuardPage() {
                     { label: "Customers-WG1", val: mtPeersCustomer.length, color: t.statusSuccess },
                     { label: "Wireguard-VPN", val: mtPeersRemote.length, color: t.statusWarning },
                 ].map(s => (
-                    <div key={s.label} style={{ padding: "8px 18px", borderRadius: t.isMono ? 4 : 8, background: t.bgCard, border: `1px solid ${t.borderPrimary}`, display: "flex", alignItems: "center", gap: 8 }}>
+                    <div key={s.label} style={{ padding: "8px 18px", borderRadius: t.cardRadius, background: t.bgCard, border: `1px solid ${t.borderPrimary}`, display: "flex", alignItems: "center", gap: 8 }}>
                         <span style={{ fontSize: "0.72rem", color: t.textMuted, fontWeight: 600 }}>{s.label}</span>
                         <span style={{ fontSize: "1rem", fontWeight: 800, color: s.color, fontFamily: t.fontMono }}>{s.val}</span>
                     </div>

@@ -269,7 +269,7 @@ export default function AdminPricingPage() {
     const inp: React.CSSProperties = {
         background: t.bgInput,
         border: `1px solid ${t.borderPrimary}`,
-        borderRadius: t.isMono ? 4 : 6,
+        borderRadius: t.buttonRadius,
         color: t.textPrimary,
         fontSize: "0.82rem",
         outline: "none",
@@ -344,7 +344,7 @@ export default function AdminPricingPage() {
                     onClick={load}
                     style={{
                         display: "flex", alignItems: "center", gap: 6,
-                        padding: "7px 14px", borderRadius: t.isMono ? 4 : 8,
+                        padding: "7px 14px", borderRadius: t.cardRadius,
                         border: `1px solid ${t.borderPrimary}`,
                         background: "transparent", color: t.textMuted,
                         fontSize: "0.8rem", cursor: "pointer",
@@ -359,7 +359,7 @@ export default function AdminPricingPage() {
     {
         success && (
             <div style={{
-                padding: "10px 16px", borderRadius: t.isMono ? 4 : 8,
+                padding: "10px 16px", borderRadius: t.cardRadius,
                 background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}33`,
                 color: t.statusSuccess, marginBottom: 16, fontSize: "0.875rem",
                 display: "flex", alignItems: "center", gap: 8,
@@ -371,7 +371,7 @@ export default function AdminPricingPage() {
     {
         error && (
             <div style={{
-                padding: "10px 16px", borderRadius: t.isMono ? 4 : 8,
+                padding: "10px 16px", borderRadius: t.cardRadius,
                 background: t.statusErrorBg, border: `1px solid ${t.statusError}33`,
                 color: t.statusError, marginBottom: 16, fontSize: "0.875rem",
                 display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -509,7 +509,7 @@ export default function AdminPricingPage() {
                                 <span style={{ fontSize: "0.82rem", color: t.textMuted }}>Credits</span>
                             </div>
                             <div style={{
-                                padding: "8px 12px", borderRadius: t.isMono ? 4 : 6,
+                                padding: "8px 12px", borderRadius: t.buttonRadius,
                                 background: t.bgSecondary, border: `1px solid ${t.borderSecondary}`,
                                 fontSize: "0.75rem", color: t.textMuted, marginBottom: 14,
                                 fontFamily: t.fontMono,
@@ -597,7 +597,7 @@ export default function AdminPricingPage() {
                 <div style={{
                     marginTop: 20,
                     display: "flex", alignItems: "center", gap: 10,
-                    padding: "12px 20px", borderRadius: t.isMono ? 4 : 8,
+                    padding: "12px 20px", borderRadius: t.cardRadius,
                     background: t.accentPrimaryMuted,
                     border: `1px solid ${t.accentPrimary}33`,
                     color: t.accentPrimary, fontSize: "0.82rem",

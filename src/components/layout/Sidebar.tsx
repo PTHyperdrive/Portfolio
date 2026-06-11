@@ -111,7 +111,7 @@ export default function Sidebar() {
             alignItems: "center",
             gap: "12px",
             padding: t.isMono ? "9px 12px" : "10px 12px",
-            borderRadius: t.isMono ? 6 : 10,
+            borderRadius: t.cardRadius,
             fontSize: "0.9rem",
             fontWeight: 600,
             textDecoration: "none",
@@ -154,7 +154,7 @@ export default function Sidebar() {
                 padding: "20px 20px 18px", flexShrink: 0, textDecoration: "none",
             }}>
                 <div style={{
-                    width: 36, height: 36, borderRadius: t.isMono ? 8 : 10,
+                    width: 36, height: 36, borderRadius: t.cardRadius,
                     background: t.isMono ? t.bgTertiary : "linear-gradient(135deg,#3b82f6,#6366f1)",
                     border: t.isMono ? `1px solid ${t.borderPrimary}` : "none",
                     display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
@@ -181,7 +181,7 @@ export default function Sidebar() {
                     style={{
                         display: "flex", alignItems: "center", gap: "12px",
                         padding: t.isMono ? "9px 12px" : "11px 12px",
-                        borderRadius: t.isMono ? 6 : 10,
+                        borderRadius: t.cardRadius,
                         fontSize: "0.92rem", fontWeight: 600,
                         marginBottom: "20px", textDecoration: "none", transition: "all 0.15s",
                         borderLeft: "3px solid transparent",
@@ -259,7 +259,7 @@ export default function Sidebar() {
                                                 return (
                                                     <Link key={sub.label} href={sub.href} style={{
                                                         display: "flex", alignItems: "center", gap: "10px",
-                                                        padding: "9px 12px", borderRadius: t.isMono ? 4 : 8,
+                                                        padding: "9px 12px", borderRadius: t.cardRadius,
                                                         fontSize: "0.875rem", fontWeight: 500,
                                                         textDecoration: "none", transition: "all 0.15s",
                                                         color: subActive ? t.textPrimary : t.textMuted,
@@ -331,7 +331,7 @@ export default function Sidebar() {
                         style={{
                             width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between",
                             gap: 10, padding: "8px 12px", cursor: "pointer",
-                            borderRadius: t.isMono ? 4 : 8,
+                            borderRadius: t.cardRadius,
                             border: `1px solid ${viewAsUser ? t.accentPrimary : t.borderPrimary}`,
                             background: viewAsUser ? t.accentPrimaryMuted : "transparent",
                             color: viewAsUser ? t.accentPrimary : t.textSecondary,

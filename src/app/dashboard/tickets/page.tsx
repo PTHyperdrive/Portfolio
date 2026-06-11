@@ -120,7 +120,7 @@ export default function TicketsPage() {
     const filtered = filter === "all" ? tickets : tickets.filter(t => t.status === filter);
 
     const card: React.CSSProperties = { background: t.bgCard, border: `1px solid ${t.borderPrimary}`, borderRadius: t.cardRadius, boxShadow: t.shadow };
-    const inputStyle: React.CSSProperties = { background: t.bgInput, border: `1px solid ${t.borderPrimary}`, borderRadius: t.isMono ? 4 : 8, color: t.textPrimary, fontSize: "0.875rem", outline: "none", padding: "9px 13px", width: "100%", boxSizing: "border-box" as const, fontFamily: t.fontFamily };
+    const inputStyle: React.CSSProperties = { background: t.bgInput, border: `1px solid ${t.borderPrimary}`, borderRadius: t.cardRadius, color: t.textPrimary, fontSize: "0.875rem", outline: "none", padding: "9px 13px", width: "100%", boxSizing: "border-box" as const, fontFamily: t.fontFamily };
 
     return (
         <div style={{ padding: "32px 36px", minHeight: "100vh", backgroundColor: t.bgPrimary }}>
@@ -144,8 +144,8 @@ export default function TicketsPage() {
             </div>
 
             {/* Toasts */}
-            {success && <div style={{ padding: "12px 16px", borderRadius: t.isMono ? 4 : 9, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}33`, color: t.statusSuccess, marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}><span style={{ display: "flex", alignItems: "center", gap: 6 }}><CheckCircle2 style={{ width: 14, height: 14 }} /> {success}</span><button onClick={() => setSuccess("")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", display: "flex" }}><X style={{ width: 14, height: 14 }} /></button></div>}
-            {error && <div style={{ padding: "12px 16px", borderRadius: t.isMono ? 4 : 9, background: t.statusErrorBg, border: `1px solid ${t.statusError}33`, color: t.statusError, marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}><span style={{ display: "flex", alignItems: "center", gap: 6 }}><AlertCircle style={{ width: 14, height: 14 }} /> {error}</span><button onClick={() => setError("")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", display: "flex" }}><X style={{ width: 14, height: 14 }} /></button></div>}
+            {success && <div style={{ padding: "12px 16px", borderRadius: t.buttonRadius, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}33`, color: t.statusSuccess, marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}><span style={{ display: "flex", alignItems: "center", gap: 6 }}><CheckCircle2 style={{ width: 14, height: 14 }} /> {success}</span><button onClick={() => setSuccess("")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", display: "flex" }}><X style={{ width: 14, height: 14 }} /></button></div>}
+            {error && <div style={{ padding: "12px 16px", borderRadius: t.buttonRadius, background: t.statusErrorBg, border: `1px solid ${t.statusError}33`, color: t.statusError, marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}><span style={{ display: "flex", alignItems: "center", gap: 6 }}><AlertCircle style={{ width: 14, height: 14 }} /> {error}</span><button onClick={() => setError("")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", display: "flex" }}><X style={{ width: 14, height: 14 }} /></button></div>}
 
             {/* Create Ticket Form */}
             {showCreate && (
@@ -178,7 +178,7 @@ export default function TicketsPage() {
                         {/* Image Upload */}
                         <div>
                             <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 600, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Evidence (up to 5 images)</label>
-                            <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 18px", borderRadius: t.isMono ? 4 : 8, border: `2px dashed ${t.borderPrimary}`, cursor: "pointer", color: t.textMuted, fontSize: "0.82rem", justifyContent: "center" }}>
+                            <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "12px 18px", borderRadius: t.cardRadius, border: `2px dashed ${t.borderPrimary}`, cursor: "pointer", color: t.textMuted, fontSize: "0.82rem", justifyContent: "center" }}>
                                 <Upload style={{ width: 16, height: 16 }} />
                                 {files.length ? `${files.length} file(s) selected` : "Click or drag to upload images"}
                                 <input type="file" accept="image/*" multiple onChange={handleFileChange} style={{ display: "none" }} />
@@ -280,7 +280,7 @@ export default function TicketsPage() {
                                 </span>
                             </div>
                             {selectedTicket.description && (
-                                <div style={{ padding: "16px 20px", borderRadius: t.isMono ? 4 : 8, background: t.bgSecondary, border: `1px solid ${t.borderSecondary}`, fontSize: "0.875rem", color: t.textSecondary, lineHeight: 1.7, whiteSpace: "pre-wrap", fontFamily: t.fontMono }}>
+                                <div style={{ padding: "16px 20px", borderRadius: t.cardRadius, background: t.bgSecondary, border: `1px solid ${t.borderSecondary}`, fontSize: "0.875rem", color: t.textSecondary, lineHeight: 1.7, whiteSpace: "pre-wrap", fontFamily: t.fontMono }}>
                                     {selectedTicket.description}
                                 </div>
                             )}
@@ -292,7 +292,7 @@ export default function TicketsPage() {
                                             <p style={{ fontSize: "0.72rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", marginBottom: 8 }}>Evidence</p>
                                             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                                                 {imgs.map((img, i) => (
-                                                    <img key={i} src={`/api/tickets/file/${img}`} alt={`Evidence ${i + 1}`} onClick={() => setLightboxUrl(`/api/tickets/file/${img}`)} style={{ maxWidth: 200, maxHeight: 150, borderRadius: t.isMono ? 4 : 8, border: `1px solid ${t.borderPrimary}`, objectFit: "cover", cursor: "pointer", transition: "opacity 0.15s" }} onMouseEnter={e => (e.currentTarget.style.opacity = "0.8")} onMouseLeave={e => (e.currentTarget.style.opacity = "1")} />
+                                                    <img key={i} src={`/api/tickets/file/${img}`} alt={`Evidence ${i + 1}`} onClick={() => setLightboxUrl(`/api/tickets/file/${img}`)} style={{ maxWidth: 200, maxHeight: 150, borderRadius: t.cardRadius, border: `1px solid ${t.borderPrimary}`, objectFit: "cover", cursor: "pointer", transition: "opacity 0.15s" }} onMouseEnter={e => (e.currentTarget.style.opacity = "0.8")} onMouseLeave={e => (e.currentTarget.style.opacity = "1")} />
                                                 ))}
                                             </div>
                                         </div>
@@ -300,7 +300,7 @@ export default function TicketsPage() {
                                 } catch { return null; }
                             })()}
                             {selectedTicket.resolvedAt && (
-                                <div style={{ marginTop: 16, padding: "10px 14px", borderRadius: t.isMono ? 4 : 8, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}33`, display: "flex", alignItems: "center", gap: 8 }}>
+                                <div style={{ marginTop: 16, padding: "10px 14px", borderRadius: t.cardRadius, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}33`, display: "flex", alignItems: "center", gap: 8 }}>
                                     <CheckCircle2 style={{ width: 14, height: 14, color: t.statusSuccess }} />
                                     <span style={{ fontSize: "0.82rem", color: t.statusSuccess }}>Resolved on {new Date(selectedTicket.resolvedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}</span>
                                 </div>
@@ -318,7 +318,7 @@ export default function TicketsPage() {
                     tabIndex={0}
                     style={{ position: "fixed", inset: 0, zIndex: 99999, background: "rgba(0,0,0,0.88)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-out", padding: 32 }}
                 >
-                    <img src={lightboxUrl} alt="Evidence fullscreen" style={{ maxWidth: "92vw", maxHeight: "92vh", objectFit: "contain", borderRadius: t.isMono ? 4 : 12, boxShadow: "0 8px 48px rgba(0,0,0,0.6)" }} />
+                    <img src={lightboxUrl} alt="Evidence fullscreen" style={{ maxWidth: "92vw", maxHeight: "92vh", objectFit: "contain", borderRadius: t.cardRadius, boxShadow: "0 8px 48px rgba(0,0,0,0.6)" }} />
                 </div>
             )}
 

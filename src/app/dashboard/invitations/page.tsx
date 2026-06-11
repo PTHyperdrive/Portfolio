@@ -153,7 +153,7 @@ export default function InvitationsPage() {
                     <div style={{ display: "flex", gap: 8 }}>
                         <button onClick={load} style={{
                             display: "flex", alignItems: "center", gap: 6,
-                            padding: "7px 14px", borderRadius: t.isMono ? 4 : 8,
+                            padding: "7px 14px", borderRadius: t.cardRadius,
                             border: `1px solid ${t.borderPrimary}`, background: "transparent",
                             color: t.textMuted, fontSize: "0.8rem", cursor: "pointer",
                         }}>
@@ -161,7 +161,7 @@ export default function InvitationsPage() {
                         </button>
                         <button onClick={generate} disabled={generating} style={{
                             display: "flex", alignItems: "center", gap: 6,
-                            padding: "7px 14px", borderRadius: t.isMono ? 4 : 8,
+                            padding: "7px 14px", borderRadius: t.cardRadius,
                             border: "none", background: t.accentPrimary,
                             color: t.textInverse, fontSize: "0.8rem", fontWeight: 700, cursor: "pointer",
                             opacity: generating ? 0.6 : 1,
@@ -176,7 +176,7 @@ export default function InvitationsPage() {
             {/* Toasts */}
             {success && (
                 <div style={{
-                    padding: "10px 16px", borderRadius: t.isMono ? 4 : 8,
+                    padding: "10px 16px", borderRadius: t.cardRadius,
                     background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}33`,
                     color: t.statusSuccess, marginBottom: 16, fontSize: "0.875rem",
                     display: "flex", alignItems: "center", gap: 8,
@@ -186,7 +186,7 @@ export default function InvitationsPage() {
             )}
             {error && (
                 <div style={{
-                    padding: "10px 16px", borderRadius: t.isMono ? 4 : 8,
+                    padding: "10px 16px", borderRadius: t.cardRadius,
                     background: t.statusErrorBg, border: `1px solid ${t.statusError}33`,
                     color: t.statusError, marginBottom: 16, fontSize: "0.875rem",
                     display: "flex", alignItems: "center", gap: 8,

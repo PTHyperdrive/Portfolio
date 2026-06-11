@@ -196,7 +196,7 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
             </div>
 
             {error && (
-                <div style={{ padding: "12px 18px", borderRadius: t.isMono ? 4 : 8, background: t.statusErrorBg, border: `1px solid ${t.statusError}33`, color: t.statusError, marginBottom: 20, fontSize: "0.88rem" }}>
+                <div style={{ padding: "12px 18px", borderRadius: t.cardRadius, background: t.statusErrorBg, border: `1px solid ${t.statusError}33`, color: t.statusError, marginBottom: 20, fontSize: "0.88rem" }}>
                     {error} <button onClick={() => setError("")} style={{ float: "right", background: "none", border: "none", color: "inherit", cursor: "pointer", display: "inline-flex", alignItems: "center" }}><X style={{ width: 14, height: 14 }} /></button>
                 </div>
             )}
@@ -337,14 +337,14 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
                         <h3 style={{ fontSize: "1.05rem", fontWeight: 700, marginBottom: 4, color: t.textPrimary }}>Console Display Type</h3>
                         <p style={{ color: t.textMuted, fontSize: "0.85rem", marginBottom: 16 }}><strong>noVNC</strong> = browser-based. <strong>SPICE</strong> = external client (virt-viewer).</p>
                         {isRunning && (
-                            <div style={{ padding: "12px 16px", borderRadius: t.isMono ? 4 : 8, background: t.statusWarningBg, border: `1px solid ${t.statusWarning}33`, color: t.statusWarning, fontSize: "0.85rem", fontWeight: 600, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+                            <div style={{ padding: "12px 16px", borderRadius: t.cardRadius, background: t.statusWarningBg, border: `1px solid ${t.statusWarning}33`, color: t.statusWarning, fontSize: "0.85rem", fontWeight: 600, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
                                 <AlertTriangle style={{ width: 14, height: 14, flexShrink: 0 }} /> Power off the VM before changing the display adapter.
                             </div>
                         )}
                         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
                             {(["novnc", "spice"] as const).map(opt => (
                                 <label key={opt} style={{
-                                    flex: 1, minWidth: 160, padding: "14px 18px", borderRadius: t.isMono ? 4 : 8,
+                                    flex: 1, minWidth: 160, padding: "14px 18px", borderRadius: t.cardRadius,
                                     border: `1px solid ${displayType === opt ? t.accentPrimary : t.borderPrimary}`,
                                     background: displayType === opt ? t.accentPrimaryMuted : "transparent",
                                     cursor: isRunning || displayLoading ? "not-allowed" : "pointer",
@@ -369,7 +369,7 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
                         <div style={{ display: "flex", gap: 12, alignItems: "flex-end", flexWrap: "wrap" }}>
                             <div style={{ flex: 1, minWidth: 250 }}>
                                 <label style={{ display: "block", fontSize: "0.82rem", color: t.textMuted, marginBottom: 6 }}>Windows Version</label>
-                                <select value={selectedIso} onChange={e => setSelectedIso(e.target.value)} style={{ width: "100%", padding: "9px 12px", borderRadius: t.isMono ? 4 : 8, background: t.bgInput, border: `1px solid ${t.borderPrimary}`, color: t.textPrimary, fontSize: "0.875rem", cursor: "pointer", outline: "none" }}>
+                                <select value={selectedIso} onChange={e => setSelectedIso(e.target.value)} style={{ width: "100%", padding: "9px 12px", borderRadius: t.cardRadius, background: t.bgInput, border: `1px solid ${t.borderPrimary}`, color: t.textPrimary, fontSize: "0.875rem", cursor: "pointer", outline: "none" }}>
                                     {Object.entries(isoCategories).map(([cat, isos]) => (
                                         <optgroup key={cat} label={cat}>{isos.map(iso => <option key={iso.id} value={iso.id}>{iso.name}</option>)}</optgroup>
                                     ))}
@@ -382,7 +382,7 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
                     {/* VM Info */}
                     <div style={{ ...card, marginBottom: 24 }}>
                         <h3 style={{ fontSize: "1.05rem", fontWeight: 700, marginBottom: 14, color: t.textPrimary }}>Instance Information</h3>
-                        <div style={{ fontSize: "0.82rem", color: t.textMuted, padding: 16, background: t.bgSecondary, borderRadius: t.isMono ? 4 : 8, fontFamily: t.fontMono }}>
+                        <div style={{ fontSize: "0.82rem", color: t.textMuted, padding: 16, background: t.bgSecondary, borderRadius: t.cardRadius, fontFamily: t.fontMono }}>
                             <div>Instance ID: {vm.id}</div>
                             <div>Proxmox VM ID: {vm.vmId}</div>
                             <div>Node: {vm.node}</div>
@@ -418,7 +418,7 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
                         </p>
                         <form onSubmit={handleDestroy}>
                             <label style={{ display: "block", fontSize: "0.85rem", color: t.textSecondary, fontWeight: 600, marginBottom: 8 }}>Enter your account password to verify:</label>
-                            <input type="password" required value={destroyPwd} onChange={e => setDestroyPwd(e.target.value)} placeholder="••••••••" style={{ width: "100%", marginBottom: 16, padding: "10px 12px", borderRadius: t.isMono ? 4 : 8, background: t.bgSecondary, border: `1px solid ${t.borderPrimary}`, color: t.textPrimary, fontSize: "0.875rem", outline: "none", boxSizing: "border-box" }} />
+                            <input type="password" required value={destroyPwd} onChange={e => setDestroyPwd(e.target.value)} placeholder="••••••••" style={{ width: "100%", marginBottom: 16, padding: "10px 12px", borderRadius: t.cardRadius, background: t.bgSecondary, border: `1px solid ${t.borderPrimary}`, color: t.textPrimary, fontSize: "0.875rem", outline: "none", boxSizing: "border-box" }} />
                             {destroyErr && <p style={{ color: t.statusError, fontSize: "0.85rem", marginBottom: 16 }}>{destroyErr}</p>}
                             <div style={{ display: "flex", gap: 12, justifyContent: "flex-end" }}>
                                 <button type="button" onClick={() => { setShowDestroy(false); setDestroyPwd(""); setDestroyErr(""); }} disabled={destroyLoading} style={{ padding: "10px 20px", borderRadius: t.buttonRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textSecondary, cursor: "pointer", fontWeight: 600 }}>Cancel</button>

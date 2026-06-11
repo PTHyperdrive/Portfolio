@@ -118,7 +118,7 @@ export default function TwoFactorModal({
                         <div style={{
                             display: "flex", alignItems: "center", gap: 8,
                             padding: "10px 14px", marginBottom: 16,
-                            borderRadius: t.isMono ? 4 : 8,
+                            borderRadius: t.cardRadius,
                             background: t.statusErrorBg,
                             border: `1px solid ${t.statusError}33`,
                             color: t.statusError,
@@ -145,7 +145,7 @@ export default function TwoFactorModal({
                             letterSpacing: "0.35em", fontWeight: 800,
                             background: t.bgInput,
                             border: `1px solid ${t.borderPrimary}`,
-                            borderRadius: t.isMono ? 4 : 8,
+                            borderRadius: t.cardRadius,
                             color: t.textPrimary, outline: "none",
                             fontFamily: t.fontMono,
                             boxSizing: "border-box",

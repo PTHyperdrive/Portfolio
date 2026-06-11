@@ -103,7 +103,7 @@ export default function TopUpPage() {
             {toast && (
                 <div style={{
                     position: "fixed", top: 24, right: 24, zIndex: 9999,
-                    padding: "14px 20px", borderRadius: t.isMono ? 4 : 10, fontWeight: 600, fontSize: "0.875rem",
+                    padding: "14px 20px", borderRadius: t.cardRadius, fontWeight: 600, fontSize: "0.875rem",
                     background: toast.type === "success" ? t.statusSuccessBg : t.statusErrorBg,
                     border: `1px solid ${toast.type === "success" ? t.statusSuccess : t.statusError}66`,
                     color: toast.type === "success" ? t.statusSuccess : t.statusError,
@@ -198,7 +198,7 @@ export default function TopUpPage() {
                                     style={{
                                         width: "100%", padding: "10px 14px 10px 42px",
                                         background: t.bgInput, border: `1px solid ${t.borderPrimary}`,
-                                        borderRadius: t.isMono ? 4 : 8, color: t.textPrimary, fontSize: "0.9rem", outline: "none",
+                                        borderRadius: t.cardRadius, color: t.textPrimary, fontSize: "0.9rem", outline: "none",
                                         boxSizing: "border-box",
                                     }}
                                 />
@@ -229,7 +229,7 @@ export default function TopUpPage() {
                                     flex: 1, padding: "10px 14px",
                                     background: promoState === "applied" ? t.statusSuccessBg : t.bgInput,
                                     border: `1px solid ${promoState === "applied" ? `${t.statusSuccess}4d` : promoState === "error" ? `${t.statusError}4d` : t.borderPrimary}`,
-                                    borderRadius: t.isMono ? 4 : 8, color: t.textPrimary, fontSize: "0.9rem", outline: "none",
+                                    borderRadius: t.cardRadius, color: t.textPrimary, fontSize: "0.9rem", outline: "none",
                                     fontFamily: t.fontMono, letterSpacing: "0.05em",
                                 }}
                             />

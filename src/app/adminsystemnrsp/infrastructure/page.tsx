@@ -168,7 +168,7 @@ export default function InfrastructurePage() {
                             onClick={fetchInitial}
                             style={{
                                 display: "flex", alignItems: "center", gap: 6, padding: "7px 14px",
-                                borderRadius: t.isMono ? 4 : 8, border: `1px solid ${t.borderPrimary}`,
+                                borderRadius: t.cardRadius, border: `1px solid ${t.borderPrimary}`,
                                 background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer",
                             }}
                         >
@@ -425,7 +425,7 @@ export default function InfrastructurePage() {
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 12 }}>
                         {data.healthEntries.map(entry => (
                             <div key={entry.name} style={{
-                                padding: "12px 16px", borderRadius: t.isMono ? 4 : 8,
+                                padding: "12px 16px", borderRadius: t.cardRadius,
                                 background: t.bgSecondary, border: `1px solid ${t.borderSecondary}`,
                             }}>
                                 <p style={{ fontSize: "0.68rem", color: t.textMuted, textTransform: "uppercase", fontWeight: 600, marginBottom: 4 }}>

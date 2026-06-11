@@ -80,7 +80,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         const active = isActive(href);
         return {
             display: "flex", alignItems: "center", gap: 10,
-            padding: "8px 12px", borderRadius: t.isMono ? 4 : 8,
+            padding: "8px 12px", borderRadius: t.cardRadius,
             textDecoration: "none", fontSize: "0.85rem", fontWeight: 600,
             color: active ? t.statusWarning : t.textSecondary,
             background: active ? t.statusWarningBg : "transparent",
@@ -144,7 +144,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <div style={{ padding: "8px 8px 0" }}>
                     <Link href="/dashboard/vps" style={{
                         display: "flex", alignItems: "center", gap: 7, padding: "7px 12px",
-                        borderRadius: t.isMono ? 4 : 8, textDecoration: "none",
+                        borderRadius: t.cardRadius, textDecoration: "none",
                         color: t.textMuted, fontSize: "0.78rem", fontWeight: 500,
                     }}>
                         <ArrowLeft style={{ width: 13, height: 13 }} /> Back to Dashboard
@@ -168,7 +168,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     {/* Credit display */}
                     <div style={{
                         display: "flex", alignItems: "center", gap: 6,
-                        padding: "7px 10px", borderRadius: t.isMono ? 4 : 8,
+                        padding: "7px 10px", borderRadius: t.cardRadius,
                         background: t.bgSecondary, border: `1px solid ${t.borderSecondary}`,
                         marginBottom: 8,
                     }}>
@@ -185,7 +185,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     {session?.user && (
                         <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8 }}>
                             <div style={{
-                                width: 28, height: 28, borderRadius: t.isMono ? 4 : 7,
+                                width: 28, height: 28, borderRadius: t.buttonRadius,
                                 background: t.statusWarningBg, display: "flex",
                                 alignItems: "center", justifyContent: "center",
                                 fontSize: "0.72rem", fontWeight: 800, color: t.statusWarning, flexShrink: 0,
@@ -200,7 +200,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                                 <p style={{ fontSize: "0.62rem", color: t.statusWarning, fontWeight: 600 }}>Administrator</p>
                             </div>
                             <button onClick={() => signOut({ callbackUrl: "/" })} title="Sign out" style={{
-                                width: 26, height: 26, borderRadius: t.isMono ? 4 : 6, flexShrink: 0,
+                                width: 26, height: 26, borderRadius: t.buttonRadius, flexShrink: 0,
                                 border: `1px solid ${t.borderPrimary}`, background: "transparent",
                                 color: t.textMuted, cursor: "pointer",
                                 display: "flex", alignItems: "center", justifyContent: "center",

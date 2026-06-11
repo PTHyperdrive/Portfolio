@@ -111,11 +111,11 @@ export default function AuditLogPage() {
                 <div style={{ padding: "16px 24px", display: "flex", gap: 12, borderBottom: `1px solid ${t.borderSecondary}` }}>
                     <div style={{ position: "relative", flex: 1 }}>
                         <Search style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", width: 15, height: 15, color: t.textMuted, pointerEvents: "none" }} />
-                        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search activities..." style={{ width: "100%", paddingLeft: 36, padding: "9px 12px 9px 36px", background: t.bgInput, border: `1px solid ${t.borderPrimary}`, borderRadius: t.isMono ? 4 : 8, color: t.textPrimary, fontSize: "0.875rem", outline: "none", boxSizing: "border-box" }} />
+                        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search activities..." style={{ width: "100%", paddingLeft: 36, padding: "9px 12px 9px 36px", background: t.bgInput, border: `1px solid ${t.borderPrimary}`, borderRadius: t.cardRadius, color: t.textPrimary, fontSize: "0.875rem", outline: "none", boxSizing: "border-box" }} />
                     </div>
                 </div>
 
-                {error && <div style={{ margin: 20, padding: "12px 16px", background: t.statusErrorBg, borderRadius: t.isMono ? 4 : 8, color: t.statusError, fontSize: "0.85rem" }}>{error}</div>}
+                {error && <div style={{ margin: 20, padding: "12px 16px", background: t.statusErrorBg, borderRadius: t.cardRadius, color: t.statusError, fontSize: "0.85rem" }}>{error}</div>}
 
                 {/* Table */}
                 {loading ? (
@@ -171,7 +171,7 @@ export default function AuditLogPage() {
                                         {isOpen && (
                                             <tr>
                                                 <td colSpan={6} style={{ padding: "0 20px 16px", background: t.accentPrimaryMuted }}>
-                                                    <div style={{ padding: 20, background: t.bgSecondary, borderRadius: t.isMono ? 6 : 12, border: `1px solid ${t.borderSecondary}` }}>
+                                                    <div style={{ padding: 20, background: t.bgSecondary, borderRadius: t.cardRadius, border: `1px solid ${t.borderSecondary}` }}>
                                                         <p style={{ fontSize: "0.8rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Activity Details</p>
                                                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
                                                             <div>
@@ -186,7 +186,7 @@ export default function AuditLogPage() {
                                                         {log.metadata && (
                                                             <div>
                                                                 <p style={{ fontSize: "0.72rem", color: t.textMuted, marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 700 }}>Metadata</p>
-                                                                <pre style={{ padding: 14, background: t.bgTertiary, borderRadius: t.isMono ? 4 : 8, fontSize: "0.78rem", color: t.textSecondary, overflowX: "auto", fontFamily: t.fontMono }}>
+                                                                <pre style={{ padding: 14, background: t.bgTertiary, borderRadius: t.cardRadius, fontSize: "0.78rem", color: t.textSecondary, overflowX: "auto", fontFamily: t.fontMono }}>
                                                                     {JSON.stringify(log.metadata, null, 2)}
                                                                 </pre>
                                                             </div>
@@ -209,10 +209,10 @@ export default function AuditLogPage() {
                             {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total}
                         </p>
                         <div style={{ display: "flex", gap: 8 }}>
-                            <button disabled={page <= 1} onClick={() => load(page - 1)} style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "6px 12px", borderRadius: t.isMono ? 4 : 8, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: page <= 1 ? t.textMuted : t.textPrimary, cursor: page <= 1 ? "not-allowed" : "pointer", fontSize: "0.85rem" }}>
+                            <button disabled={page <= 1} onClick={() => load(page - 1)} style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "6px 12px", borderRadius: t.cardRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: page <= 1 ? t.textMuted : t.textPrimary, cursor: page <= 1 ? "not-allowed" : "pointer", fontSize: "0.85rem" }}>
                                 <ChevronLeft style={{ width: 16, height: 16 }} />
                             </button>
-                            <button disabled={page >= totalPages} onClick={() => load(page + 1)} style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "6px 12px", borderRadius: t.isMono ? 4 : 8, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: page >= totalPages ? t.textMuted : t.textPrimary, cursor: page >= totalPages ? "not-allowed" : "pointer", fontSize: "0.85rem" }}>
+                            <button disabled={page >= totalPages} onClick={() => load(page + 1)} style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: "6px 12px", borderRadius: t.cardRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: page >= totalPages ? t.textMuted : t.textPrimary, cursor: page >= totalPages ? "not-allowed" : "pointer", fontSize: "0.85rem" }}>
                                 <ChevronRight style={{ width: 16, height: 16 }} />
                             </button>
                         </div>

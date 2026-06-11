@@ -170,7 +170,7 @@ export default function AdminAccountsPage() {
     const adminCount = users.filter(u => u.role === "ADMIN").length;
 
     const card: React.CSSProperties = { background: t.bgCard, border: `1px solid ${t.borderPrimary}`, borderRadius: t.cardRadius, boxShadow: t.shadow };
-    const inp: React.CSSProperties = { background: t.bgInput, border: `1px solid ${t.borderPrimary}`, borderRadius: t.isMono ? 4 : 8, color: t.textPrimary, fontSize: "0.84rem", outline: "none", padding: "7px 11px", fontFamily: t.fontFamily };
+    const inp: React.CSSProperties = { background: t.bgInput, border: `1px solid ${t.borderPrimary}`, borderRadius: t.cardRadius, color: t.textPrimary, fontSize: "0.84rem", outline: "none", padding: "7px 11px", fontFamily: t.fontFamily };
 
     return (
         <div style={{ padding: "32px 36px", minHeight: "100vh", backgroundColor: t.bgPrimary }}>
@@ -189,11 +189,11 @@ export default function AdminAccountsPage() {
                     </div>
                     <div style={{ display: "flex", gap: 8 }}>
                         {selected.size > 0 && (
-                            <button onClick={openDeleteModal} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: t.isMono ? 4 : 8, border: `1px solid ${t.statusError}40`, background: `${t.statusError}15`, color: t.statusError, fontSize: "0.8rem", fontWeight: 600, cursor: "pointer", transition: "all 0.15s" }}>
+                            <button onClick={openDeleteModal} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: t.cardRadius, border: `1px solid ${t.statusError}40`, background: `${t.statusError}15`, color: t.statusError, fontSize: "0.8rem", fontWeight: 600, cursor: "pointer", transition: "all 0.15s" }}>
                                 <Trash2 style={{ width: 13, height: 13 }} /> Delete {selected.size} account{selected.size > 1 ? "s" : ""}
                             </button>
                         )}
-                        <button onClick={load} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: t.isMono ? 4 : 8, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>
+                        <button onClick={load} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: t.cardRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>
                             <RefreshCw style={{ width: 13, height: 13 }} /> Refresh
                         </button>
                     </div>
@@ -255,7 +255,7 @@ export default function AdminAccountsPage() {
                                         </td>
                                         <td style={{ padding: "12px 16px" }}>
                                             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                                <div style={{ width: 30, height: 30, borderRadius: t.isMono ? 4 : 8, background: t.accentPrimaryMuted, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "0.75rem", color: t.accentPrimary, flexShrink: 0 }}>
+                                                <div style={{ width: 30, height: 30, borderRadius: t.cardRadius, background: t.accentPrimaryMuted, display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, fontSize: "0.75rem", color: t.accentPrimary, flexShrink: 0 }}>
                                                     {(user.name || user.email)[0].toUpperCase()}
                                                 </div>
                                                 <span style={{ fontWeight: 600, fontSize: "0.875rem", color: t.textPrimary }}>{user.name || "—"}</span>
@@ -271,7 +271,7 @@ export default function AdminAccountsPage() {
                                             <button
                                                 onClick={e => { e.stopPropagation(); setCrModal({ userId: user.id, name: user.name || user.email, email: user.email, credits: user.credits }); }}
                                                 title="Adjust credits"
-                                                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 8px", borderRadius: t.isMono ? 4 : 6, border: `1px solid ${t.borderPrimary}`, background: "transparent", cursor: "pointer", fontFamily: t.fontMono, fontSize: "0.82rem", color: t.statusSuccess }}
+                                                style={{ display: "inline-flex", alignItems: "center", gap: 6, padding: "3px 8px", borderRadius: t.buttonRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", cursor: "pointer", fontFamily: t.fontMono, fontSize: "0.82rem", color: t.statusSuccess }}
                                             >
                                                 {user.credits.toLocaleString()}
                                                 <Wallet style={{ width: 12, height: 12, color: t.textMuted }} />
@@ -314,7 +314,7 @@ export default function AdminAccountsPage() {
                                                 title="Reset password"
                                                 style={{
                                                     display: "flex", alignItems: "center", justifyContent: "center",
-                                                    width: 28, height: 28, borderRadius: t.isMono ? 4 : 6,
+                                                    width: 28, height: 28, borderRadius: t.buttonRadius,
                                                     border: `1px solid ${t.borderPrimary}`, background: "transparent",
                                                     color: t.textMuted, cursor: "pointer", transition: "all 0.15s",
                                                 }}
@@ -335,11 +335,11 @@ export default function AdminAccountsPage() {
                                     {expanded === user.id && user.vpsInstances.length > 0 && (
                                         <tr key={`${user.id}-exp`}>
                                             <td colSpan={11} style={{ padding: "0 16px 14px", background: t.bgSecondary }}>
-                                                <div style={{ padding: "12px 14px", borderRadius: t.isMono ? 4 : 8, background: t.bgTertiary, border: `1px solid ${t.borderSecondary}` }}>
+                                                <div style={{ padding: "12px 14px", borderRadius: t.cardRadius, background: t.bgTertiary, border: `1px solid ${t.borderSecondary}` }}>
                                                     <p style={{ fontSize: "0.68rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>VPS Instances</p>
                                                     <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                                                         {user.vpsInstances.map(vm => (
-                                                            <div key={vm.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 10px", borderRadius: t.isMono ? 4 : 6, background: t.bgCard }}>
+                                                            <div key={vm.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 10px", borderRadius: t.buttonRadius, background: t.bgCard }}>
                                                                 <span style={{ width: 7, height: 7, borderRadius: "50%", background: vm.status === "running" ? t.statusSuccess : t.statusError, flexShrink: 0 }} />
                                                                 <span style={{ fontWeight: 600, fontSize: "0.82rem", color: t.textPrimary, minWidth: 140 }}>{vm.name}</span>
                                                                 <span style={{ fontFamily: t.fontMono, fontSize: "0.72rem", color: t.textMuted }}>VM {vm.vmId}</span>
@@ -398,11 +398,11 @@ export default function AdminAccountsPage() {
                             <p style={{ fontSize: "0.75rem", color: crMsg.ok ? t.statusSuccess : t.statusError, marginBottom: 8, fontWeight: 600 }}>{crMsg.text}</p>
                         )}
                         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
-                            <button onClick={() => setCrModal(null)} style={{ padding: "7px 16px", borderRadius: t.isMono ? 4 : 8, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>Cancel</button>
+                            <button onClick={() => setCrModal(null)} style={{ padding: "7px 16px", borderRadius: t.cardRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>Cancel</button>
                             <button
                                 onClick={adjustCredits}
                                 disabled={crSaving || !crDelta}
-                                style={{ padding: "7px 16px", borderRadius: t.isMono ? 4 : 8, border: "none", background: crDelta ? t.accentPrimary : `${t.textMuted}40`, color: "#fff", fontSize: "0.8rem", fontWeight: 600, cursor: crDelta ? "pointer" : "not-allowed" }}
+                                style={{ padding: "7px 16px", borderRadius: t.cardRadius, border: "none", background: crDelta ? t.accentPrimary : `${t.textMuted}40`, color: "#fff", fontSize: "0.8rem", fontWeight: 600, cursor: crDelta ? "pointer" : "not-allowed" }}
                             >
                                 {crSaving ? "Applying..." : "Apply"}
                             </button>
@@ -448,12 +448,12 @@ export default function AdminAccountsPage() {
                             <p style={{ fontSize: "0.75rem", color: pwMsg.ok ? t.statusSuccess : t.statusError, marginBottom: 8, fontWeight: 600 }}>{pwMsg.text}</p>
                         )}
                         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
-                            <button onClick={() => setPwModal(null)} style={{ padding: "7px 16px", borderRadius: t.isMono ? 4 : 8, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>Cancel</button>
+                            <button onClick={() => setPwModal(null)} style={{ padding: "7px 16px", borderRadius: t.cardRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>Cancel</button>
                             <button
                                 onClick={resetPassword}
                                 disabled={pwSaving || newPw.length < 8}
                                 style={{
-                                    padding: "7px 16px", borderRadius: t.isMono ? 4 : 8, border: "none",
+                                    padding: "7px 16px", borderRadius: t.cardRadius, border: "none",
                                     background: newPw.length >= 8 ? t.accentPrimary : `${t.textMuted}40`,
                                     color: "#fff", fontSize: "0.8rem", fontWeight: 600, cursor: newPw.length >= 8 ? "pointer" : "not-allowed",
                                     opacity: pwSaving ? 0.6 : 1, transition: "all 0.15s",
@@ -480,7 +480,7 @@ export default function AdminAccountsPage() {
                                 <p style={{ fontSize: "0.78rem", color: t.statusError, fontWeight: 600 }}>This action is permanent and cannot be undone.</p>
                             </div>
                         </div>
-                        <div style={{ maxHeight: 180, overflowY: "auto", marginBottom: 16, padding: "10px 12px", borderRadius: t.isMono ? 4 : 8, background: t.bgSecondary, border: `1px solid ${t.borderSecondary}` }}>
+                        <div style={{ maxHeight: 180, overflowY: "auto", marginBottom: 16, padding: "10px 12px", borderRadius: t.cardRadius, background: t.bgSecondary, border: `1px solid ${t.borderSecondary}` }}>
                             {users.filter(u => selected.has(u.id)).map(u => (
                                 <div key={u.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "5px 0", fontSize: "0.82rem" }}>
                                     <Trash2 style={{ width: 11, height: 11, color: t.statusError, flexShrink: 0 }} />
@@ -492,12 +492,12 @@ export default function AdminAccountsPage() {
                         <p style={{ fontSize: "0.78rem", color: t.textMuted, lineHeight: 1.5, marginBottom: 16 }}>All user data including VPS instances, orders, sessions, VPCs, WireGuard peers, and chat history will be permanently deleted.</p>
                         {deleteErr && <p style={{ fontSize: "0.78rem", color: t.statusError, fontWeight: 600, marginBottom: 10 }}>{deleteErr}</p>}
                         <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-                            <button onClick={closeDeleteModal} style={{ padding: "9px 20px", borderRadius: t.isMono ? 4 : 8, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.82rem", cursor: "pointer" }}>Cancel</button>
+                            <button onClick={closeDeleteModal} style={{ padding: "9px 20px", borderRadius: t.cardRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.82rem", cursor: "pointer" }}>Cancel</button>
                             <button
                                 onClick={handleBulkDelete}
                                 disabled={countdown > 0 || deleting}
                                 style={{
-                                    padding: "9px 20px", borderRadius: t.isMono ? 4 : 8, border: "none",
+                                    padding: "9px 20px", borderRadius: t.cardRadius, border: "none",
                                     background: countdown > 0 ? `${t.textMuted}40` : t.statusError,
                                     color: "#fff", fontSize: "0.82rem", fontWeight: 700,
                                     cursor: countdown > 0 || deleting ? "not-allowed" : "pointer",
