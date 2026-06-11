@@ -352,7 +352,8 @@ model VpcAssignment {
   vpcId          String
   vpsInstanceId  String      @unique  // 1:1 — one VM per VPC assignment
   bridgeName     String      // Proxmox bridge assigned (e.g. "vc001")
-  ipAddress      String?     // Static IP within subnet
+  ipAddress      String?     // Resolved IP within the /28 (auto or manual)
+  dhcp           Boolean     @default(true)  // true = auto-assign, false = manual static
   assignedAt     DateTime    @default(now())
 
   vpc         Vpc         @relation(fields: [vpcId], references: [id], onDelete: Cascade)

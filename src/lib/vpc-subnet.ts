@@ -55,6 +55,41 @@ export function netFromIndex(index: number, networkId: string): VpcNet {
     };
 }
 
+// ── Host IP allocation within a /28 ──────────────────────────────
+
+export function ipToInt(ip: string): number {
+    return ip.split(".").reduce((acc, o) => (acc << 8) + (parseInt(o, 10) & 255), 0) >>> 0;
+}
+
+export function intToIp(n: number): string {
+    return [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255].join(".");
+}
+
+/** True if `ip` falls within the VPC's assignable host range (dhcpStart…dhcpEnd). */
+export function isHostInRange(ip: string, dhcpStart: string, dhcpEnd: string): boolean {
+    if (!/^(\d{1,3}\.){3}\d{1,3}$/.test(ip)) return false;
+    const n = ipToInt(ip);
+    return n >= ipToInt(dhcpStart) && n <= ipToInt(dhcpEnd);
+}
+
+/**
+ * Pick the next free host IP in a /28 (the "automatic"/DHCP path).
+ * Walks dhcpStart…dhcpEnd skipping any address already taken.
+ */
+export function allocateHostIp(
+    dhcpStart: string,
+    dhcpEnd: string,
+    usedIps: Set<string>,
+): string | null {
+    const start = ipToInt(dhcpStart);
+    const end = ipToInt(dhcpEnd);
+    for (let n = start; n <= end; n++) {
+        const ip = intToIp(n);
+        if (!usedIps.has(ip)) return ip;
+    }
+    return null;
+}
+
 /**
  * Allocate a /28 for a VPC.
  *

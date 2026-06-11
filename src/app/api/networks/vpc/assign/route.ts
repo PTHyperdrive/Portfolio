@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { audit } from "@/lib/audit";
+import { allocateHostIp, isHostInRange } from "@/lib/vpc-subnet";
 
 /**
  * POST /api/networks/vpc/assign — Assign user's own VM to their own VPC.
@@ -15,11 +16,15 @@ export async function POST(req: NextRequest) {
         }
 
         const userId = session.user.id;
-        const { vpcId, vpsInstanceId, ipAddress } = (await req.json()) as {
+        const { vpcId, vpsInstanceId, ipAddress, dhcp } = (await req.json()) as {
             vpcId: string;
             vpsInstanceId: string;
             ipAddress?: string;
+            // true / undefined = automatic (DHCP-style auto-assign).
+            // false = manual: caller must supply a valid in-range ipAddress.
+            dhcp?: boolean;
         };
+        const autoAssign = dhcp !== false;
 
         if (!vpcId || !vpsInstanceId) {
             return NextResponse.json(
@@ -57,17 +62,47 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // ── Check IP uniqueness within VPC ──────────────────────────
-        if (ipAddress) {
-            const ipConflict = await prisma.vpcAssignment.findFirst({
-                where: { vpcId, ipAddress },
-            });
-            if (ipConflict) {
+        // ── Resolve the IP (automatic vs manual) ────────────────────
+        const taken = await prisma.vpcAssignment.findMany({
+            where: { vpcId, ipAddress: { not: null } },
+            select: { ipAddress: true },
+        });
+        const usedIps = new Set(taken.map((a) => a.ipAddress as string));
+        const dhcpStart = vpc.dhcpStart ?? "";
+        const dhcpEnd = vpc.dhcpEnd ?? "";
+
+        let resolvedIp: string | null = null;
+
+        if (autoAssign) {
+            // Automatic: hand out the next free address in the /28 pool.
+            resolvedIp = allocateHostIp(dhcpStart, dhcpEnd, usedIps);
+            if (!resolvedIp) {
+                return NextResponse.json(
+                    { error: "No free IPs left in this VPC's /28 pool." },
+                    { status: 409 },
+                );
+            }
+        } else {
+            // Manual: the caller must give a valid, in-range, free address.
+            if (!ipAddress) {
+                return NextResponse.json(
+                    { error: "Manual mode requires an ipAddress." },
+                    { status: 400 },
+                );
+            }
+            if (!isHostInRange(ipAddress, dhcpStart, dhcpEnd)) {
+                return NextResponse.json(
+                    { error: `IP must be within ${dhcpStart}–${dhcpEnd} for this VPC.` },
+                    { status: 400 },
+                );
+            }
+            if (usedIps.has(ipAddress)) {
                 return NextResponse.json(
                     { error: `IP ${ipAddress} is already assigned in this VPC` },
                     { status: 409 },
                 );
             }
+            resolvedIp = ipAddress;
         }
 
         // ── Create assignment ───────────────────────────────────────
@@ -76,7 +111,8 @@ export async function POST(req: NextRequest) {
                 vpcId,
                 vpsInstanceId,
                 bridgeName: vpc.vnetName,
-                ipAddress: ipAddress || null,
+                ipAddress: resolvedIp,
+                dhcp: autoAssign,
             },
             include: {
                 vpc: { select: { name: true, vlanId: true, subnet: true } },
@@ -93,7 +129,8 @@ export async function POST(req: NextRequest) {
                 vpsInstanceId,
                 vmId: assignment.vpsInstance.vmId,
                 vlanId: assignment.vpc.vlanId,
-                ipAddress,
+                ipAddress: resolvedIp,
+                mode: autoAssign ? "auto" : "manual",
             },
             req,
         });
