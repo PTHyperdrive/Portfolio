@@ -51,12 +51,19 @@ function rawRequest(
         const isHttps = parsed.protocol === "https:";
         const mod = isHttps ? https : http;
 
+        // Pre-encode the body so we can send a fixed Content-Length. Without
+        // it Node falls back to Transfer-Encoding: chunked, which RouterOS's
+        // REST server rejects with 400 Bad Request on every PUT/POST.
+        const bodyBuf = options.body != null ? Buffer.from(options.body) : null;
+        const headers: Record<string, string> = { ...(options.headers || {}) };
+        if (bodyBuf) headers["Content-Length"] = String(bodyBuf.length);
+
         const reqOptions: https.RequestOptions = {
             hostname: parsed.hostname,
             port: parsed.port || (isHttps ? 443 : 80),
             path: parsed.pathname + parsed.search,
             method: options.method || "GET",
-            headers: options.headers || {},
+            headers,
             rejectUnauthorized: options.rejectUnauthorized ?? true,
         };
 
@@ -81,8 +88,8 @@ function rawRequest(
             });
         }
 
-        if (options.body) {
-            req.write(options.body);
+        if (bodyBuf) {
+            req.write(bodyBuf);
         }
         req.end();
     });
