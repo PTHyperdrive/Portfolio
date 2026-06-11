@@ -1126,6 +1126,57 @@ export async function regenerateCloudInitImage(
     });
 }
 
+/** Swap the bridge in a Proxmox net0 string, preserving model/mac/rate. */
+function swapNet0Bridge(currentNet0: string | undefined, bridge: string): string {
+    const cur = currentNet0 || "virtio,bridge=vmbr0";
+    return /bridge=[^,]+/.test(cur)
+        ? cur.replace(/bridge=[^,]+/, `bridge=${bridge}`)
+        : `${cur},bridge=${bridge}`;
+}
+
+/**
+ * Attach a VM to a VPC: repoint net0 to the VPC's VNet bridge and set the
+ * cloud-init IP. Pass `ipCidr=null` for DHCP (the per-VLAN MikroTik DHCP
+ * server assigns the address) or a CIDR for a manual static IP.
+ * Returns the NIC MAC so the caller can pin a DHCP reservation if needed.
+ *
+ * @param ipCidr  e.g. "10.50.49.2/28", or null for DHCP
+ * @param gateway e.g. "10.50.49.1" (ignored when ipCidr is null)
+ */
+export async function attachVmToVpcNetwork(
+    node: string,
+    vmId: string,
+    bridge: string,
+    ipCidr: string | null,
+    gateway: string | null,
+): Promise<{ mac: string }> {
+    const config = await getVMConfig(node, vmId);
+    const net0 = swapNet0Bridge(config.net0, bridge);
+    await updateVMConfig(node, vmId, { net0 });
+    const mac = net0.match(/=([0-9A-Fa-f:]{17})/)?.[1] ?? "";
+    await setCloudInitConfig(node, vmId, {
+        ipconfig0: ipCidr ? `ip=${ipCidr},gw=${gateway}` : "ip=dhcp",
+        nameserver: "8.8.8.8 1.1.1.1",
+    });
+    await regenerateCloudInitImage(node, vmId);
+    return { mac };
+}
+
+/**
+ * Detach a VM from a VPC: move net0 back to the default bridge and reset
+ * cloud-init to DHCP. Best-effort revert used on unassign.
+ */
+export async function detachVmFromVpcNetwork(
+    node: string,
+    vmId: string,
+    defaultBridge = process.env.PROXMOX_DEFAULT_BRIDGE || "vmbr0",
+): Promise<void> {
+    const config = await getVMConfig(node, vmId);
+    await updateVMConfig(node, vmId, { net0: swapNet0Bridge(config.net0, defaultBridge) });
+    await setCloudInitConfig(node, vmId, { ipconfig0: "ip=dhcp" });
+    await regenerateCloudInitImage(node, vmId);
+}
+
 /**
  * Query the QEMU Guest Agent for network interface information.
  *

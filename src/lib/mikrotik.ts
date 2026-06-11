@@ -485,6 +485,106 @@ export async function removeFirewallRulesByComment(
     return removed;
 }
 
+// ─── Per-VLAN DHCP (one server per customer VLAN) ─────────────────
+//
+// Each customer VLAN is its own L2 segment, so a dedicated DHCP server can
+// hand out addresses from that customer's /28 with no ambiguity.
+//
+// Provision order:  pool → network → server.
+// Teardown order:   server → network → pool  (all matched by comment).
+
+/** Create an IP pool covering a customer's usable host range. */
+export async function createDhcpPool(
+    name: string,
+    range: string,          // "10.50.3.18-10.50.3.30"
+    comment?: string,
+): Promise<void> {
+    await mikrotikFetch("/ip/pool", {
+        method: "PUT",
+        body: JSON.stringify({ name, ranges: range, ...(comment ? { comment } : {}) }),
+    });
+}
+
+/** Create the DHCP server bound to a customer's VLAN interface. */
+export async function createDhcpServer(
+    name: string,
+    interfaceName: string,
+    poolName: string,
+    comment?: string,
+    leaseTime = "1d",
+): Promise<void> {
+    await mikrotikFetch("/ip/dhcp-server", {
+        method: "PUT",
+        body: JSON.stringify({
+            name,
+            interface: interfaceName,
+            "address-pool": poolName,
+            "lease-time": leaseTime,
+            disabled: "false",
+            ...(comment ? { comment } : {}),
+        }),
+    });
+}
+
+/** Create the DHCP network (subnet/gateway/DNS offered to clients). */
+export async function createDhcpNetwork(
+    subnet: string,         // "10.50.3.16/28"
+    gateway: string,        // "10.50.3.17"
+    dns = "8.8.8.8,1.1.1.1",
+    comment?: string,
+): Promise<void> {
+    await mikrotikFetch("/ip/dhcp-server/network", {
+        method: "PUT",
+        body: JSON.stringify({
+            address: subnet,
+            gateway,
+            "dns-server": dns,
+            ...(comment ? { comment } : {}),
+        }),
+    });
+}
+
+/**
+ * Pin a manual static IP as a DHCP reservation (ip↔mac) so the pool never
+ * hands that address to another VM.
+ */
+export async function addDhcpLease(
+    server: string,
+    address: string,
+    macAddress: string,
+    comment?: string,
+): Promise<void> {
+    await mikrotikFetch("/ip/dhcp-server/lease", {
+        method: "PUT",
+        body: JSON.stringify({
+            server, address, "mac-address": macAddress,
+            ...(comment ? { comment } : {}),
+        }),
+    });
+}
+
+/** Remove only DHCP leases matching a comment (per-VM reservation cleanup). */
+export async function removeDhcpLeaseByComment(comment: string): Promise<void> {
+    try {
+        const rows = await mikrotikFetch("/ip/dhcp-server/lease") as Array<Record<string, string>>;
+        for (const r of rows.filter((x) => x.comment === comment)) {
+            await mikrotikFetch(`/ip/dhcp-server/lease/${r[".id"]}`, { method: "DELETE" }).catch(() => {});
+        }
+    } catch { /* non-fatal */ }
+}
+
+/** Remove DHCP leases, server, network, and pool for a customer (by comment). */
+export async function removeDhcpByComment(comment: string): Promise<void> {
+    for (const path of ["/ip/dhcp-server/lease", "/ip/dhcp-server", "/ip/dhcp-server/network", "/ip/pool"]) {
+        try {
+            const rows = await mikrotikFetch(path) as Array<Record<string, string>>;
+            for (const r of rows.filter((x) => x.comment === comment)) {
+                await mikrotikFetch(`${path}/${r[".id"]}`, { method: "DELETE" }).catch(() => {});
+            }
+        } catch { /* non-fatal */ }
+    }
+}
+
 // ─── Aggregated Health Snapshot ───────────────────────────────────
 
 export interface MikrotikHealthSnapshot {
