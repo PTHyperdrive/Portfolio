@@ -48,6 +48,7 @@ export async function POST(req: Request) {
                 passwordHash: true,
                 twoFactorEnabled: true,
                 twoFactorSecret: true,
+                emailTwoFactorEnabled: true,
             },
         });
 
@@ -57,9 +58,9 @@ export async function POST(req: Request) {
 
         // Build the list of 2FA methods this account actually has. The UI shows
         // these in the "use another method" switcher; the gate is in authorize().
-        // (Email codes append "email" here once that method ships.)
         const methods: ("otp" | "email")[] = [];
         if (user.twoFactorEnabled && user.twoFactorSecret) methods.push("otp");
+        if (user.emailTwoFactorEnabled) methods.push("email");
 
         return NextResponse.json({ ok: true, requires2fa: methods.length > 0, methods });
     } catch (error) {

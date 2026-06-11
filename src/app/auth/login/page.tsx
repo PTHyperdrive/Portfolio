@@ -29,6 +29,7 @@ export default function LoginPage() {
     const [methods, setMethods] = useState<Method[]>([]);
     const [activeMethod, setActiveMethod] = useState<Method>("otp");
     const [showPicker, setShowPicker] = useState(false);
+    const [emailSent, setEmailSent] = useState(false);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const router = useRouter();
@@ -62,12 +63,26 @@ export default function LoginPage() {
         router.push(callbackUrl);
     };
 
-    // Switch to another enabled method (email send will hook in here in Phase 2).
+    // Request an email code for the login challenge (no session yet — the
+    // endpoint re-verifies the password before sending).
+    const sendEmailCode = async () => {
+        try {
+            await fetch("/api/auth/2fa/email/send", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, password }),
+            });
+            setEmailSent(true);
+        } catch { /* non-fatal — user can resend */ }
+    };
+
+    // Switch to another enabled method; sending a fresh email code if needed.
     const selectMethod = (m: Method) => {
         setActiveMethod(m);
         setCode("");
         setError("");
         setShowPicker(false);
+        if (m === "email") { setEmailSent(false); sendEmailCode(); }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -102,6 +117,8 @@ export default function LoginPage() {
                     setMethods(ms);
                     setActiveMethod(ms[0]);
                     setStep("challenge");
+                    // If email is the primary method, dispatch a code immediately.
+                    if (ms[0] === "email") { setEmailSent(false); sendEmailCode(); }
                     return;
                 }
 
@@ -232,6 +249,19 @@ export default function LoginPage() {
                                 autoComplete="one-time-code"
                                 style={{ letterSpacing: "0.4em", textAlign: "center", fontFamily: "'JetBrains Mono', monospace" }}
                             />
+
+                            {activeMethod === "email" && (
+                                <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "8px" }}>
+                                    {emailSent ? "We emailed a code to your address. " : "Sending a code to your email… "}
+                                    <button
+                                        type="button"
+                                        onClick={() => { setEmailSent(false); sendEmailCode(); }}
+                                        style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--accent-cyan)", fontSize: "0.78rem", fontWeight: 600, padding: 0 }}
+                                    >
+                                        Resend
+                                    </button>
+                                </p>
+                            )}
 
                             {/* Choose another method — only the ones this account has */}
                             {methods.length > 1 && (

@@ -18,6 +18,7 @@ export async function GET() {
                 credits: true,
                 twoFactorEnabled: true,
                 loginWith2FA: true,
+                emailTwoFactorEnabled: true,
                 activePlan: true,
                 planActivatedAt: true,
             },

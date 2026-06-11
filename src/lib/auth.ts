@@ -5,6 +5,7 @@ import speakeasy from 'speakeasy';
 import prisma from '@/lib/db';
 import { verifyPassword, checkRateLimit } from '@/lib/security';
 import { safeDecryptTotpSecret } from '@/lib/totp-crypto';
+import { verifyEmailOtp } from '@/lib/email-otp';
 import { loginSchema } from '@/lib/validation';
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
@@ -43,31 +44,38 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 // ── Login 2FA gate ───────────────────────────────────────
                 // Login 2FA gate — the REAL enforcement point (precheck only
                 // decides what the UI shows; it can't be bypassed by skipping
-                // it). Enabling the authenticator makes a valid TOTP mandatory.
-                // A stored secret is required too, so a half-set-up flag never
-                // locks anyone out.
-                if (user.twoFactorEnabled && user.twoFactorSecret) {
-                    const totp =
-                        typeof (credentials as Record<string, unknown>).totp === 'string'
-                            ? ((credentials as Record<string, unknown>).totp as string).trim()
-                            : '';
-                    if (!/^\d{6}$/.test(totp)) return null;
+                // it). If the account has ANY method enabled, a valid code from
+                // ONE of its enabled methods is mandatory.
+                const otpOn = !!(user.twoFactorEnabled && user.twoFactorSecret);
+                const emailOn = !!user.emailTwoFactorEnabled;
 
-                    // Throttle code guessing. A short burst window plus a
-                    // wider lockout: 5 tries/60s, and at most 15 tries/15min
-                    // per account — slows a pentester to a crawl.
+                if (otpOn || emailOn) {
+                    // Throttle guessing: 5/60s burst + 15/15min sustained per
+                    // account — slows a brute-forcer to a crawl across methods.
                     const burst = checkRateLimit(`login-2fa:${user.id}`, 5, 60_000);
                     const sustained = checkRateLimit(`login-2fa-15m:${user.id}`, 15, 15 * 60_000);
                     if (!burst.allowed || !sustained.allowed) return null;
 
-                    const secret = safeDecryptTotpSecret(user.twoFactorSecret);
-                    const ok = speakeasy.totp.verify({
-                        secret,
-                        encoding: 'base32',
-                        token: totp,
-                        window: 1,
-                    });
-                    if (!ok) return null;
+                    const cred = credentials as Record<string, unknown>;
+                    const totp = typeof cred.totp === 'string' ? cred.totp.trim() : '';
+                    const emailCode = typeof cred.emailCode === 'string' ? cred.emailCode.trim() : '';
+
+                    let verified = false;
+
+                    if (otpOn && /^\d{6}$/.test(totp)) {
+                        verified = speakeasy.totp.verify({
+                            secret: safeDecryptTotpSecret(user.twoFactorSecret!),
+                            encoding: 'base32',
+                            token: totp,
+                            window: 1,
+                        });
+                    }
+
+                    if (!verified && emailOn && /^\d{6}$/.test(emailCode)) {
+                        verified = await verifyEmailOtp(user.id, 'login', emailCode);
+                    }
+
+                    if (!verified) return null;
                 }
 
                 return {
