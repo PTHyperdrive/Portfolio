@@ -20,7 +20,7 @@ function NavLink({ href, label, pathname, t }: {
             href={href}
             style={{
                 padding: "8px 16px",
-                borderRadius: t.isMono ? 0 : 8,
+                borderRadius: t.cardRadius,
                 fontSize: "0.88rem",
                 fontWeight: 500,
                 color: isActive ? t.accentPrimary : t.textSecondary,
@@ -43,7 +43,7 @@ function MobileLink({ href, label, pathname, t }: {
             href={href}
             style={{
                 padding: "12px 16px",
-                borderRadius: t.isMono ? 0 : 8,
+                borderRadius: t.cardRadius,
                 color: pathname === href ? t.accentPrimary : t.textSecondary,
                 textDecoration: "none",
                 fontSize: "0.95rem",
@@ -87,7 +87,7 @@ export default function Navbar() {
                     </Link>
                     <div style={{ display: "flex", gap: "8px" }}>
                         {[1, 2, 3, 4].map((i) => (
-                            <div key={i} style={{ width: 60, height: 28, borderRadius: t.isMono ? 0 : 8, background: t.bgCard }} />
+                            <div key={i} style={{ width: 60, height: 28, borderRadius: t.cardRadius, background: t.bgCard }} />
                         ))}
                     </div>
                 </div>
@@ -147,7 +147,7 @@ export default function Navbar() {
                                 href="/dashboard/billing"
                                 style={{
                                     display: "flex", alignItems: "center", gap: "7px",
-                                    padding: "6px 14px", borderRadius: t.isMono ? 0 : 20,
+                                    padding: "6px 14px", borderRadius: t.cardRadius,
                                     background: t.isMono
                                         ? t.bgTertiary
                                         : "linear-gradient(135deg, rgba(251,191,36,0.12), rgba(245,158,11,0.08))",
@@ -179,7 +179,7 @@ export default function Navbar() {
                             {/* User avatar + name */}
                             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                                 <div style={{
-                                    width: 32, height: 32, borderRadius: t.isMono ? 0 : 10,
+                                    width: 32, height: 32, borderRadius: t.cardRadius,
                                     background: t.isMono ? t.bgTertiary : "var(--gradient-primary)",
                                     border: t.isMono ? `1px solid ${t.borderPrimary}` : "none",
                                     display: "flex", alignItems: "center", justifyContent: "center",
@@ -244,7 +244,7 @@ export default function Navbar() {
                             href="/dashboard/billing"
                             style={{
                                 display: "flex", alignItems: "center", gap: 8,
-                                padding: "12px 16px", borderRadius: t.isMono ? 0 : 8,
+                                padding: "12px 16px", borderRadius: t.cardRadius,
                                 textDecoration: "none", color: t.textSecondary,
                             }}
                         >

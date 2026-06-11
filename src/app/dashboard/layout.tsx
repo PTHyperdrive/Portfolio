@@ -75,7 +75,7 @@ export default function DashboardLayout({
                         aria-label="Open menu"
                         style={{
                             display: "flex", alignItems: "center", justifyContent: "center",
-                            width: 38, height: 38, borderRadius: t.isMono ? 0 : 8,
+                            width: 38, height: 38, borderRadius: t.cardRadius,
                             border: `1px solid ${t.borderPrimary}`, background: "transparent",
                             color: t.textPrimary, cursor: "pointer",
                         }}

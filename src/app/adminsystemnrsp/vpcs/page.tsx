@@ -175,7 +175,7 @@ export default function VpcsPage() {
     const detail = vpcs.find(v => v.id === selectedVpc);
 
     const inputStyle: React.CSSProperties = {
-        width: "100%", padding: "9px 12px", borderRadius: t.isMono ? 0 : 8,
+        width: "100%", padding: "9px 12px", borderRadius: t.cardRadius,
         background: t.bgInput, border: `1px solid ${t.borderPrimary}`,
         color: t.textPrimary, fontSize: "0.85rem", outline: "none", boxSizing: "border-box",
     };
@@ -199,10 +199,10 @@ export default function VpcsPage() {
                         </div>
                     </div>
                     <div style={{ display: "flex", gap: 8 }}>
-                        <button id="vpcs-refresh" onClick={loadVpcs} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: t.isMono ? 0 : 8, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>
+                        <button id="vpcs-refresh" onClick={loadVpcs} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: t.cardRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>
                             <RefreshCw style={{ width: 13, height: 13 }} /> Refresh
                         </button>
-                        <button id="vpcs-create" onClick={() => setShowCreate(true)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 16px", borderRadius: t.isMono ? 0 : 8, border: "none", background: t.accentPrimary, color: t.textInverse, fontSize: "0.8rem", fontWeight: 700, cursor: "pointer" }}>
+                        <button id="vpcs-create" onClick={() => setShowCreate(true)} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 16px", borderRadius: t.cardRadius, border: "none", background: t.accentPrimary, color: t.textInverse, fontSize: "0.8rem", fontWeight: 700, cursor: "pointer" }}>
                             <Plus style={{ width: 13, height: 13 }} /> New VPC
                         </button>
                     </div>
@@ -216,7 +216,7 @@ export default function VpcsPage() {
                     { label: "Active", val: vpcs.filter(v => v.status === "ACTIVE").length, color: t.statusSuccess },
                     { label: "Assigned VMs", val: vpcs.reduce((a, v) => a + v._count.assignments, 0), color: t.statusWarning },
                 ].map(s => (
-                    <div key={s.label} style={{ padding: "8px 18px", borderRadius: t.isMono ? 0 : 8, background: t.bgCard, border: `1px solid ${t.borderPrimary}`, display: "flex", alignItems: "center", gap: 8 }}>
+                    <div key={s.label} style={{ padding: "8px 18px", borderRadius: t.cardRadius, background: t.bgCard, border: `1px solid ${t.borderPrimary}`, display: "flex", alignItems: "center", gap: 8 }}>
                         <span style={{ fontSize: "0.72rem", color: t.textMuted, fontWeight: 600 }}>{s.label}</span>
                         <span style={{ fontSize: "1rem", fontWeight: 800, color: s.color, fontFamily: t.fontMono }}>{s.val}</span>
                     </div>
@@ -272,10 +272,10 @@ export default function VpcsPage() {
                                 </div>
                             </div>
                             <div style={{ display: "flex", gap: 6 }}>
-                                <button onClick={() => openAssign(detail.id)} style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 12px", borderRadius: t.isMono ? 0 : 6, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.accentPrimary, fontSize: "0.75rem", fontWeight: 600, cursor: "pointer" }}>
+                                <button onClick={() => openAssign(detail.id)} style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 12px", borderRadius: t.buttonRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.accentPrimary, fontSize: "0.75rem", fontWeight: 600, cursor: "pointer" }}>
                                     <LinkIcon style={{ width: 12, height: 12 }} /> Assign VM
                                 </button>
-                                <button onClick={() => handleDelete(detail.id)} disabled={deleting === detail.id} style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 12px", borderRadius: t.isMono ? 0 : 6, border: "none", background: t.statusError, color: "#fff", fontSize: "0.75rem", fontWeight: 600, cursor: "pointer", opacity: deleting === detail.id ? 0.5 : 1 }}>
+                                <button onClick={() => handleDelete(detail.id)} disabled={deleting === detail.id} style={{ display: "flex", alignItems: "center", gap: 4, padding: "6px 12px", borderRadius: t.buttonRadius, border: "none", background: t.statusError, color: "#fff", fontSize: "0.75rem", fontWeight: 600, cursor: "pointer", opacity: deleting === detail.id ? 0.5 : 1 }}>
                                     <Trash2 style={{ width: 12, height: 12 }} /> {deleting === detail.id ? "…" : "Delete"}
                                 </button>
                             </div>
@@ -311,7 +311,7 @@ export default function VpcsPage() {
                                 <p style={{ fontSize: "0.82rem", color: t.textMuted, padding: "12px 0" }}>No VMs assigned to this VPC.</p>
                             ) : (
                                 detail.assignments.map(a => (
-                                    <div key={a.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderRadius: t.isMono ? 0 : 8, background: t.bgSecondary, marginBottom: 6 }}>
+                                    <div key={a.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderRadius: t.cardRadius, background: t.bgSecondary, marginBottom: 6 }}>
                                         <div>
                                             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                                                 <span style={{ fontWeight: 600, fontSize: "0.85rem", color: t.textPrimary }}>{a.vpsInstance.name}</span>
@@ -365,8 +365,8 @@ export default function VpcsPage() {
                             </label>
                             {createErr && <p style={{ color: t.statusError, fontSize: "0.82rem", marginBottom: 12 }}>{createErr}</p>}
                             <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-                                <button type="button" onClick={() => setShowCreate(false)} style={{ padding: "9px 18px", borderRadius: t.isMono ? 0 : 8, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textSecondary, cursor: "pointer", fontWeight: 600 }}>Cancel</button>
-                                <button type="submit" disabled={creating} style={{ padding: "9px 20px", borderRadius: t.isMono ? 0 : 8, border: "none", background: t.accentPrimary, color: t.textInverse, fontWeight: 700, cursor: "pointer", opacity: creating ? 0.6 : 1 }}>{creating ? "Creating…" : "Create VPC"}</button>
+                                <button type="button" onClick={() => setShowCreate(false)} style={{ padding: "9px 18px", borderRadius: t.cardRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textSecondary, cursor: "pointer", fontWeight: 600 }}>Cancel</button>
+                                <button type="submit" disabled={creating} style={{ padding: "9px 20px", borderRadius: t.cardRadius, border: "none", background: t.accentPrimary, color: t.textInverse, fontWeight: 700, cursor: "pointer", opacity: creating ? 0.6 : 1 }}>{creating ? "Creating…" : "Create VPC"}</button>
                             </div>
                         </form>
                     </div>
@@ -390,8 +390,8 @@ export default function VpcsPage() {
                             <input value={assignIp} onChange={e => setAssignIp(e.target.value)} placeholder="10.50.1.2" style={inputStyle} />
                         </div>
                         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-                            <button onClick={() => setShowAssign(null)} style={{ padding: "9px 18px", borderRadius: t.isMono ? 0 : 8, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textSecondary, cursor: "pointer", fontWeight: 600 }}>Cancel</button>
-                            <button onClick={() => handleAssign(showAssign)} disabled={assigning || !assignVmId} style={{ padding: "9px 20px", borderRadius: t.isMono ? 0 : 8, border: "none", background: t.accentPrimary, color: t.textInverse, fontWeight: 700, cursor: "pointer", opacity: assigning ? 0.6 : 1 }}>{assigning ? "Assigning…" : "Assign"}</button>
+                            <button onClick={() => setShowAssign(null)} style={{ padding: "9px 18px", borderRadius: t.cardRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textSecondary, cursor: "pointer", fontWeight: 600 }}>Cancel</button>
+                            <button onClick={() => handleAssign(showAssign)} disabled={assigning || !assignVmId} style={{ padding: "9px 20px", borderRadius: t.cardRadius, border: "none", background: t.accentPrimary, color: t.textInverse, fontWeight: 700, cursor: "pointer", opacity: assigning ? 0.6 : 1 }}>{assigning ? "Assigning…" : "Assign"}</button>
                         </div>
                     </div>
                 </div>

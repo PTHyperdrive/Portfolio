@@ -127,7 +127,7 @@ export default function VPNDashboard() {
     };
 
     const inputStyle: React.CSSProperties = {
-        width: "100%", padding: "10px 14px", borderRadius: t.isMono ? 0 : 8,
+        width: "100%", padding: "10px 14px", borderRadius: t.cardRadius,
         background: t.bgInput, border: `1px solid ${t.borderPrimary}`,
         color: t.textPrimary, fontSize: "0.9rem", outline: "none", boxSizing: "border-box",
     };
@@ -155,7 +155,7 @@ export default function VPNDashboard() {
                     onClick={() => setShowCreate(true)}
                     style={{
                         display: "flex", alignItems: "center", gap: 6,
-                        padding: "9px 18px", borderRadius: t.isMono ? 0 : 8,
+                        padding: "9px 18px", borderRadius: t.cardRadius,
                         border: "none", background: t.accentPrimary, color: t.textInverse,
                         fontSize: "0.82rem", fontWeight: 700, cursor: "pointer",
                     }}
@@ -226,7 +226,7 @@ export default function VPNDashboard() {
                                     disabled={revoking === peer.id}
                                     style={{
                                         display: "flex", alignItems: "center", gap: 4,
-                                        padding: "6px 12px", borderRadius: t.isMono ? 0 : 6,
+                                        padding: "6px 12px", borderRadius: t.buttonRadius,
                                         border: `1px solid ${t.statusError}33`, background: t.statusErrorBg,
                                         color: t.statusError, fontSize: "0.75rem", fontWeight: 600, cursor: "pointer",
                                         opacity: revoking === peer.id ? 0.5 : 1,
@@ -263,7 +263,7 @@ export default function VPNDashboard() {
                                     <button key={preset} onClick={() => setPeerName(preset)}
                                         style={{
                                             flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                                            padding: "8px 0", borderRadius: t.isMono ? 0 : 8,
+                                            padding: "8px 0", borderRadius: t.cardRadius,
                                             border: peerName === preset ? `2px solid ${t.accentPrimary}` : `1px solid ${t.borderPrimary}`,
                                             background: peerName === preset ? t.accentPrimaryMuted : "transparent",
                                             color: peerName === preset ? t.accentPrimary : t.textMuted,
@@ -289,11 +289,11 @@ export default function VPNDashboard() {
 
                         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
                             <button onClick={() => { setShowCreate(false); setCreateError(""); }}
-                                style={{ padding: "9px 18px", borderRadius: t.isMono ? 0 : 8, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textSecondary, cursor: "pointer", fontWeight: 600 }}>
+                                style={{ padding: "9px 18px", borderRadius: t.cardRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textSecondary, cursor: "pointer", fontWeight: 600 }}>
                                 Cancel
                             </button>
                             <button onClick={handleCreate} disabled={creating || !peerName.trim()}
-                                style={{ padding: "9px 20px", borderRadius: t.isMono ? 0 : 8, border: "none", background: t.accentPrimary, color: t.textInverse, fontWeight: 700, cursor: "pointer", opacity: creating || !peerName.trim() ? 0.5 : 1 }}>
+                                style={{ padding: "9px 20px", borderRadius: t.cardRadius, border: "none", background: t.accentPrimary, color: t.textInverse, fontWeight: 700, cursor: "pointer", opacity: creating || !peerName.trim() ? 0.5 : 1 }}>
                                 {creating ? "Generating…" : "Generate Peer"}
                             </button>
                         </div>
@@ -331,7 +331,7 @@ export default function VPNDashboard() {
                         {/* Toggle: Config / QR */}
                         <div style={{ padding: "16px 28px 0", display: "flex", gap: 8 }}>
                             <button onClick={() => setShowQr(false)} style={{
-                                padding: "6px 16px", borderRadius: t.isMono ? 0 : 6,
+                                padding: "6px 16px", borderRadius: t.buttonRadius,
                                 border: !showQr ? `2px solid ${t.accentPrimary}` : `1px solid ${t.borderPrimary}`,
                                 background: !showQr ? t.accentPrimaryMuted : "transparent",
                                 color: !showQr ? t.accentPrimary : t.textMuted,
@@ -340,7 +340,7 @@ export default function VPNDashboard() {
                                 Config File
                             </button>
                             <button onClick={() => setShowQr(true)} style={{
-                                padding: "6px 16px", borderRadius: t.isMono ? 0 : 6,
+                                padding: "6px 16px", borderRadius: t.buttonRadius,
                                 border: showQr ? `2px solid ${t.accentPrimary}` : `1px solid ${t.borderPrimary}`,
                                 background: showQr ? t.accentPrimaryMuted : "transparent",
                                 color: showQr ? t.accentPrimary : t.textMuted,
@@ -365,7 +365,7 @@ export default function VPNDashboard() {
                                 </div>
                             ) : (
                                 <pre style={{
-                                    padding: 16, borderRadius: t.isMono ? 0 : 8,
+                                    padding: 16, borderRadius: t.cardRadius,
                                     background: t.bgSecondary, color: t.textSecondary,
                                     fontSize: "0.78rem", lineHeight: 1.7,
                                     fontFamily: t.fontMono, overflow: "auto",
@@ -381,7 +381,7 @@ export default function VPNDashboard() {
                         <div style={{ padding: "0 28px 24px", display: "flex", gap: 8, justifyContent: "flex-end" }}>
                             <button onClick={handleCopy} style={{
                                 display: "flex", alignItems: "center", gap: 6,
-                                padding: "9px 16px", borderRadius: t.isMono ? 0 : 8,
+                                padding: "9px 16px", borderRadius: t.cardRadius,
                                 border: `1px solid ${t.borderPrimary}`, background: "transparent",
                                 color: copied ? t.statusSuccess : t.textSecondary,
                                 fontWeight: 600, fontSize: "0.82rem", cursor: "pointer",
@@ -391,14 +391,14 @@ export default function VPNDashboard() {
                             </button>
                             <button onClick={handleDownload} style={{
                                 display: "flex", alignItems: "center", gap: 6,
-                                padding: "9px 16px", borderRadius: t.isMono ? 0 : 8,
+                                padding: "9px 16px", borderRadius: t.cardRadius,
                                 border: "none", background: t.accentPrimary, color: t.textInverse,
                                 fontWeight: 700, fontSize: "0.82rem", cursor: "pointer",
                             }}>
                                 <Download style={{ width: 14, height: 14 }} /> Download .conf
                             </button>
                             <button onClick={() => { setNewResult(null); setShowQr(false); }} style={{
-                                padding: "9px 16px", borderRadius: t.isMono ? 0 : 8,
+                                padding: "9px 16px", borderRadius: t.cardRadius,
                                 border: `1px solid ${t.borderPrimary}`, background: "transparent",
                                 color: t.textMuted, fontWeight: 600, fontSize: "0.82rem", cursor: "pointer",
                             }}>

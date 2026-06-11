@@ -64,7 +64,7 @@ export default function ChapterEditor() {
     const inputStyle: React.CSSProperties = {
         width: "100%", boxSizing: "border-box" as const,
         background: t.bgInput, border: `1px solid ${t.borderPrimary}`,
-        borderRadius: t.isMono ? 0 : 8, color: t.textPrimary,
+        borderRadius: t.cardRadius, color: t.textPrimary,
         fontSize: "0.88rem", padding: "10px 14px", outline: "none",
     };
 
@@ -314,14 +314,14 @@ export default function ChapterEditor() {
                             </select>
                             <div style={{ display: "flex", gap: 6 }}>
                                 <button onClick={handleCreateSection} disabled={!newTitle.trim() || saving} style={{
-                                    flex: 1, padding: "6px", borderRadius: t.isMono ? 0 : 6, border: "none",
+                                    flex: 1, padding: "6px", borderRadius: t.buttonRadius, border: "none",
                                     background: t.statusWarning, color: "#000", fontWeight: 700,
                                     fontSize: "0.78rem", cursor: "pointer", opacity: !newTitle.trim() ? 0.5 : 1,
                                 }}>
                                     Add
                                 </button>
                                 <button onClick={() => { setShowNewSection(false); setNewTitle(""); }} style={{
-                                    padding: "6px 10px", borderRadius: t.isMono ? 0 : 6,
+                                    padding: "6px 10px", borderRadius: t.buttonRadius,
                                     border: `1px solid ${t.borderPrimary}`, background: "transparent",
                                     color: t.textMuted, cursor: "pointer", fontSize: "0.78rem",
                                 }}>
@@ -332,7 +332,7 @@ export default function ChapterEditor() {
                     ) : (
                         <button onClick={() => setShowNewSection(true)} style={{
                             width: "100%", display: "flex", alignItems: "center", justifyContent: "center",
-                            gap: 6, padding: "8px", borderRadius: t.isMono ? 0 : 6,
+                            gap: 6, padding: "8px", borderRadius: t.buttonRadius,
                             border: `1px dashed ${t.borderPrimary}`, background: "transparent",
                             color: t.textMuted, cursor: "pointer", fontSize: "0.78rem",
                         }}>
@@ -404,7 +404,7 @@ export default function ChapterEditor() {
                         {/* Markdown Toolbar */}
                         <div style={{
                             display: "flex", alignItems: "center", gap: 2, padding: "6px 8px",
-                            borderRadius: `${t.isMono ? 0 : 8}px ${t.isMono ? 0 : 8}px 0 0`,
+                            borderRadius: `${t.cardRadius}px ${t.cardRadius}px 0 0`,
                             border: `1px solid ${t.borderPrimary}`, borderBottom: "none",
                             background: t.bgSecondary,
                         }}>
@@ -416,7 +416,7 @@ export default function ChapterEditor() {
                                 { icon: ImageIcon, action: () => insertMarkdown("![alt](", ")"), title: "Image" },
                             ].map(({ icon: Icon, action, title }) => (
                                 <button key={title} onClick={action} title={title} style={{
-                                    width: 30, height: 28, borderRadius: t.isMono ? 0 : 5,
+                                    width: 30, height: 28, borderRadius: t.buttonRadius,
                                     border: "none", background: "transparent",
                                     color: t.textSecondary, cursor: "pointer",
                                     display: "flex", alignItems: "center", justifyContent: "center",
@@ -431,7 +431,7 @@ export default function ChapterEditor() {
                                 { icon: ShieldAlert, action: () => insertMarkdown("> [!CAUTION]\n> ", ""), title: "Caution Callout", color: t.statusError },
                             ].map(({ icon: Icon, action, title, color }) => (
                                 <button key={title} onClick={action} title={title} style={{
-                                    width: 30, height: 28, borderRadius: t.isMono ? 0 : 5,
+                                    width: 30, height: 28, borderRadius: t.buttonRadius,
                                     border: "none", background: "transparent",
                                     color, cursor: "pointer",
                                     display: "flex", alignItems: "center", justifyContent: "center",
@@ -449,7 +449,7 @@ export default function ChapterEditor() {
                             placeholder="Write section content in Markdown...&#10;&#10;Supports:&#10;- Code blocks (```)&#10;- Callouts: > [!NOTE], > [!WARNING], > [!CAUTION]&#10;- Images: ![alt](url)&#10;- Links: [text](url)"
                             style={{
                                 ...inputStyle,
-                                borderRadius: `0 0 ${t.isMono ? 0 : 8}px ${t.isMono ? 0 : 8}px`,
+                                borderRadius: `0 0 ${t.cardRadius}px ${t.cardRadius}px`,
                                 fontFamily: t.fontMono, fontSize: "0.86rem",
                                 lineHeight: 1.7, minHeight: 400, resize: "vertical" as const,
                             }}

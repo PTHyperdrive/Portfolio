@@ -141,7 +141,7 @@ export default function SshKeysPage() {
     const input: React.CSSProperties = {
         background: t.bgInput,
         border: `1px solid ${t.borderPrimary}`,
-        borderRadius: t.isMono ? 0 : 8, color: t.textPrimary,
+        borderRadius: t.cardRadius, color: t.textPrimary,
         fontSize: "0.875rem", outline: "none",
         padding: "9px 13px", width: "100%",
         boxSizing: "border-box" as const,
@@ -201,7 +201,7 @@ export default function SshKeysPage() {
 
             {/* Toasts */}
             {success && (
-                <div style={{ padding: "12px 16px", borderRadius: t.isMono ? 0 : 9, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}33`, color: t.statusSuccess, marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ padding: "12px 16px", borderRadius: t.buttonRadius, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}33`, color: t.statusSuccess, marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <CheckCircle style={{ width: 15, height: 15 }} /> {success}
                     </span>
@@ -211,7 +211,7 @@ export default function SshKeysPage() {
                 </div>
             )}
             {error && (
-                <div style={{ padding: "12px 16px", borderRadius: t.isMono ? 0 : 9, background: t.statusErrorBg, border: `1px solid ${t.statusError}33`, color: t.statusError, marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div style={{ padding: "12px 16px", borderRadius: t.buttonRadius, background: t.statusErrorBg, border: `1px solid ${t.statusError}33`, color: t.statusError, marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         <AlertCircle style={{ width: 15, height: 15 }} /> {error}
                     </span>
@@ -284,7 +284,7 @@ export default function SshKeysPage() {
                         </div>
 
                         {formError && (
-                            <div style={{ padding: "10px 14px", borderRadius: t.isMono ? 0 : 8, background: t.statusErrorBg, border: `1px solid ${t.statusError}33`, color: t.statusError, fontSize: "0.84rem" }}>
+                            <div style={{ padding: "10px 14px", borderRadius: t.cardRadius, background: t.statusErrorBg, border: `1px solid ${t.statusError}33`, color: t.statusError, fontSize: "0.84rem" }}>
                                 {formError}
                             </div>
                         )}
@@ -312,7 +312,7 @@ export default function SshKeysPage() {
                     </div>
                 ) : keys.length === 0 ? (
                     <div style={{ padding: "60px 40px", display: "flex", flexDirection: "column", alignItems: "center", gap: 16, textAlign: "center" }}>
-                        <div style={{ width: 80, height: 80, borderRadius: t.isMono ? 0 : 20, background: t.statusWarningBg, border: `1px solid ${t.statusWarning}33`, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                        <div style={{ width: 80, height: 80, borderRadius: t.cardRadius, background: t.statusWarningBg, border: `1px solid ${t.statusWarning}33`, display: "flex", alignItems: "center", justifyContent: "center" }}>
                             <KeyRound style={{ width: 36, height: 36, color: t.statusWarning }} />
                         </div>
                         <h2 style={{ fontSize: "1.1rem", fontWeight: 700, color: t.textPrimary }}>No SSH keys yet</h2>

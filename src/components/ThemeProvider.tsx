@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
 
-export type ThemeId = "slop" | "mono-dark" | "mono-light";
+export type ThemeId = "pro-dark" | "pro-light" | "mono-dark" | "mono-light" | "slop";
 
 interface ThemeContextValue {
     theme: ThemeId;
@@ -10,11 +10,11 @@ interface ThemeContextValue {
     cycleTheme: () => void;
 }
 
-const CYCLE_ORDER: ThemeId[] = ["slop", "mono-dark", "mono-light"];
-const STORAGE_KEY = "nrsp-theme";
+const CYCLE_ORDER: ThemeId[] = ["pro-dark", "pro-light", "mono-dark", "mono-light", "slop"];
+const STORAGE_KEY = "nrsp-theme-v2";
 
 const ThemeContext = createContext<ThemeContextValue>({
-    theme: "mono-dark",
+    theme: "pro-dark",
     setTheme: () => {},
     cycleTheme: () => {},
 });
@@ -24,14 +24,14 @@ export function useTheme() {
 }
 
 function getInitialTheme(): ThemeId {
-    if (typeof window === "undefined") return "slop";
+    if (typeof window === "undefined") return "pro-dark";
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored && CYCLE_ORDER.includes(stored as ThemeId)) return stored as ThemeId;
-    return "mono-dark";
+    return "pro-dark";
 }
 
 export default function ThemeProvider({ children }: { children: ReactNode }) {
-    const [theme, setThemeState] = useState<ThemeId>("mono-dark");
+    const [theme, setThemeState] = useState<ThemeId>("pro-dark");
     const [mounted, setMounted] = useState(false);
 
     // Read from localStorage on mount

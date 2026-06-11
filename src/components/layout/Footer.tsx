@@ -82,7 +82,7 @@ export default function Footer() {
                                     style={{
                                         width: 36,
                                         height: 36,
-                                        borderRadius: t.isMono ? 0 : 8,
+                                        borderRadius: t.cardRadius,
                                         background: t.isMono ? "transparent" : t.bgCard,
                                         border: `1px solid ${t.borderPrimary}`,
                                         display: "flex",

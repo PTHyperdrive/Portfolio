@@ -31,10 +31,10 @@ export default function BandwidthPage() {
                         </div>
                     </div>
                     {/* Time range selector */}
-                    <div style={{ display: "flex", gap: 2, padding: 3, borderRadius: t.isMono ? 0 : 10, background: t.bgSecondary, border: `1px solid ${t.borderPrimary}` }}>
+                    <div style={{ display: "flex", gap: 2, padding: 3, borderRadius: t.cardRadius, background: t.bgSecondary, border: `1px solid ${t.borderPrimary}` }}>
                         {TIME_RANGES.map(r => (
                             <button key={r} onClick={() => setRange(r)} style={{
-                                padding: "6px 14px", borderRadius: t.isMono ? 0 : 7, border: "none",
+                                padding: "6px 14px", borderRadius: t.buttonRadius, border: "none",
                                 background: range === r ? t.accentPrimaryMuted : "transparent",
                                 color: range === r ? t.accentPrimary : t.textMuted,
                                 fontWeight: range === r ? 700 : 500, fontSize: "0.8rem", cursor: "pointer", transition: "all 0.15s",

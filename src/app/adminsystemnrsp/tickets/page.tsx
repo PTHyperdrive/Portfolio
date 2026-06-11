@@ -87,7 +87,7 @@ export default function AdminTicketsPage() {
                             <p style={{ fontSize: "0.83rem", color: t.textMuted }}>Review and resolve user support tickets.</p>
                         </div>
                     </div>
-                    <button onClick={load} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: t.isMono ? 0 : 8, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>
+                    <button onClick={load} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: t.cardRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>
                         <RefreshCw style={{ width: 13, height: 13 }} /> Refresh
                     </button>
                 </div>
@@ -136,7 +136,7 @@ export default function AdminTicketsPage() {
                                     <div style={{ position: "relative" }}>
                                         <select value={ticket.status} onChange={e => changeStatus(ticket.id, e.target.value)} disabled={updating} style={{
                                             width: "100%", padding: "5px 8px", background: t.bgInput, border: `1px solid ${t.borderPrimary}`,
-                                            borderRadius: t.isMono ? 0 : 6, color: t.textPrimary, fontSize: "0.75rem", cursor: "pointer", fontFamily: t.fontFamily,
+                                            borderRadius: t.buttonRadius, color: t.textPrimary, fontSize: "0.75rem", cursor: "pointer", fontFamily: t.fontFamily,
                                         }}>
                                             <option value="PENDING">Pending</option>
                                             <option value="UNSOLVED">Unsolved</option>
@@ -171,13 +171,13 @@ export default function AdminTicketsPage() {
                                 </span>
                             </div>
                             {selected.description && (
-                                <div style={{ padding: "16px 20px", borderRadius: t.isMono ? 0 : 8, background: t.bgSecondary, border: `1px solid ${t.borderSecondary}`, fontSize: "0.875rem", color: t.textSecondary, lineHeight: 1.7, whiteSpace: "pre-wrap", fontFamily: t.fontMono, marginBottom: 16 }}>
+                                <div style={{ padding: "16px 20px", borderRadius: t.cardRadius, background: t.bgSecondary, border: `1px solid ${t.borderSecondary}`, fontSize: "0.875rem", color: t.textSecondary, lineHeight: 1.7, whiteSpace: "pre-wrap", fontFamily: t.fontMono, marginBottom: 16 }}>
                                     {selected.description}
                                 </div>
                             )}
-                            {selected.imageUrls && (() => { try { const imgs: string[] = JSON.parse(selected.imageUrls); return imgs.length > 0 ? (<div><p style={{ fontSize: "0.72rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", marginBottom: 8 }}>Evidence</p><div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{imgs.map((img, i) => (<img key={i} src={`/api/tickets/file/${img}`} alt={`Evidence ${i+1}`} onClick={() => setLightboxUrl(`/api/tickets/file/${img}`)} style={{ maxWidth: 200, maxHeight: 150, borderRadius: t.isMono ? 0 : 8, border: `1px solid ${t.borderPrimary}`, objectFit: "cover", cursor: "pointer", transition: "opacity 0.15s" }} onMouseEnter={e => (e.currentTarget.style.opacity = "0.8")} onMouseLeave={e => (e.currentTarget.style.opacity = "1")} />))}</div></div>) : null; } catch { return null; } })()}
+                            {selected.imageUrls && (() => { try { const imgs: string[] = JSON.parse(selected.imageUrls); return imgs.length > 0 ? (<div><p style={{ fontSize: "0.72rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", marginBottom: 8 }}>Evidence</p><div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{imgs.map((img, i) => (<img key={i} src={`/api/tickets/file/${img}`} alt={`Evidence ${i+1}`} onClick={() => setLightboxUrl(`/api/tickets/file/${img}`)} style={{ maxWidth: 200, maxHeight: 150, borderRadius: t.cardRadius, border: `1px solid ${t.borderPrimary}`, objectFit: "cover", cursor: "pointer", transition: "opacity 0.15s" }} onMouseEnter={e => (e.currentTarget.style.opacity = "0.8")} onMouseLeave={e => (e.currentTarget.style.opacity = "1")} />))}</div></div>) : null; } catch { return null; } })()}
                             {/* Admin Status Controls */}
-                            <div style={{ marginTop: 20, padding: "14px 18px", borderRadius: t.isMono ? 0 : 8, background: t.statusWarningBg, border: `1px solid ${t.statusWarning}33` }}>
+                            <div style={{ marginTop: 20, padding: "14px 18px", borderRadius: t.cardRadius, background: t.statusWarningBg, border: `1px solid ${t.statusWarning}33` }}>
                                 <p style={{ fontSize: "0.72rem", fontWeight: 700, color: t.statusWarning, textTransform: "uppercase", marginBottom: 8 }}>Update Status</p>
                                 <div style={{ display: "flex", gap: 8 }}>
                                     {(["PENDING", "UNSOLVED", "SOLVED"] as const).map(s => {
@@ -204,7 +204,7 @@ export default function AdminTicketsPage() {
                     tabIndex={0}
                     style={{ position: "fixed", inset: 0, zIndex: 99999, background: "rgba(0,0,0,0.88)", backdropFilter: "blur(8px)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "zoom-out", padding: 32 }}
                 >
-                    <img src={lightboxUrl} alt="Evidence fullscreen" style={{ maxWidth: "92vw", maxHeight: "92vh", objectFit: "contain", borderRadius: t.isMono ? 0 : 12, boxShadow: "0 8px 48px rgba(0,0,0,0.6)" }} />
+                    <img src={lightboxUrl} alt="Evidence fullscreen" style={{ maxWidth: "92vw", maxHeight: "92vh", objectFit: "contain", borderRadius: t.cardRadius, boxShadow: "0 8px 48px rgba(0,0,0,0.6)" }} />
                 </div>
             )}
         </div>

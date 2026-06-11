@@ -151,7 +151,7 @@ export default function MarkdownRenderer({ content }: { content: string }) {
                     position: relative;
                     background: ${t.isMono ? (t.isLight ? "#f5f5f5" : "#0a0a0a") : "#0d1117"};
                     border: 1px solid ${t.borderPrimary};
-                    border-radius: ${t.isMono ? 0 : 8}px;
+                    border-radius: ${t.cardRadius}px;
                     margin: 16px 0;
                     overflow-x: auto;
                 }
@@ -178,7 +178,7 @@ export default function MarkdownRenderer({ content }: { content: string }) {
                     font-family: ${t.fontMono};
                 }
                 .md-callout {
-                    border-radius: ${t.isMono ? 0 : 8}px;
+                    border-radius: ${t.cardRadius}px;
                     padding: 14px 18px;
                     margin: 16px 0;
                     display: flex;
@@ -212,7 +212,7 @@ export default function MarkdownRenderer({ content }: { content: string }) {
                 .md-callout-caution .md-callout-label { color: ${t.statusError}; }
                 .md-img {
                     max-width: 100%;
-                    border-radius: ${t.isMono ? 0 : 8}px;
+                    border-radius: ${t.cardRadius}px;
                     border: 1px solid ${t.borderPrimary};
                     margin: 12px 0;
                 }

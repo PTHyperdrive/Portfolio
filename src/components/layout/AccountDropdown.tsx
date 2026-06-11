@@ -43,7 +43,7 @@ export default function AccountDropdown() {
                 style={{
                     display: "flex", alignItems: "center", gap: 10,
                     padding: "6px 14px 6px 6px",
-                    borderRadius: t.isMono ? 0 : 10,
+                    borderRadius: t.cardRadius,
                     border: `1px solid ${t.borderPrimary}`,
                     background: open ? t.bgCardHover : "transparent",
                     cursor: "pointer",

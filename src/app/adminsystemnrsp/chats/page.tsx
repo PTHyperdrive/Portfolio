@@ -81,10 +81,10 @@ function PinGate({ onUnlock, t }: { onUnlock: (pk: CryptoKey) => void; t: Return
                 <p style={{ fontSize: "0.8rem", color: t.textMuted, marginBottom: 24, lineHeight: 1.5 }}>{isSetup ? "Create a PIN to generate your admin ECDH keypair." : "Enter your admin PIN to decrypt your private key."}</p>
                 <form onSubmit={e => { e.preventDefault(); isSetup ? setup() : unlock(); }}>
                     <div style={{ position: "relative", marginBottom: 12 }}>
-                        <input ref={ref} type={show ? "text" : "password"} value={pin} onChange={e => setPin(e.target.value)} placeholder={isSetup ? "Create PIN (4+)" : "Enter PIN"} autoComplete="off" style={{ width: "100%", boxSizing: "border-box", padding: "11px 40px 11px 14px", background: t.bgInput, border: `1px solid ${err ? t.statusError : t.borderPrimary}`, borderRadius: t.isMono ? 0 : 8, color: t.textPrimary, fontSize: "0.95rem", outline: "none", fontFamily: t.fontMono, letterSpacing: "0.12em", textAlign: "center" }} />
+                        <input ref={ref} type={show ? "text" : "password"} value={pin} onChange={e => setPin(e.target.value)} placeholder={isSetup ? "Create PIN (4+)" : "Enter PIN"} autoComplete="off" style={{ width: "100%", boxSizing: "border-box", padding: "11px 40px 11px 14px", background: t.bgInput, border: `1px solid ${err ? t.statusError : t.borderPrimary}`, borderRadius: t.cardRadius, color: t.textPrimary, fontSize: "0.95rem", outline: "none", fontFamily: t.fontMono, letterSpacing: "0.12em", textAlign: "center" }} />
                         <button type="button" onClick={() => setShow(s => !s)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: t.textMuted, cursor: "pointer", display: "flex" }}>{show ? <EyeOff style={{ width: 15, height: 15 }} /> : <Eye style={{ width: 15, height: 15 }} />}</button>
                     </div>
-                    {isSetup && <input type={show ? "text" : "password"} value={pinC} onChange={e => setPinC(e.target.value)} placeholder="Confirm PIN" style={{ width: "100%", boxSizing: "border-box", padding: "11px 14px", background: t.bgInput, border: `1px solid ${t.borderPrimary}`, borderRadius: t.isMono ? 0 : 8, color: t.textPrimary, fontSize: "0.95rem", outline: "none", fontFamily: t.fontMono, letterSpacing: "0.12em", textAlign: "center", marginBottom: 12 }} />}
+                    {isSetup && <input type={show ? "text" : "password"} value={pinC} onChange={e => setPinC(e.target.value)} placeholder="Confirm PIN" style={{ width: "100%", boxSizing: "border-box", padding: "11px 14px", background: t.bgInput, border: `1px solid ${t.borderPrimary}`, borderRadius: t.cardRadius, color: t.textPrimary, fontSize: "0.95rem", outline: "none", fontFamily: t.fontMono, letterSpacing: "0.12em", textAlign: "center", marginBottom: 12 }} />}
                     {err && <p style={{ fontSize: "0.75rem", color: t.statusError, marginBottom: 12 }}>{err}</p>}
                     <button type="submit" disabled={!pin || busy} style={{ width: "100%", padding: "11px", borderRadius: t.buttonRadius, border: "none", background: !pin || busy ? t.bgSecondary : (isSetup ? t.accentPrimary : t.statusWarning), color: !pin || busy ? t.textMuted : (isSetup ? "#fff" : "#000"), fontWeight: 800, fontSize: "0.875rem", cursor: !pin || busy ? "not-allowed" : "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
                         {busy ? <Loader2 style={{ width: 15, height: 15, animation: "spin 1s linear infinite" }} /> : <Unlock style={{ width: 15, height: 15 }} />}
@@ -255,11 +255,11 @@ export default function AdminChatsPage() {
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                         {adminPrivKey && (
-                            <button onClick={handleLock} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: t.isMono ? 0 : 8, border: `1px solid ${t.statusSuccess}44`, background: t.statusSuccessBg, color: t.statusSuccess, fontSize: "0.8rem", fontWeight: 700, cursor: "pointer" }}>
+                            <button onClick={handleLock} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: t.cardRadius, border: `1px solid ${t.statusSuccess}44`, background: t.statusSuccessBg, color: t.statusSuccess, fontSize: "0.8rem", fontWeight: 700, cursor: "pointer" }}>
                                 <Unlock style={{ width: 13, height: 13 }} /> Session Unlocked — Lock
                             </button>
                         )}
-                        <button onClick={loadChats} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: t.isMono ? 0 : 8, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>
+                        <button onClick={loadChats} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: t.cardRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>
                             <RefreshCw style={{ width: 13, height: 13 }} /> Refresh
                         </button>
                     </div>
@@ -328,7 +328,7 @@ export default function AdminChatsPage() {
                                 </div>
                                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                                     {!detail.closed && (
-                                        <button onClick={closeChat} disabled={toggling} style={{ padding: "5px 12px", borderRadius: t.isMono ? 0 : 6, border: `1px solid ${t.borderPrimary}`, background: t.statusErrorBg, color: t.statusError, fontSize: "0.75rem", fontWeight: 700, cursor: "pointer" }}>
+                                        <button onClick={closeChat} disabled={toggling} style={{ padding: "5px 12px", borderRadius: t.buttonRadius, border: `1px solid ${t.borderPrimary}`, background: t.statusErrorBg, color: t.statusError, fontSize: "0.75rem", fontWeight: 700, cursor: "pointer" }}>
                                             {toggling ? "Closing..." : "Close Permanently"}
                                         </button>
                                     )}

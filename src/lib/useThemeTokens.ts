@@ -147,10 +147,78 @@ const MONO_LIGHT_TOKENS: ThemeTokens = {
     isLight: true,
 };
 
+// ─── Pro: neutral base + a single teal/cyan accent, subtle elevation ──
+
+const PRO_DARK_TOKENS: ThemeTokens = {
+    bgPrimary: "#0b0e10",
+    bgSecondary: "#11161a",
+    bgTertiary: "#171d22",
+    bgCard: "#12171b",
+    bgCardHover: "#1a2127",
+    bgInput: "#0e1316",
+    borderPrimary: "rgba(255,255,255,0.09)",
+    borderSecondary: "rgba(255,255,255,0.05)",
+    textPrimary: "#e6edf0",
+    textSecondary: "#9fb0b8",
+    textMuted: "#62727a",
+    textInverse: "#04201c",
+    accentPrimary: "#2dd4bf",
+    accentPrimaryHover: "#5eead4",
+    accentPrimaryMuted: "rgba(45,212,191,0.13)",
+    accentSecondary: "#22d3ee",
+    statusSuccess: "#5fbf8a",
+    statusSuccessBg: "rgba(95,191,138,0.12)",
+    statusWarning: "#e0b15a",
+    statusWarningBg: "rgba(224,177,90,0.12)",
+    statusError: "#e06c6c",
+    statusErrorBg: "rgba(224,108,108,0.12)",
+    shadow: "0 1px 3px rgba(0,0,0,0.45)",
+    cardRadius: 8,
+    buttonRadius: 6,
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+    fontMono: "'JetBrains Mono', 'Roboto Mono', monospace",
+    isMono: false,
+    isLight: false,
+};
+
+const PRO_LIGHT_TOKENS: ThemeTokens = {
+    bgPrimary: "#f7f9fa",
+    bgSecondary: "#ffffff",
+    bgTertiary: "#eef2f4",
+    bgCard: "#ffffff",
+    bgCardHover: "#f3f6f7",
+    bgInput: "#ffffff",
+    borderPrimary: "#dce4e7",
+    borderSecondary: "#e9eef0",
+    textPrimary: "#0f1b1f",
+    textSecondary: "#4a5a60",
+    textMuted: "#7d8c92",
+    textInverse: "#ffffff",
+    accentPrimary: "#0d9488",
+    accentPrimaryHover: "#0f766e",
+    accentPrimaryMuted: "rgba(13,148,136,0.09)",
+    accentSecondary: "#0891b2",
+    statusSuccess: "#2f9e58",
+    statusSuccessBg: "rgba(47,158,88,0.09)",
+    statusWarning: "#b07d10",
+    statusWarningBg: "rgba(176,125,16,0.09)",
+    statusError: "#c0392b",
+    statusErrorBg: "rgba(192,57,43,0.08)",
+    shadow: "0 1px 3px rgba(16,30,40,0.10)",
+    cardRadius: 8,
+    buttonRadius: 6,
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+    fontMono: "'JetBrains Mono', 'Roboto Mono', monospace",
+    isMono: false,
+    isLight: true,
+};
+
 const TOKEN_MAP: Record<ThemeId, ThemeTokens> = {
     slop: SLOP_TOKENS,
     "mono-dark": MONO_DARK_TOKENS,
     "mono-light": MONO_LIGHT_TOKENS,
+    "pro-dark": PRO_DARK_TOKENS,
+    "pro-light": PRO_LIGHT_TOKENS,
 };
 
 export function useThemeTokens(): ThemeTokens {

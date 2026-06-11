@@ -82,14 +82,14 @@ export default function AdminDashboardPage() {
                             <p style={{ fontSize: "0.83rem", color: t.textMuted }}>Platform management, users, billing, and infrastructure oversight.</p>
                         </div>
                     </div>
-                    <button onClick={() => loadStats()} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: t.isMono ? 0 : 8, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>
+                    <button onClick={() => loadStats()} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: t.cardRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>
                         <RefreshCw style={{ width: 13, height: 13 }} /> Refresh
                     </button>
                 </div>
             </div>
 
             {/* Role Warning */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 20px", borderRadius: t.isMono ? 0 : 8, background: t.statusWarningBg, border: `1px solid ${t.statusWarning}33`, color: t.statusWarning, fontSize: "0.83rem", marginBottom: 24 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 20px", borderRadius: t.cardRadius, background: t.statusWarningBg, border: `1px solid ${t.statusWarning}33`, color: t.statusWarning, fontSize: "0.83rem", marginBottom: 24 }}>
                 <AlertTriangle style={{ width: 16, height: 16, flexShrink: 0 }} />
                 <span>You are operating in administrator mode. All actions are logged in the audit trail.</span>
             </div>

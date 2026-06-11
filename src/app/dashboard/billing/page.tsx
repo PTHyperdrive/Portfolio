@@ -115,7 +115,7 @@ export default function BillingPage() {
                 </div>
 
                 {error && (
-                    <div style={{ padding: "14px 20px", borderRadius: t.isMono ? 0 : 8, background: t.statusErrorBg, color: t.statusError, marginBottom: "24px", fontSize: "0.9rem" }}>
+                    <div style={{ padding: "14px 20px", borderRadius: t.cardRadius, background: t.statusErrorBg, color: t.statusError, marginBottom: "24px", fontSize: "0.9rem" }}>
                         {error}
                     </div>
                 )}
@@ -124,7 +124,7 @@ export default function BillingPage() {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "20px", marginBottom: "32px" }}>
                     {/* Active Plan */}
                     <div style={{ ...card, padding: "24px", display: "flex", flexDirection: "column" }}>
-                        <div style={{ width: 36, height: 36, borderRadius: t.isMono ? 0 : 12, background: t.accentPrimaryMuted, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+                        <div style={{ width: 36, height: 36, borderRadius: t.cardRadius, background: t.accentPrimaryMuted, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
                             <Monitor style={{ width: 18, height: 18, color: t.accentPrimary }} />
                         </div>
                         <p style={{ fontSize: "0.78rem", color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "6px" }}>Active Plan</p>
@@ -183,7 +183,7 @@ export default function BillingPage() {
                     {/* Current Balance */}
                     <div style={{ ...card, padding: "24px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
                         <div>
-                            <div style={{ width: 36, height: 36, borderRadius: t.isMono ? 0 : 12, background: t.accentPrimaryMuted, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+                            <div style={{ width: 36, height: 36, borderRadius: t.cardRadius, background: t.accentPrimaryMuted, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
                                 <CreditCard style={{ width: 18, height: 18, color: t.accentPrimary }} />
                             </div>
                             <p style={{ fontSize: "0.78rem", color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "6px" }}>Current Balance</p>
@@ -206,7 +206,7 @@ export default function BillingPage() {
 
                     {/* Upgrade CTA */}
                     <div style={{ ...card, padding: "24px", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", textAlign: "center" }}>
-                        <div style={{ width: 36, height: 36, borderRadius: t.isMono ? 0 : 12, background: t.accentPrimaryMuted, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
+                        <div style={{ width: 36, height: 36, borderRadius: t.cardRadius, background: t.accentPrimaryMuted, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
                             <Rocket style={{ width: 18, height: 18, color: t.accentPrimary }} />
                         </div>
                         <p style={{ fontSize: "0.88rem", color: t.textSecondary, marginBottom: "14px" }}>
@@ -258,7 +258,7 @@ export default function BillingPage() {
                         </div>
 
                         <div style={{
-                            padding: "14px 18px", borderRadius: t.isMono ? 0 : 8,
+                            padding: "14px 18px", borderRadius: t.cardRadius,
                             background: (forecast.runway.days ?? 99) <= 3 ? t.statusErrorBg : t.accentPrimaryMuted,
                             color: (forecast.runway.days ?? 99) <= 3 ? t.statusError : t.textSecondary,
                             fontSize: "0.88rem",
@@ -281,7 +281,7 @@ export default function BillingPage() {
 
                     {!data?.transactions.length ? (
                         <div style={{ textAlign: "center", padding: "40px 0" }}>
-                            <div style={{ width: 56, height: 56, borderRadius: t.isMono ? 0 : 16, background: t.accentPrimaryMuted, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
+                            <div style={{ width: 56, height: 56, borderRadius: t.cardRadius, background: t.accentPrimaryMuted, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 16px" }}>
                                 <FileText style={{ width: 24, height: 24, color: t.accentPrimary }} />
                             </div>
                             <p style={{ color: t.textMuted, fontSize: "0.9rem", marginBottom: "16px" }}>No invoices yet.</p>

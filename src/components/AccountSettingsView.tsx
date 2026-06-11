@@ -270,7 +270,7 @@ export default function AccountSettingsView() {
         padding: "10px 14px",
         background: t.bgInput,
         border: `1px solid ${t.borderPrimary}`,
-        borderRadius: t.isMono ? 0 : 8,
+        borderRadius: t.cardRadius,
         color: t.textPrimary,
         fontSize: "0.9rem",
         outline: "none",
@@ -362,7 +362,7 @@ export default function AccountSettingsView() {
                         <div style={{ ...card, padding: "24px" }}>
                             <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "16px", color: t.textPrimary }}>Avatar</h3>
                             <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-                                <div style={{ width: 72, height: 72, borderRadius: t.isMono ? 0 : 16, background: t.isMono ? t.bgTertiary : "linear-gradient(135deg, #3b82f6, #6366f1)", border: t.isMono ? `1px solid ${t.borderPrimary}` : "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.8rem", fontWeight: 800, color: t.isLight ? t.textPrimary : "#fff" }}>
+                                <div style={{ width: 72, height: 72, borderRadius: t.cardRadius, background: t.isMono ? t.bgTertiary : "linear-gradient(135deg, #3b82f6, #6366f1)", border: t.isMono ? `1px solid ${t.borderPrimary}` : "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.8rem", fontWeight: 800, color: t.isLight ? t.textPrimary : "#fff" }}>
                                     {(session?.user?.name || session?.user?.email || "U")[0].toUpperCase()}
                                 </div>
                                 <div>
@@ -518,7 +518,7 @@ export default function AccountSettingsView() {
                             </button>
                         </div>
                         {loginWith2FA && is2FAEnabled && (
-                            <div style={{ marginTop: 14, padding: "12px 16px", borderRadius: t.isMono ? 0 : 8, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}33`, display: "flex", alignItems: "center", gap: 8 }}>
+                            <div style={{ marginTop: 14, padding: "12px 16px", borderRadius: t.cardRadius, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}33`, display: "flex", alignItems: "center", gap: 8 }}>
                                 <ShieldCheck style={{ width: 16, height: 16, color: t.statusSuccess, flexShrink: 0 }} />
                                 <p style={{ fontSize: "0.82rem", fontWeight: 600, color: t.statusSuccess }}>Login 2FA is active. A code will be required at every sign-in.</p>
                             </div>
@@ -535,7 +535,7 @@ export default function AccountSettingsView() {
 
                             {/* Success / status toast */}
                             {successMsg && (
-                                <div style={{ marginBottom: "16px", padding: "12px 16px", borderRadius: t.isMono ? 0 : 8, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}4d`, color: t.statusSuccess, fontSize: "0.86rem", fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
+                                <div style={{ marginBottom: "16px", padding: "12px 16px", borderRadius: t.cardRadius, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}4d`, color: t.statusSuccess, fontSize: "0.86rem", fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
                                     <CheckCircle style={{ width: 16, height: 16, flexShrink: 0 }} />
                                     {successMsg}
                                 </div>
@@ -572,7 +572,7 @@ export default function AccountSettingsView() {
 
                             {/* Enabled badge */}
                             {is2FAEnabled && !isDisableModalOpen && !setupOpen && (
-                                <div style={{ padding: "14px 18px", borderRadius: t.isMono ? 0 : 8, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}33`, display: "flex", alignItems: "center", gap: 10 }}>
+                                <div style={{ padding: "14px 18px", borderRadius: t.cardRadius, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}33`, display: "flex", alignItems: "center", gap: 10 }}>
                                     <ShieldCheck style={{ width: 22, height: 22, color: t.statusSuccess, flexShrink: 0 }} />
                                     <div>
                                         <p style={{ fontSize: "0.88rem", fontWeight: 700, color: t.statusSuccess }}>2FA is active</p>
@@ -583,7 +583,7 @@ export default function AccountSettingsView() {
 
                             {/* ── Setup flow (QR + verify) ── */}
                             {setupOpen && !is2FAEnabled && (
-                                <div style={{ marginTop: "24px", padding: "24px", borderRadius: t.isMono ? 0 : 8, background: t.accentPrimaryMuted, border: `1px solid ${t.accentPrimary}1f` }}>
+                                <div style={{ marginTop: "24px", padding: "24px", borderRadius: t.cardRadius, background: t.accentPrimaryMuted, border: `1px solid ${t.accentPrimary}1f` }}>
                                     {twoFALoading && !qrCodeUrl && (
                                         <p style={{ textAlign: "center", fontSize: "0.9rem", color: t.textMuted, padding: "20px 0" }}>Generating QR code…</p>
                                     )}
@@ -641,7 +641,7 @@ export default function AccountSettingsView() {
 
                             {/* ── Disable modal (inline) ── */}
                             {isDisableModalOpen && (
-                                <div style={{ marginTop: "20px", padding: "24px", borderRadius: t.isMono ? 0 : 8, background: t.statusErrorBg, border: `1px solid ${t.statusError}40` }}>
+                                <div style={{ marginTop: "20px", padding: "24px", borderRadius: t.cardRadius, background: t.statusErrorBg, border: `1px solid ${t.statusError}40` }}>
                                     <p style={{ fontSize: "0.9rem", fontWeight: 700, color: t.statusError, marginBottom: "6px", display: "flex", alignItems: "center", gap: 8 }}>
                                         <AlertTriangle style={{ width: 16, height: 16 }} />
                                         Disable Two-Factor Authentication
@@ -732,7 +732,7 @@ export default function AccountSettingsView() {
                             {!sessionsLoading && deviceSessions.length > 0 && (
                                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                                     {deviceSessions.map((ds, idx) => (
-                                        <div key={ds.id} style={{ padding: "14px 16px", borderRadius: t.isMono ? 0 : 8, background: t.bgInput, border: `1px solid ${t.borderSecondary}`, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                                        <div key={ds.id} style={{ padding: "14px 16px", borderRadius: t.cardRadius, background: t.bgInput, border: `1px solid ${t.borderSecondary}`, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
                                             <div style={{ minWidth: 0 }}>
                                                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                                                     <p style={{ fontSize: "0.88rem", fontWeight: 600, color: t.textPrimary }}>

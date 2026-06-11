@@ -42,7 +42,7 @@ export default function BlockStoragePage() {
     };
 
     const card: React.CSSProperties = { background: t.bgCard, border: `1px solid ${t.borderPrimary}`, borderRadius: t.cardRadius, boxShadow: t.shadow };
-    const inputStyle: React.CSSProperties = { background: t.bgInput, border: `1px solid ${t.borderPrimary}`, borderRadius: t.isMono ? 0 : 8, color: t.textPrimary, fontSize: "0.875rem", outline: "none", padding: "9px 13px", cursor: "pointer" };
+    const inputStyle: React.CSSProperties = { background: t.bgInput, border: `1px solid ${t.borderPrimary}`, borderRadius: t.cardRadius, color: t.textPrimary, fontSize: "0.875rem", outline: "none", padding: "9px 13px", cursor: "pointer" };
     const cost = info ? (info.pricing[storageType] * sizeGb).toLocaleString() : "—";
 
     return (
@@ -63,7 +63,7 @@ export default function BlockStoragePage() {
             {/* Pricing badges */}
             <div style={{ display: "flex", gap: 10, marginBottom: 24, flexWrap: "wrap" }}>
                 {(Object.keys(TIER_LABELS) as StorageType[]).map(tt => (
-                    <div key={tt} style={{ padding: "6px 14px", borderRadius: t.isMono ? 0 : 8, background: t.accentPrimaryMuted, border: `1px solid ${t.accentPrimary}33`, display: "flex", alignItems: "center", gap: 8 }}>
+                    <div key={tt} style={{ padding: "6px 14px", borderRadius: t.cardRadius, background: t.accentPrimaryMuted, border: `1px solid ${t.accentPrimary}33`, display: "flex", alignItems: "center", gap: 8 }}>
                         <span style={{ fontSize: "0.78rem", fontWeight: 600, color: t.accentPrimary }}>{TIER_LABELS[tt]}</span>
                         <span style={{ fontSize: "0.72rem", color: t.textMuted }}>= 2,000 VND/GB</span>
                     </div>
@@ -71,8 +71,8 @@ export default function BlockStoragePage() {
             </div>
 
             {/* Toasts */}
-            {success && <div style={{ padding: "12px 16px", borderRadius: t.isMono ? 0 : 9, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}33`, color: t.statusSuccess, marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between", whiteSpace: "pre-line" }}>{success}<button onClick={() => setSuccess("")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", flexShrink: 0, alignSelf: "flex-start", display: "flex", alignItems: "center" }}><X style={{ width: 14, height: 14 }} /></button></div>}
-            {error && <div style={{ padding: "12px 16px", borderRadius: t.isMono ? 0 : 9, background: t.statusErrorBg, border: `1px solid ${t.statusError}33`, color: t.statusError, marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between" }}>{error}<button onClick={() => setError("")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", display: "flex", alignItems: "center" }}><X style={{ width: 14, height: 14 }} /></button></div>}
+            {success && <div style={{ padding: "12px 16px", borderRadius: t.buttonRadius, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}33`, color: t.statusSuccess, marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between", whiteSpace: "pre-line" }}>{success}<button onClick={() => setSuccess("")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", flexShrink: 0, alignSelf: "flex-start", display: "flex", alignItems: "center" }}><X style={{ width: 14, height: 14 }} /></button></div>}
+            {error && <div style={{ padding: "12px 16px", borderRadius: t.buttonRadius, background: t.statusErrorBg, border: `1px solid ${t.statusError}33`, color: t.statusError, marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between" }}>{error}<button onClick={() => setError("")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", display: "flex", alignItems: "center" }}><X style={{ width: 14, height: 14 }} /></button></div>}
 
             {loading ? (
                 <div style={{ padding: 60, display: "flex", alignItems: "center", justifyContent: "center", color: t.textMuted, gap: 10 }}>Loading VMs…</div>
@@ -129,7 +129,7 @@ export default function BlockStoragePage() {
                                                 <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 600, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Storage Tier</label>
                                                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                                                     {(Object.keys(TIER_LABELS) as StorageType[]).map(tt => (
-                                                        <label key={tt} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: t.isMono ? 0 : 8, border: `1px solid ${storageType === tt ? t.accentPrimary + "55" : t.borderPrimary}`, background: storageType === tt ? t.accentPrimaryMuted : "transparent", cursor: "pointer", transition: "all 0.15s" }}>
+                                                        <label key={tt} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: t.cardRadius, border: `1px solid ${storageType === tt ? t.accentPrimary + "55" : t.borderPrimary}`, background: storageType === tt ? t.accentPrimaryMuted : "transparent", cursor: "pointer", transition: "all 0.15s" }}>
                                                             <input type="radio" name="type" value={tt} checked={storageType === tt} onChange={() => setStorageType(tt)} style={{ display: "none" }} />
                                                             <div style={{ width: 8, height: 8, borderRadius: "50%", background: storageType === tt ? t.accentPrimary : t.textMuted, flexShrink: 0 }} />
                                                             <div>
@@ -144,7 +144,7 @@ export default function BlockStoragePage() {
                                                 <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 600, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Size: <span style={{ color: t.accentPrimary }}>{sizeGb} GB</span></label>
                                                 <input type="range" min={info.limits.min} max={info.limits.max} step={info.limits.step} value={sizeGb} onChange={e => setSizeGb(Number(e.target.value))} style={{ width: "100%", accentColor: t.accentPrimary, cursor: "pointer" }} />
                                                 <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}><span style={{ fontSize: "0.68rem", color: t.textMuted }}>{info.limits.min} GB</span><span style={{ fontSize: "0.68rem", color: t.textMuted }}>{info.limits.max} GB</span></div>
-                                                <input type="number" min={info.limits.min} max={info.limits.max} step={info.limits.step} value={sizeGb} onChange={e => setSizeGb(Number(e.target.value))} style={{ marginTop: 10, background: t.bgInput, border: `1px solid ${t.borderPrimary}`, borderRadius: t.isMono ? 0 : 8, color: t.textPrimary, fontSize: "0.875rem", outline: "none", padding: "8px 12px", width: "100%", boxSizing: "border-box" }} />
+                                                <input type="number" min={info.limits.min} max={info.limits.max} step={info.limits.step} value={sizeGb} onChange={e => setSizeGb(Number(e.target.value))} style={{ marginTop: 10, background: t.bgInput, border: `1px solid ${t.borderPrimary}`, borderRadius: t.cardRadius, color: t.textPrimary, fontSize: "0.875rem", outline: "none", padding: "8px 12px", width: "100%", boxSizing: "border-box" }} />
                                             </div>
                                             <div>
                                                 <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 600, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Total Cost</label>

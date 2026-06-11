@@ -35,7 +35,7 @@ export default function BareMetalPage() {
                             <p style={{ fontSize: "0.83rem", color: t.textMuted }}>Dedicated physical servers with full hardware access. No hypervisor overhead.</p>
                         </div>
                     </div>
-                    <span style={{ padding: "6px 14px", borderRadius: t.isMono ? 0 : 8, background: t.statusWarningBg, border: `1px solid ${t.statusWarning}33`, color: t.statusWarning, fontSize: "0.78rem", fontWeight: 700 }}>
+                    <span style={{ padding: "6px 14px", borderRadius: t.cardRadius, background: t.statusWarningBg, border: `1px solid ${t.statusWarning}33`, color: t.statusWarning, fontSize: "0.78rem", fontWeight: 700 }}>
                         COMING SOON
                     </span>
                 </div>
