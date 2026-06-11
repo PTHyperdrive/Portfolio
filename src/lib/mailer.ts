@@ -7,9 +7,12 @@
  *   SMTP_SECURE     — "true" for port 465 implicit TLS; default false
  *   SMTP_USER       — auth username (optional for an open internal relay)
  *   SMTP_PASS       — auth password
- *   MAIL_FROM       — From header, e.g. "NotRespond <noreply@notrespond.com>"
+ *   MAIL_FROM       — From header (default "NotRespond <noreply@notrespond.com>")
+ *   MAIL_REPLY_TO   — optional real inbox for replies (e.g. support@notrespond.com)
+ *                     so users who reply to the no-reply address aren't lost.
  *
- * If SMTP_HOST is unset, sends throw — callers treat that as a soft failure.
+ * noreply@ needs NO mailbox — it's send-only; just verify the domain at your
+ * relay so SPF/DKIM align. If SMTP_HOST is unset, sends throw (soft failure).
  */
 
 import nodemailer, { type Transporter } from "nodemailer";
@@ -44,11 +47,13 @@ export interface MailMessage {
 
 export async function sendMail(msg: MailMessage): Promise<void> {
     const from = process.env.MAIL_FROM || "NotRespond <noreply@notrespond.com>";
+    const replyTo = process.env.MAIL_REPLY_TO; // optional real inbox for replies
     await getTransport().sendMail({
         from,
         to: msg.to,
         subject: msg.subject,
         text: msg.text,
+        ...(replyTo ? { replyTo } : {}),
         ...(msg.html ? { html: msg.html } : {}),
     });
 }
