@@ -10,7 +10,9 @@ import {
 /* ─── Types ─── */
 
 interface VpcInfo {
-    id: string; name: string; vlanId: number; vnetName: string;
+    id: string; name: string;
+    // Admin-only fields — absent from the customer API response.
+    vlanId?: number; vnetName?: string;
     subnet: string; gateway: string; status: string; createdAt: string;
     _count: { assignments: number };
     assignments?: VpcAssignment[];
@@ -31,6 +33,7 @@ export default function NetworksPage() {
     const [ownedVpcs, setOwnedVpcs] = useState<VpcInfo[]>([]);
     const [unassignedVMs, setUnassignedVMs] = useState<VpsInfo[]>([]);
     const [maxVpcs, setMaxVpcs] = useState(3);
+    const [isAdmin, setIsAdmin] = useState(false);
     const [loading, setLoading] = useState(true);
 
     // Create VPC
@@ -43,6 +46,7 @@ export default function NetworksPage() {
     const [showAssign, setShowAssign] = useState<string | null>(null);
     const [assignVmId, setAssignVmId] = useState("");
     const [assignIp, setAssignIp] = useState("");
+    const [assignDhcp, setAssignDhcp] = useState(true); // true = auto DHCP
     const [assigning, setAssigning] = useState(false);
 
     // Delete / Unassign
@@ -75,6 +79,7 @@ export default function NetworksPage() {
                 setOwnedVpcs(d.vpcs ?? []);
                 setUnassignedVMs(d.unassignedVMs ?? []);
                 setMaxVpcs(d.maxVpcs ?? 3);
+                setIsAdmin(d.isAdmin ?? false);
             }
         } catch { /* silent */ }
         finally { setLoading(false); }
@@ -124,7 +129,7 @@ export default function NetworksPage() {
         try {
             const res = await fetch("/api/networks/vpc/assign", {
                 method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ vpcId, vpsInstanceId: assignVmId, ipAddress: assignIp || undefined }),
+                body: JSON.stringify({ vpcId, vpsInstanceId: assignVmId, dhcp: assignDhcp, ipAddress: assignDhcp ? undefined : (assignIp || undefined) }),
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Failed");
@@ -220,7 +225,9 @@ export default function NetworksPage() {
                                         <div>
                                             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                                 <span style={{ fontWeight: 700, color: t.textPrimary, fontSize: "0.95rem" }}>{vpc.name}</span>
-                                                <span style={{ fontSize: "0.65rem", fontWeight: 700, padding: "2px 6px", borderRadius: 4, background: t.accentPrimaryMuted, color: t.accentPrimary, fontFamily: t.fontMono }}>VLAN {vpc.vlanId}</span>
+                                                {isAdmin && vpc.vlanId != null && (
+                                                    <span style={{ fontSize: "0.65rem", fontWeight: 700, padding: "2px 6px", borderRadius: 4, background: t.accentPrimaryMuted, color: t.accentPrimary, fontFamily: t.fontMono }}>VLAN {vpc.vlanId}</span>
+                                                )}
                                                 <span style={{ fontSize: "0.65rem", fontWeight: 700, padding: "2px 6px", borderRadius: 4, background: t.statusSuccessBg, color: t.statusSuccess }}>{vpc.status}</span>
                                             </div>
                                             <div style={{ fontSize: "0.75rem", color: t.textMuted, fontFamily: t.fontMono, marginTop: 2 }}>
@@ -343,8 +350,20 @@ export default function NetworksPage() {
                                     </select>
                                 </div>
                                 <div style={{ marginBottom: 16 }}>
-                                    <label style={{ display: "block", fontSize: "0.78rem", color: t.textMuted, marginBottom: 4, fontWeight: 600 }}>Static IP (optional)</label>
-                                    <input value={assignIp} onChange={e => setAssignIp(e.target.value)} placeholder="Leave blank for DHCP" style={inputStyle} />
+                                    <label style={{ display: "block", fontSize: "0.78rem", color: t.textMuted, marginBottom: 6, fontWeight: 600 }}>IP Assignment</label>
+                                    <div style={{ display: "flex", gap: 8, marginBottom: assignDhcp ? 0 : 10 }}>
+                                        {([[true, "Automatic (DHCP)"], [false, "Manual (static)"]] as const).map(([val, lbl]) => (
+                                            <button key={lbl} onClick={() => setAssignDhcp(val)} style={{
+                                                flex: 1, padding: "8px", borderRadius: t.isMono ? 4 : 8, cursor: "pointer", fontSize: "0.78rem", fontWeight: 600,
+                                                border: `1px solid ${assignDhcp === val ? t.accentPrimary : t.borderPrimary}`,
+                                                background: assignDhcp === val ? t.accentPrimaryMuted : "transparent",
+                                                color: assignDhcp === val ? t.accentPrimary : t.textSecondary,
+                                            }}>{lbl}</button>
+                                        ))}
+                                    </div>
+                                    {!assignDhcp && (
+                                        <input value={assignIp} onChange={e => setAssignIp(e.target.value)} placeholder={`Static IP (e.g. ${ownedVpcs.find(v => v.id === showAssign)?.gateway?.replace(/\.\d+$/, ".5") ?? "10.50.x.5"})`} style={inputStyle} />
+                                    )}
                                 </div>
                             </>
                         )}

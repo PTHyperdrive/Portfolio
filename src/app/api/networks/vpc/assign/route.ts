@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { audit } from "@/lib/audit";
-import { allocateHostIp, isHostInRange } from "@/lib/vpc-subnet";
+import { isHostInRange } from "@/lib/vpc-subnet";
+import { attachVmToVpcNetwork, detachVmFromVpcNetwork } from "@/lib/proxmox";
+import { addDhcpLease, removeDhcpLeaseByComment } from "@/lib/mikrotik";
 
 /**
  * POST /api/networks/vpc/assign — Assign user's own VM to their own VPC.
@@ -62,45 +64,26 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // ── Resolve the IP (automatic vs manual) ────────────────────
-        const taken = await prisma.vpcAssignment.findMany({
-            where: { vpcId, ipAddress: { not: null } },
-            select: { ipAddress: true },
-        });
-        const usedIps = new Set(taken.map((a) => a.ipAddress as string));
+        // ── Resolve the IP mode (DHCP automatic vs manual static) ────
         const dhcpStart = vpc.dhcpStart ?? "";
         const dhcpEnd = vpc.dhcpEnd ?? "";
+        let resolvedIp: string | null = null; // null = DHCP-assigned at boot
 
-        let resolvedIp: string | null = null;
-
-        if (autoAssign) {
-            // Automatic: hand out the next free address in the /28 pool.
-            resolvedIp = allocateHostIp(dhcpStart, dhcpEnd, usedIps);
-            if (!resolvedIp) {
-                return NextResponse.json(
-                    { error: "No free IPs left in this VPC's /28 pool." },
-                    { status: 409 },
-                );
-            }
-        } else {
-            // Manual: the caller must give a valid, in-range, free address.
+        if (!autoAssign) {
+            // Manual: caller supplies a valid, in-range, free static IP.
+            const taken = await prisma.vpcAssignment.findMany({
+                where: { vpcId, ipAddress: { not: null } },
+                select: { ipAddress: true },
+            });
+            const usedIps = new Set(taken.map((a) => a.ipAddress as string));
             if (!ipAddress) {
-                return NextResponse.json(
-                    { error: "Manual mode requires an ipAddress." },
-                    { status: 400 },
-                );
+                return NextResponse.json({ error: "Manual mode requires an ipAddress." }, { status: 400 });
             }
             if (!isHostInRange(ipAddress, dhcpStart, dhcpEnd)) {
-                return NextResponse.json(
-                    { error: `IP must be within ${dhcpStart}–${dhcpEnd} for this VPC.` },
-                    { status: 400 },
-                );
+                return NextResponse.json({ error: `IP must be within ${dhcpStart}–${dhcpEnd}.` }, { status: 400 });
             }
             if (usedIps.has(ipAddress)) {
-                return NextResponse.json(
-                    { error: `IP ${ipAddress} is already assigned in this VPC` },
-                    { status: 409 },
-                );
+                return NextResponse.json({ error: `IP ${ipAddress} is already assigned in this VPC` }, { status: 409 });
             }
             resolvedIp = ipAddress;
         }
@@ -110,7 +93,7 @@ export async function POST(req: NextRequest) {
             data: {
                 vpcId,
                 vpsInstanceId,
-                bridgeName: vpc.vnetName,
+                bridgeName: vpc.vnetName, // the user's SDN VNet (per-VLAN bridge)
                 ipAddress: resolvedIp,
                 dhcp: autoAssign,
             },
@@ -119,6 +102,29 @@ export async function POST(req: NextRequest) {
                 vpsInstance: { select: { vmId: true, name: true, node: true } },
             },
         });
+
+        // ── Push the network config to the actual VM ─────────────────
+        // Auto: net0 → VNet bridge + cloud-init DHCP (MikroTik serves the IP).
+        // Manual: static cloud-init IP + a MikroTik DHCP reservation so the
+        // pool never re-hands it out. Non-fatal: report a warning on failure.
+        let networkWarning: string | undefined;
+        try {
+            const prefix = vpc.subnet.split("/")[1] || "28";
+            const { mac } = await attachVmToVpcNetwork(
+                assignment.vpsInstance.node,
+                assignment.vpsInstance.vmId,
+                vpc.vnetName,
+                resolvedIp ? `${resolvedIp}/${prefix}` : null,
+                resolvedIp ? vpc.gateway : null,
+            );
+            if (resolvedIp && mac && vpc.networkId) {
+                // Per-VM lease comment so unassign removes only this reservation.
+                await addDhcpLease(`NRSP-VPC-${vpc.networkId}`, resolvedIp, mac, `NRSP-VM-${assignment.vpsInstance.vmId}`);
+            }
+        } catch (err) {
+            networkWarning = err instanceof Error ? err.message : "Failed to apply VM network config";
+            console.warn("[networks/vpc/assign] network push failed:", networkWarning);
+        }
 
         void audit({
             userId,
@@ -135,7 +141,7 @@ export async function POST(req: NextRequest) {
             req,
         });
 
-        return NextResponse.json(assignment, { status: 201 });
+        return NextResponse.json({ ...assignment, networkWarning }, { status: 201 });
     } catch (error) {
         console.error("[networks/vpc/assign] POST error:", error);
         return NextResponse.json({ error: "Failed to assign VM" }, { status: 500 });
@@ -177,7 +183,7 @@ export async function DELETE(req: NextRequest) {
             where: { vpcId, vpsInstanceId },
             include: {
                 vpc: { select: { vlanId: true } },
-                vpsInstance: { select: { vmId: true, userId: true } },
+                vpsInstance: { select: { vmId: true, node: true, userId: true } },
             },
         });
 
@@ -188,6 +194,15 @@ export async function DELETE(req: NextRequest) {
         // Verify the VM belongs to the user
         if (assignment.vpsInstance.userId !== userId) {
             return NextResponse.json({ error: "Access denied" }, { status: 403 });
+        }
+
+        // Revert the VM's NIC to the default bridge + DHCP, and drop any
+        // manual DHCP reservation for it (best-effort).
+        try {
+            await detachVmFromVpcNetwork(assignment.vpsInstance.node, assignment.vpsInstance.vmId);
+            await removeDhcpLeaseByComment(`NRSP-VM-${assignment.vpsInstance.vmId}`);
+        } catch (err) {
+            console.warn("[networks/vpc/assign] network revert failed:", err);
         }
 
         await prisma.vpcAssignment.delete({ where: { id: assignment.id } });

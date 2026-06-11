@@ -14,11 +14,23 @@
 
 import { createHash } from "crypto";
 
-export const CUSTOMER_VLAN_ID = 50;
 export const VPC_POOL_CIDR = "10.50.0.0/16";
 
 /** /28 blocks available in 10.50.0.0/16 (65536 / 16). */
 export const TOTAL_SUBNETS = 4096;
+
+// Per-user 802.1Q VLAN tag range (each VPC = its own VLAN = its own L2 +
+// its own MikroTik DHCP server).
+export const VLAN_MIN = 1001;
+export const VLAN_MAX = 2000;
+
+/** Allocate the next free VLAN tag in [VLAN_MIN, VLAN_MAX]. */
+export function allocateVlan(usedVlans: Set<number>): number {
+    for (let v = VLAN_MIN; v <= VLAN_MAX; v++) {
+        if (!usedVlans.has(v)) return v;
+    }
+    throw new Error(`VLAN pool exhausted (${VLAN_MIN}-${VLAN_MAX})`);
+}
 
 export interface VpcNet {
     /** 8-hex label hashed from the seed (the human-facing "network id"). */

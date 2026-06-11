@@ -320,12 +320,12 @@ model Vpc {
   id              String      @id @default(cuid())
   userId          String?     // Owner — null for legacy admin-created VPCs
   name            String      // User-chosen display name
-  vlanId          Int         @default(50)  // All customer VPCs ride VLAN 50
+  vlanId          Int         @unique  // Per-user 802.1Q VLAN tag (1001-2000)
   networkId       String?     // 8-hex hash label of the owner id (per /28)
   networkIndex    Int?        @unique  // /28 block index in 10.50.0.0/16 (0-4095)
-  vnetName        String      // Shared Proxmox SDN VNet name (e.g. "vmcust50")
-  zoneName        String      @default("NRSPVC")  // Proxmox SDN Zone
-  mikrotikVlanIf  String?     // MikroTik VLAN interface (shared "vlan50-customers")
+  vnetName        String      @unique  // Proxmox SDN VNet name (e.g. "vc1001")
+  zoneName        String      @default("NRSPVC")  // Proxmox SDN Zone (VLAN type)
+  mikrotikVlanIf  String?     // MikroTik per-user VLAN interface (e.g. "vlan1001-cust")
   subnet          String      @unique  // "10.50.3.16/28" — one /28 per VPC
   gateway         String      // "10.50.3.17"
   dhcpStart       String?     // "10.50.3.18"
