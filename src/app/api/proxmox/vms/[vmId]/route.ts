@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { startVM, stopVM, restartVM, getVMStatus, changeVMIso } from "@/lib/proxmox";
+import { startVM, stopVM, restartVM, resetVM, shutdownVM, getVMStatus, changeVMIso } from "@/lib/proxmox";
 import { getIsoById } from "@/lib/windows-isos";
 import { audit } from "@/lib/audit";
 
@@ -91,14 +91,37 @@ export async function POST(
                 await prisma.vpsInstance.update({ where: { id: instance.id }, data: { status: "running" } });
                 break;
 
-            case "stop":
+            case "stop":          // hard power-off (status/stop)
                 await stopVM(node, vmId);
                 await prisma.vpsInstance.update({ where: { id: instance.id }, data: { status: "stopped" } });
                 break;
 
-            case "restart":
-                await restartVM(node, vmId);
+            case "shutdown":      // graceful ACPI shutdown
+                try {
+                    await shutdownVM(node, vmId);
+                } catch (e) {
+                    // Already off / spammed — treat "not running" as success.
+                    if (!/not running/i.test(e instanceof Error ? e.message : "")) throw e;
+                }
+                await prisma.vpsInstance.update({ where: { id: instance.id }, data: { status: "stopped" } });
                 break;
+
+            case "restart":       // graceful reboot
+            case "reset": {       // hard reset (power-cycle)
+                try {
+                    await (action === "reset" ? resetVM(node, vmId) : restartVM(node, vmId));
+                } catch (e) {
+                    // Clicking restart repeatedly hits Proxmox mid-reboot, which
+                    // returns "VM NNN not running". That just means the reboot is
+                    // already in progress — report it as such instead of a 500.
+                    const msg = e instanceof Error ? e.message : "";
+                    if (/not running/i.test(msg)) {
+                        return NextResponse.json({ success: true, action, vmId, message: "VM is already restarting." });
+                    }
+                    throw e;
+                }
+                break;
+            }
 
             case "reinstall":
                 if (!isoId) {
@@ -126,7 +149,8 @@ export async function POST(
 
         // ISO 27001: Audit VM action
         const actionMap: Record<string, "VM_START" | "VM_STOP" | "VM_REBOOT" | "VM_REINSTALL"> = {
-            start: "VM_START", stop: "VM_STOP", restart: "VM_REBOOT", reinstall: "VM_REINSTALL",
+            start: "VM_START", stop: "VM_STOP", shutdown: "VM_STOP",
+            restart: "VM_REBOOT", reset: "VM_REBOOT", reinstall: "VM_REINSTALL",
         };
         const auditAction = actionMap[action];
         if (auditAction) {
