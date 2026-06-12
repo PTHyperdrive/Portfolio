@@ -6,7 +6,7 @@ import { UAParser } from "ua-parser-js";
 import { useThemeTokens } from "@/lib/useThemeTokens";
 import {
     User, Settings, Lock, ShieldCheck, Camera, AlertTriangle,
-    XCircle, CheckCircle, RefreshCw, Mail
+    XCircle, CheckCircle, RefreshCw, Mail, KeyRound
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -59,6 +59,59 @@ export default function AccountSettingsView() {
     const [disableLoading, setDisableLoading] = useState(false);
     const [disableError, setDisableError] = useState("");
     const [successMsg, setSuccessMsg] = useState("");
+
+    // Backup recovery codes
+    type RecoveryStatus = { generated: boolean; totalRemaining: number; attemptsUsed: number; attemptsMax: number; locked: boolean };
+    const [recoveryStatus, setRecoveryStatus] = useState<RecoveryStatus | null>(null);
+    const [generatedCodes, setGeneratedCodes] = useState<string[] | null>(null);
+    const [recoveryBusy, setRecoveryBusy] = useState(false);
+    const [recoveryMsg, setRecoveryMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+    const loadRecoveryStatus = () => {
+        fetch("/api/auth/2fa/recovery")
+            .then(r => r.json())
+            .then((d: { status?: RecoveryStatus }) => { if (d?.status) setRecoveryStatus(d.status); })
+            .catch(() => { /* non-critical */ });
+    };
+
+    const handleGenerateRecovery = async () => {
+        setRecoveryBusy(true);
+        setRecoveryMsg(null);
+        try {
+            const res = await fetch("/api/auth/2fa/recovery", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "generate" }),
+            });
+            const d = await res.json();
+            if (!res.ok) throw new Error(d.error ?? "Failed to generate backup codes");
+            setGeneratedCodes(d.codes as string[]);
+            loadRecoveryStatus();
+        } catch (err) {
+            setRecoveryMsg({ ok: false, text: err instanceof Error ? err.message : "Failed to generate backup codes" });
+        } finally {
+            setRecoveryBusy(false);
+        }
+    };
+
+    const copyRecoveryCodes = () => {
+        if (!generatedCodes) return;
+        navigator.clipboard?.writeText(generatedCodes.join("\n")).then(
+            () => setRecoveryMsg({ ok: true, text: "Codes copied to clipboard." }),
+            () => setRecoveryMsg({ ok: false, text: "Couldn't copy — select and copy manually." }),
+        );
+    };
+
+    const downloadRecoveryCodes = () => {
+        if (!generatedCodes) return;
+        const body = `NotRespond backup codes\nGenerated: ${new Date().toISOString()}\n\n${generatedCodes.join("\n")}\n\nEach code works once. Keep them somewhere safe and offline.\n`;
+        const url = URL.createObjectURL(new Blob([body], { type: "text/plain" }));
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "notrespond-backup-codes.txt";
+        a.click();
+        URL.revokeObjectURL(url);
+    };
 
     const user = session?.user as Record<string, unknown> | undefined;
 
@@ -178,9 +231,9 @@ export default function AccountSettingsView() {
             .finally(() => setSessionsLoading(false));
     };
 
-    // Load sessions when the Security tab is opened
+    // Load sessions + backup-code status when the Security tab is opened
     useEffect(() => {
-        if (activeTab === "security") loadSessions();
+        if (activeTab === "security") { loadSessions(); loadRecoveryStatus(); }
     }, [activeTab]);
 
 
@@ -721,6 +774,82 @@ export default function AccountSettingsView() {
                                         </div>
                                     </div>
                                 </div>
+                            )}
+                        </div>
+
+                        {/* Backup recovery codes */}
+                        <div style={{ ...card, padding: "28px" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: "12px" }}>
+                                <div>
+                                    <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "4px", color: t.textPrimary, display: "flex", alignItems: "center", gap: 8 }}>
+                                        <KeyRound style={{ width: 18, height: 18, color: t.accentPrimary }} />
+                                        Backup recovery codes
+                                        {recoveryStatus?.locked && (
+                                            <span style={{ fontSize: "0.62rem", fontWeight: 800, padding: "2px 8px", borderRadius: t.buttonRadius, background: t.statusErrorBg, color: t.statusError }}>LOCKED</span>
+                                        )}
+                                    </h3>
+                                    <p style={{ fontSize: "0.82rem", color: t.textMuted, maxWidth: 480, lineHeight: 1.5 }}>
+                                        One-time codes to sign in if you lose your authenticator and email access. You get 10 codes and 10 total backup-code attempts — after that they lock, and you&apos;ll need another method or a support ticket.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {!is2FAEnabled && !isEmail2FAEnabled ? (
+                                <p style={{ fontSize: "0.82rem", color: t.textMuted, padding: "12px 14px", borderRadius: t.cardRadius, background: t.bgInput, border: `1px solid ${t.borderSecondary}` }}>
+                                    Enable an authenticator app or email codes first — backup codes are a fallback for those.
+                                </p>
+                            ) : generatedCodes ? (
+                                <div style={{ padding: "18px", borderRadius: t.cardRadius, background: t.accentPrimaryMuted, border: `1px solid ${t.accentPrimary}1f` }}>
+                                    <p style={{ fontSize: "0.82rem", fontWeight: 700, color: t.textPrimary, marginBottom: "4px", display: "flex", alignItems: "center", gap: 6 }}>
+                                        <AlertTriangle style={{ width: 14, height: 14, color: t.accentPrimary }} />
+                                        Save these now — they won&apos;t be shown again.
+                                    </p>
+                                    <p style={{ fontSize: "0.78rem", color: t.textMuted, marginBottom: "14px" }}>Each code works once. Store them offline, somewhere safe.</p>
+                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "16px" }}>
+                                        {generatedCodes.map((c) => (
+                                            <code key={c} style={{ padding: "8px 12px", borderRadius: 8, background: t.bgInput, border: `1px solid ${t.borderPrimary}`, color: t.textPrimary, fontSize: "0.9rem", fontWeight: 700, letterSpacing: "0.08em", textAlign: "center", userSelect: "all", fontFamily: t.fontMono }}>
+                                                {c}
+                                            </code>
+                                        ))}
+                                    </div>
+                                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                                        <button onClick={copyRecoveryCodes} style={{ padding: "8px 18px", borderRadius: t.buttonRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textSecondary, fontWeight: 600, fontSize: "0.82rem", cursor: "pointer" }}>Copy</button>
+                                        <button onClick={downloadRecoveryCodes} style={{ padding: "8px 18px", borderRadius: t.buttonRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textSecondary, fontWeight: 600, fontSize: "0.82rem", cursor: "pointer" }}>Download .txt</button>
+                                        <button onClick={() => { setGeneratedCodes(null); setRecoveryMsg(null); }} style={{ padding: "8px 18px", borderRadius: t.buttonRadius, border: "none", background: t.accentPrimary, color: t.textInverse, fontWeight: 700, fontSize: "0.82rem", cursor: "pointer", marginLeft: "auto" }}>I&apos;ve saved them</button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div>
+                                    {recoveryStatus?.generated && (
+                                        <div style={{ display: "flex", gap: 18, flexWrap: "wrap", marginBottom: "14px", fontSize: "0.82rem" }}>
+                                            <span style={{ color: t.textSecondary }}>
+                                                <strong style={{ color: t.textPrimary }}>{recoveryStatus.totalRemaining}</strong> of 10 codes left
+                                            </span>
+                                            <span style={{ color: t.textSecondary }}>
+                                                Attempts used: <strong style={{ color: recoveryStatus.locked ? t.statusError : t.textPrimary }}>{recoveryStatus.attemptsUsed}/{recoveryStatus.attemptsMax}</strong>
+                                            </span>
+                                        </div>
+                                    )}
+                                    {recoveryStatus?.locked && (
+                                        <p style={{ fontSize: "0.8rem", color: t.statusError, marginBottom: "12px", display: "flex", alignItems: "center", gap: 6 }}>
+                                            <AlertTriangle style={{ width: 14, height: 14 }} /> Backup codes are locked. Generate a fresh set to re-enable them.
+                                        </p>
+                                    )}
+                                    <button
+                                        onClick={handleGenerateRecovery}
+                                        disabled={recoveryBusy}
+                                        style={{ padding: "10px 22px", borderRadius: t.buttonRadius, border: "none", background: t.accentPrimary, color: t.textInverse, fontWeight: 700, fontSize: "0.85rem", cursor: recoveryBusy ? "not-allowed" : "pointer", opacity: recoveryBusy ? 0.6 : 1 }}
+                                    >
+                                        {recoveryBusy ? "Generating…" : recoveryStatus?.generated ? "Regenerate backup codes" : "Generate backup codes"}
+                                    </button>
+                                    {recoveryStatus?.generated && (
+                                        <p style={{ fontSize: "0.76rem", color: t.textMuted, marginTop: "8px" }}>Regenerating replaces your current codes and resets the attempt counter.</p>
+                                    )}
+                                </div>
+                            )}
+
+                            {recoveryMsg && (
+                                <p style={{ fontSize: "0.8rem", marginTop: 12, fontWeight: 600, color: recoveryMsg.ok ? t.statusSuccess : t.statusError }}>{recoveryMsg.text}</p>
                             )}
                         </div>
 

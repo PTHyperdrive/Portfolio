@@ -226,8 +226,8 @@ export default function PaymentPage() {
     /* ── Render ───────────────────────────────────────────────── */
 
     return (
-        <div style={{ paddingTop: "120px", paddingBottom: "80px", minHeight: "100vh" }}>
-            <div className="container" style={{ maxWidth: "680px" }}>
+        <div style={{ paddingTop: "120px", paddingBottom: "80px", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center" }}>
+            <div className="container" style={{ width: "100%", maxWidth: "680px", margin: "0 auto" }}>
                 {/* Header */}
                 <div style={{ marginBottom: "40px" }}>
                     <span className="badge badge-cyan" style={{ marginBottom: "12px", display: "inline-block" }}>

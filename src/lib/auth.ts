@@ -6,6 +6,8 @@ import prisma from '@/lib/db';
 import { verifyPassword, checkRateLimit } from '@/lib/security';
 import { safeDecryptTotpSecret } from '@/lib/totp-crypto';
 import { verifyEmailOtp } from '@/lib/email-otp';
+import { verifyRecoveryCode } from '@/lib/recovery-codes';
+import { audit } from '@/lib/audit';
 import { loginSchema } from '@/lib/validation';
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
@@ -23,6 +25,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 email: { label: 'Email', type: 'email' },
                 password: { label: 'Password', type: 'password' },
                 totp: { label: 'Authenticator code', type: 'text' },
+                emailCode: { label: 'Email code', type: 'text' },
+                recoveryCode: { label: 'Backup code', type: 'text' },
             },
             async authorize(credentials) {
                 const parsed = loginSchema.safeParse(credentials);
@@ -59,6 +63,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                     const cred = credentials as Record<string, unknown>;
                     const totp = typeof cred.totp === 'string' ? cred.totp.trim() : '';
                     const emailCode = typeof cred.emailCode === 'string' ? cred.emailCode.trim() : '';
+                    const recoveryCode = typeof cred.recoveryCode === 'string' ? cred.recoveryCode.trim() : '';
 
                     let verified = false;
 
@@ -73,6 +78,23 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
                     if (!verified && emailOn && /^\d{6}$/.test(emailCode)) {
                         verified = await verifyEmailOtp(user.id, 'login', emailCode);
+                    }
+
+                    // ── Last line: backup recovery code ──────────────────
+                    // Only when the primary methods didn't pass. The lifetime
+                    // cap + lock are enforced inside verifyRecoveryCode, which
+                    // counts EVERY submission (right or wrong) toward the 10.
+                    if (!verified && recoveryCode) {
+                        const r = await verifyRecoveryCode(user.id, recoveryCode);
+                        verified = r.ok;
+                        void audit({
+                            userId: user.id,
+                            action: r.locked ? 'TFA_RECOVERY_LOCKED' : 'TFA_RECOVERY_USED',
+                            resourceType: 'UserAccount',
+                            resourceId: user.id,
+                            outcome: r.ok ? 'SUCCESS' : 'FAILED',
+                            metadata: { remainingAttempts: r.remainingAttempts, locked: r.locked },
+                        });
                     }
 
                     if (!verified) return null;

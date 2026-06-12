@@ -22,6 +22,14 @@ model User {
   twoFactorEnabled Boolean @default(false)
   twoFactorSecret  String?
   emailTwoFactorEnabled Boolean @default(false) // email-code 2FA at login
+  // ── Backup recovery codes (last-line 2FA) ──────────────────────
+  // Lifetime guard: every backup-code submission at login (right OR wrong)
+  // increments recoveryAttempts. At 10 the method is locked forever
+  // (recoveryLockedAt) and the user must fall back to another method or a
+  // support ticket. Generating a fresh set (authenticated) resets the counter.
+  recoveryAttempts         Int       @default(0)  // lifetime backup-code submissions
+  recoveryLockedAt         DateTime?              // set when the 10-attempt cap is hit
+  recoveryCodesGeneratedAt DateTime?              // when the current set was issued
   canInvite     Boolean   @default(false) // Admin toggle: allows user to generate invite codes
   maxVpcs       Int       @default(3)    // Max VPCs per user (3 default, up to 5 via admin)
   trialExpiresAt DateTime?
@@ -45,6 +53,7 @@ model User {
   deploymentTickets DeploymentTicket[]
   deviceSessions    DeviceSession[]
   emailOtpCodes     EmailOtpCode[]
+  recoveryCodes     RecoveryCode[]
   sshKeys              SshKey[]
   nextcloudStorage     UserNextcloudStorage?
   supportChats         SupportChat[]
@@ -119,6 +128,20 @@ model EmailOtpCode {
 
   @@index([userId, purpose])
   @@index([expiresAt])
+}
+
+/// Single-use 2FA backup recovery codes. High-entropy, SHA-256 hashed at rest.
+/// Generating a fresh set replaces all prior codes for that user.
+model RecoveryCode {
+  id        String    @id @default(cuid())
+  userId    String
+  codeHash  String                      // sha256(normalized code)
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 // ─── SSH Key Management ──────────────────────────────────────────
@@ -267,6 +290,8 @@ model VpsInstance {
   status         String    @default("stopped") // running, stopped, provisioning
   displayType    String    @default("novnc")   // novnc | spice
   specs          Json?     // {vcpu, ram_gb, disk_gb, gpu}
+  ciUsername     String?   // cloud-init login user (shown on the VM Overview)
+  ciPassword     String?   @db.Text // cloud-init password, AES-256-GCM encrypted at rest
   ipAddress      String?
   expiresAt      DateTime?
   ticketId       String?   @unique  // Links to DeploymentTicket
@@ -561,6 +586,10 @@ enum AuditAction {
   ACCOUNT_CREATED
   TFA_ENABLED
   TFA_DISABLED
+  TFA_RECOVERY_GENERATED
+  TFA_RECOVERY_USED
+  TFA_RECOVERY_LOCKED
+  TFA_LOCKOUT_TICKET
   PASSWORD_CHANGED
   SESSION_REVOKED
   // VM Lifecycle
