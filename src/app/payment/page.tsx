@@ -8,6 +8,7 @@ import {
     Wallet, Clock, CheckCircle2, AlertTriangle, ShieldCheck, ShieldAlert,
     Copy, Loader2, ArrowLeft, Zap, ChevronDown,
 } from "lucide-react";
+import { useThemeTokens } from "@/lib/useThemeTokens";
 
 /* ── Types ────────────────────────────────────────────────────── */
 
@@ -45,6 +46,7 @@ export default function PaymentPage() {
     const params = useSearchParams();
     const router = useRouter();
     const { data: session } = useSession();
+    const t = useThemeTokens();
 
     const plan = params.get("plan") || "Cloud Starter";
 
@@ -225,47 +227,49 @@ export default function PaymentPage() {
 
     /* ── Render ───────────────────────────────────────────────── */
 
+    const card: React.CSSProperties = { background: t.bgCard, border: `1px solid ${t.borderPrimary}`, borderRadius: t.cardRadius, boxShadow: t.shadow, padding: 28, marginBottom: 24 };
+
     return (
-        <div style={{ paddingTop: "120px", paddingBottom: "80px", minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center" }}>
-            <div className="container" style={{ width: "100%", maxWidth: "680px", margin: "0 auto" }}>
+        <div style={{ paddingTop: 120, paddingBottom: 80, minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", backgroundColor: t.bgPrimary, padding: "120px 24px 80px", fontFamily: t.fontFamily }}>
+            <div style={{ width: "100%", maxWidth: 680 }}>
                 {/* Header */}
-                <div style={{ marginBottom: "40px" }}>
-                    <span className="badge badge-cyan" style={{ marginBottom: "12px", display: "inline-block" }}>
+                <div style={{ marginBottom: 40 }}>
+                    <span style={{ display: "inline-block", marginBottom: 12, padding: "4px 14px", borderRadius: 20, fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", background: `${t.accentPrimary}18`, color: t.accentPrimary, border: `1px solid ${t.accentPrimary}33` }}>
                         CHECKOUT
                     </span>
-                    <h1 style={{ fontSize: "2rem", fontWeight: 800, marginBottom: "8px" }}>
-                        Complete Your <span className="gradient-text">Order</span>
+                    <h1 style={{ fontSize: "2rem", fontWeight: 800, marginBottom: 8, color: t.textPrimary }}>
+                        Complete Your <span style={{ color: t.accentPrimary }}>Order</span>
                     </h1>
-                    <p style={{ color: "var(--text-muted)", fontSize: "0.95rem" }}>
+                    <p style={{ color: t.textMuted, fontSize: "0.95rem" }}>
                         You&apos;re one step away from activating your plan.
                     </p>
                 </div>
 
                 {/* Order Summary Card */}
-                <div className="glass-card" style={{ padding: "28px", marginBottom: "24px" }}>
+                <div style={card}>
                     <h3 style={{
-                        fontSize: "0.82rem", fontWeight: 700, color: "var(--text-muted)",
-                        textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "20px",
+                        fontSize: "0.82rem", fontWeight: 700, color: t.textMuted,
+                        textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 20,
                     }}>
                         Order Summary
                     </h3>
                     <div style={{
                         display: "flex", justifyContent: "space-between", alignItems: "center",
-                        padding: "12px 0", borderBottom: "1px solid rgba(255,255,255,0.06)",
+                        padding: "12px 0", borderBottom: `1px solid ${t.borderSecondary}`,
                     }}>
                         <div>
-                            <p style={{ fontWeight: 700, fontSize: "1.05rem" }}>{plan}</p>
-                            <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginTop: "2px" }}>
+                            <p style={{ fontWeight: 700, fontSize: "1.05rem", color: t.textPrimary }}>{plan}</p>
+                            <p style={{ fontSize: "0.82rem", color: t.textMuted, marginTop: 2 }}>
                                 VPS Hosting Plan
                             </p>
                         </div>
-                        <span className="gradient-text" style={{ fontSize: "1.4rem", fontWeight: 800 }}>
+                        <span style={{ fontSize: "1.4rem", fontWeight: 800, color: t.accentPrimary }}>
                             {pricingLoading ? "..." : hourlyRate === 0 ? "Free" : `${hourlyRate.toLocaleString()} Credits/hr`}
                         </span>
                     </div>
-                    <div style={{ display: "flex", justifyContent: "space-between", paddingTop: "16px" }}>
-                        <span style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>Est. monthly (forecast)</span>
-                        <span style={{ fontWeight: 800, fontSize: "1.1rem" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", paddingTop: 16 }}>
+                        <span style={{ color: t.textMuted, fontSize: "0.9rem" }}>Est. monthly (forecast)</span>
+                        <span style={{ fontWeight: 800, fontSize: "1.1rem", color: t.textPrimary }}>
                             {pricingLoading ? "..." : hourlyRate === 0
                                 ? "$0.00"
                                 : `${monthlyForecast.toLocaleString()} Credits (~$${monthlyUsdt})`}
@@ -274,10 +278,10 @@ export default function PaymentPage() {
                 </div>
 
                 {/* ── USDT Payment ─────────────────────────────── */}
-                <div className="glass-card" style={{ padding: "28px", marginBottom: "24px" }}>
+                <div style={card}>
                     <h3 style={{
-                        fontSize: "0.82rem", fontWeight: 700, color: "var(--text-muted)",
-                        textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "20px",
+                        fontSize: "0.82rem", fontWeight: 700, color: t.textMuted,
+                        textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 20,
                     }}>
                         Payment Method
                     </h3>
@@ -285,24 +289,24 @@ export default function PaymentPage() {
                     {!showCrypto && !topup ? (
                         <button
                             onClick={() => setShowCrypto(true)}
-                            className="btn btn-secondary"
                             style={{
                                 width: "100%", padding: "16px 24px", display: "flex",
-                                alignItems: "center", gap: "16px", justifyContent: "flex-start",
-                                fontSize: "0.95rem",
+                                alignItems: "center", gap: 16, justifyContent: "flex-start",
+                                fontSize: "0.95rem", borderRadius: t.buttonRadius,
+                                border: `1px solid ${t.borderPrimary}`, background: t.bgCard,
+                                color: t.textSecondary, cursor: "pointer", transition: "all 0.15s",
                             }}
                         >
-                            <Wallet style={{ width: 24, height: 24 }} />
+                            <Wallet style={{ width: 24, height: 24, color: t.accentPrimary }} />
                             <div style={{ textAlign: "left" }}>
-                                <div style={{ fontWeight: 700 }}>Pay with USDT</div>
-                                <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "2px" }}>
+                                <div style={{ fontWeight: 700, color: t.textPrimary }}>Pay with USDT</div>
+                                <div style={{ fontSize: "0.78rem", color: t.textMuted, marginTop: 2 }}>
                                     Tether USD on TRC-20 or ERC-20 network
                                 </div>
                             </div>
                             <ChevronDown style={{ marginLeft: "auto", width: 16, height: 16 }} />
                         </button>
                     ) : !topup ? (
-                        /* ── Chain selection + amount ────────────── */
                         <div>
                             <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
                                 {(["TRC20", "ERC20"] as CryptoChain[]).map(c => (
@@ -310,16 +314,16 @@ export default function PaymentPage() {
                                         key={c}
                                         onClick={() => setChain(c)}
                                         style={{
-                                            flex: 1, padding: "12px", borderRadius: "var(--radius-sm)",
-                                            border: `2px solid ${chain === c ? "var(--accent-cyan)" : "var(--glass-border)"}`,
-                                            background: chain === c ? "rgba(0,240,255,0.06)" : "transparent",
-                                            color: chain === c ? "var(--accent-cyan)" : "var(--text-secondary)",
+                                            flex: 1, padding: 12, borderRadius: t.cardRadius,
+                                            border: `2px solid ${chain === c ? t.accentPrimary : t.borderPrimary}`,
+                                            background: chain === c ? `${t.accentPrimary}0d` : "transparent",
+                                            color: chain === c ? t.accentPrimary : t.textSecondary,
                                             cursor: "pointer", fontWeight: 700, fontSize: "0.9rem",
                                             transition: "all 0.15s",
                                         }}
                                     >
                                         USDT {c === "TRC20" ? "TRC-20" : "ERC-20"}
-                                        <div style={{ fontSize: "0.72rem", fontWeight: 400, marginTop: 4, color: "var(--text-muted)" }}>
+                                        <div style={{ fontSize: "0.72rem", fontWeight: 400, marginTop: 4, color: t.textMuted }}>
                                             {c === "TRC20" ? "Tron network (lower fees)" : "Ethereum network"}
                                         </div>
                                     </button>
@@ -327,7 +331,7 @@ export default function PaymentPage() {
                             </div>
 
                             <div style={{ marginBottom: 16 }}>
-                                <label style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginBottom: 6, display: "block" }}>
+                                <label style={{ fontSize: "0.82rem", color: t.textMuted, marginBottom: 6, display: "block" }}>
                                     Amount (USDT)
                                 </label>
                                 <input
@@ -335,10 +339,9 @@ export default function PaymentPage() {
                                     min={1}
                                     value={usdtAmount}
                                     onChange={e => setUsdtAmount(parseFloat(e.target.value) || 0)}
-                                    className="input-field"
-                                    style={{ fontFamily: "'JetBrains Mono', monospace" }}
+                                    style={{ width: "100%", padding: "10px 14px", borderRadius: t.cardRadius, background: t.bgInput, border: `1px solid ${t.borderPrimary}`, color: t.textPrimary, fontSize: "0.875rem", fontFamily: t.fontMono, outline: "none", boxSizing: "border-box" as const }}
                                 />
-                                <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: 6 }}>
+                                <p style={{ fontSize: "0.78rem", color: t.textMuted, marginTop: 6 }}>
                                     = {(usdtAmount * exchangeRate).toLocaleString()} Credits
                                     (1 USDT = {exchangeRate.toLocaleString()} Credits)
                                 </p>
@@ -347,8 +350,7 @@ export default function PaymentPage() {
                             <button
                                 onClick={initiateCryptoTopup}
                                 disabled={cryptoLoading || usdtAmount <= 0}
-                                className="btn btn-primary"
-                                style={{ width: "100%", padding: "14px", fontSize: "0.95rem" }}
+                                style={{ width: "100%", padding: 14, fontSize: "0.95rem", borderRadius: t.buttonRadius, border: "none", background: t.accentPrimary, color: t.textInverse, fontWeight: 700, cursor: cryptoLoading || usdtAmount <= 0 ? "not-allowed" : "pointer", opacity: cryptoLoading || usdtAmount <= 0 ? 0.5 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
                             >
                                 {cryptoLoading ? (
                                     <Loader2 style={{ width: 16, height: 16, animation: "spin 1s linear infinite" }} />
@@ -359,14 +361,13 @@ export default function PaymentPage() {
                             </button>
                         </div>
                     ) : (
-                        /* ── Deposit address display ─────────────── */
                         <div>
                             {/* Status banner */}
                             {topupStatus?.status === "COMPLETED" ? (
                                 <div style={{
-                                    padding: "14px 18px", borderRadius: "var(--radius-sm)",
-                                    background: "rgba(0,255,136,0.08)", border: "1px solid rgba(0,255,136,0.2)",
-                                    color: "var(--accent-green)", marginBottom: 16,
+                                    padding: "14px 18px", borderRadius: t.cardRadius,
+                                    background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}33`,
+                                    color: t.statusSuccess, marginBottom: 16,
                                     display: "flex", alignItems: "center", gap: 10,
                                 }}>
                                     <CheckCircle2 style={{ width: 18, height: 18 }} />
@@ -379,9 +380,9 @@ export default function PaymentPage() {
                                 </div>
                             ) : topupStatus?.status === "EXPIRED" || timeLeft === "Expired" ? (
                                 <div style={{
-                                    padding: "14px 18px", borderRadius: "var(--radius-sm)",
-                                    background: "rgba(255,0,110,0.08)", border: "1px solid rgba(255,0,110,0.2)",
-                                    color: "var(--accent-magenta)", marginBottom: 16,
+                                    padding: "14px 18px", borderRadius: t.cardRadius,
+                                    background: t.statusErrorBg, border: `1px solid ${t.statusError}33`,
+                                    color: t.statusError, marginBottom: 16,
                                     display: "flex", alignItems: "center", gap: 10,
                                 }}>
                                     <AlertTriangle style={{ width: 18, height: 18 }} />
@@ -393,11 +394,11 @@ export default function PaymentPage() {
 
                             {/* Chain badge + timer */}
                             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                                <span className="badge badge-cyan">{topup.chain === "TRC20" ? "USDT TRC-20" : "USDT ERC-20"}</span>
+                                <span style={{ padding: "4px 14px", borderRadius: 20, fontSize: "0.7rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.08em", background: `${t.accentPrimary}18`, color: t.accentPrimary, border: `1px solid ${t.accentPrimary}33` }}>{topup.chain === "TRC20" ? "USDT TRC-20" : "USDT ERC-20"}</span>
                                 {topupStatus?.status !== "COMPLETED" && topupStatus?.status !== "EXPIRED" && (
                                     <span style={{
                                         display: "flex", alignItems: "center", gap: 6,
-                                        fontSize: "0.82rem", color: "var(--accent-orange)", fontWeight: 600,
+                                        fontSize: "0.82rem", color: t.statusWarning, fontWeight: 600,
                                     }}>
                                         <Clock style={{ width: 14, height: 14 }} />
                                         {timeLeft}
@@ -407,36 +408,36 @@ export default function PaymentPage() {
 
                             {/* Amount */}
                             <div style={{
-                                padding: "12px 16px", borderRadius: "var(--radius-sm)",
-                                background: "rgba(255,255,255,0.03)", border: "1px solid var(--glass-border)",
+                                padding: "12px 16px", borderRadius: t.cardRadius,
+                                background: t.bgSecondary, border: `1px solid ${t.borderSecondary}`,
                                 marginBottom: 12,
                             }}>
-                                <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: 4 }}>
+                                <p style={{ fontSize: "0.75rem", color: t.textMuted, marginBottom: 4 }}>
                                     Send exactly:
                                 </p>
                                 <p style={{
                                     fontSize: "1.4rem", fontWeight: 800,
-                                    fontFamily: "'JetBrains Mono', monospace",
+                                    fontFamily: t.fontMono,
                                 }}>
-                                    <span className="gradient-text">{topup.amountUsdt}</span>
-                                    <span style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginLeft: 8 }}>USDT</span>
+                                    <span style={{ color: t.accentPrimary }}>{topup.amountUsdt}</span>
+                                    <span style={{ color: t.textMuted, fontSize: "0.9rem", marginLeft: 8 }}>USDT</span>
                                 </p>
                             </div>
 
                             {/* Deposit address */}
                             <div style={{
-                                padding: "12px 16px", borderRadius: "var(--radius-sm)",
-                                background: "rgba(255,255,255,0.03)", border: "1px solid var(--glass-border)",
+                                padding: "12px 16px", borderRadius: t.cardRadius,
+                                background: t.bgSecondary, border: `1px solid ${t.borderSecondary}`,
                                 marginBottom: 12,
                             }}>
-                                <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: 4 }}>
+                                <p style={{ fontSize: "0.75rem", color: t.textMuted, marginBottom: 4 }}>
                                     To this address:
                                 </p>
                                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                                     <code style={{
                                         flex: 1, fontSize: "0.82rem", wordBreak: "break-all",
-                                        fontFamily: "'JetBrains Mono', monospace",
-                                        color: "var(--text-primary)",
+                                        fontFamily: t.fontMono,
+                                        color: t.textPrimary,
                                     }}>
                                         {topup.depositAddress}
                                     </code>
@@ -444,9 +445,9 @@ export default function PaymentPage() {
                                         onClick={copyAddress}
                                         title="Copy address"
                                         style={{
-                                            padding: "6px 10px", borderRadius: "var(--radius-sm)",
-                                            border: "1px solid var(--glass-border)",
-                                            background: "transparent", color: "var(--accent-cyan)",
+                                            padding: "6px 10px", borderRadius: t.cardRadius,
+                                            border: `1px solid ${t.borderPrimary}`,
+                                            background: "transparent", color: t.accentPrimary,
                                             cursor: "pointer", display: "flex", alignItems: "center", gap: 4,
                                             fontSize: "0.78rem", fontWeight: 600,
                                         }}
@@ -460,9 +461,9 @@ export default function PaymentPage() {
                             {/* ── Clipboard Integrity Check ──────── */}
                             {clipboardCheck === "match" && (
                                 <div style={{
-                                    padding: "10px 14px", borderRadius: "var(--radius-sm)",
-                                    background: "rgba(0,255,136,0.06)", border: "1px solid rgba(0,255,136,0.15)",
-                                    color: "var(--accent-green)", marginBottom: 12,
+                                    padding: "10px 14px", borderRadius: t.cardRadius,
+                                    background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}22`,
+                                    color: t.statusSuccess, marginBottom: 12,
                                     display: "flex", alignItems: "center", gap: 8, fontSize: "0.82rem",
                                 }}>
                                     <ShieldCheck style={{ width: 16, height: 16, flexShrink: 0 }} />
@@ -473,9 +474,9 @@ export default function PaymentPage() {
                             )}
                             {clipboardCheck === "mismatch" && (
                                 <div style={{
-                                    padding: "14px 16px", borderRadius: "var(--radius-sm)",
-                                    background: "rgba(255,0,0,0.08)", border: "2px solid rgba(255,0,0,0.4)",
-                                    color: "#ff4444", marginBottom: 12,
+                                    padding: "14px 16px", borderRadius: t.cardRadius,
+                                    background: t.statusErrorBg, border: `2px solid ${t.statusError}66`,
+                                    color: t.statusError, marginBottom: 12,
                                 }}>
                                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                                         <ShieldAlert style={{ width: 20, height: 20, flexShrink: 0 }} />
@@ -498,10 +499,10 @@ export default function PaymentPage() {
                                     onClick={verifyClipboard}
                                     style={{
                                         width: "100%", padding: "8px 14px", marginBottom: 12,
-                                        borderRadius: "var(--radius-sm)",
-                                        border: "1px solid var(--glass-border)",
+                                        borderRadius: t.cardRadius,
+                                        border: `1px solid ${t.borderPrimary}`,
                                         background: "transparent",
-                                        color: "var(--text-muted)", cursor: "pointer",
+                                        color: t.textMuted, cursor: "pointer",
                                         display: "flex", alignItems: "center", justifyContent: "center",
                                         gap: 6, fontSize: "0.82rem",
                                     }}
@@ -514,11 +515,11 @@ export default function PaymentPage() {
                             {/* Confirmation progress */}
                             {topupStatus && topupStatus.status !== "EXPIRED" && topupStatus.status !== "COMPLETED" && (
                                 <div style={{
-                                    padding: "10px 14px", borderRadius: "var(--radius-sm)",
-                                    background: "rgba(0,240,255,0.04)", border: "1px solid rgba(0,240,255,0.1)",
+                                    padding: "10px 14px", borderRadius: t.cardRadius,
+                                    background: `${t.accentPrimary}08`, border: `1px solid ${t.accentPrimary}1a`,
                                     marginBottom: 12,
                                     display: "flex", alignItems: "center", gap: 8,
-                                    color: "var(--accent-cyan)", fontSize: "0.82rem",
+                                    color: t.accentPrimary, fontSize: "0.82rem",
                                 }}>
                                     <Loader2 style={{ width: 14, height: 14, animation: "spin 1s linear infinite" }} />
                                     <span>
@@ -534,19 +535,19 @@ export default function PaymentPage() {
 
                 {/* Pay with credit balance */}
                 <div style={{
-                    padding: "20px 24px", borderRadius: "var(--radius-sm)",
-                    border: "1px dashed rgba(0,240,255,0.2)",
-                    background: "rgba(0,240,255,0.03)", marginBottom: "24px",
+                    padding: "20px 24px", borderRadius: t.cardRadius,
+                    border: `1px dashed ${t.accentPrimary}33`,
+                    background: `${t.accentPrimary}06`, marginBottom: 24,
                 }}>
                     <p style={{
-                        fontSize: "0.78rem", color: "var(--accent-cyan)", fontWeight: 700,
-                        textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "10px",
+                        fontSize: "0.78rem", color: t.accentPrimary, fontWeight: 700,
+                        textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 10,
                         display: "flex", alignItems: "center", gap: 6,
                     }}>
                         <Wallet style={{ width: 14, height: 14 }} />
                         Pay with Credit Balance
                     </p>
-                    <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginBottom: "14px" }}>
+                    <p style={{ fontSize: "0.85rem", color: t.textMuted, marginBottom: 14 }}>
                         {hourlyRate === 0
                             ? "Activate this plan instantly — no charge."
                             : `No upfront cost — ${hourlyRate.toLocaleString()} credits/hour metered from your wallet only while your VM runs.`}
@@ -554,8 +555,7 @@ export default function PaymentPage() {
                     <button
                         onClick={handleActivateWithCredits}
                         disabled={loading || isTrialLocked}
-                        className="btn btn-primary"
-                        style={{ width: "100%", padding: "14px", fontSize: "0.95rem" }}
+                        style={{ width: "100%", padding: 14, fontSize: "0.95rem", borderRadius: t.buttonRadius, border: "none", background: t.accentPrimary, color: t.textInverse, fontWeight: 700, cursor: loading || isTrialLocked ? "not-allowed" : "pointer", opacity: loading || isTrialLocked ? 0.5 : 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}
                     >
                         {isTrialLocked ? "Trial Activated" : loading ? "Processing..." : (
                             <>
@@ -565,7 +565,7 @@ export default function PaymentPage() {
                         )}
                     </button>
                     {isTrialLocked && (
-                        <p style={{ fontSize: "0.8rem", color: "var(--accent-magenta)", marginTop: "12px", textAlign: "center" }}>
+                        <p style={{ fontSize: "0.8rem", color: t.statusError, marginTop: 12, textAlign: "center" }}>
                             You have already claimed your one-time free trial.
                         </p>
                     )}
@@ -574,23 +574,23 @@ export default function PaymentPage() {
                 {/* Status message */}
                 {msg && (
                     <div style={{
-                        padding: "14px 18px", borderRadius: "var(--radius-sm)",
-                        background: status === "success" ? "rgba(0,255,136,0.08)"
-                            : status === "error" ? "rgba(255,0,110,0.08)"
-                            : "rgba(0,240,255,0.08)",
-                        border: `1px solid ${status === "success" ? "rgba(0,255,136,0.2)"
-                            : status === "error" ? "rgba(255,0,110,0.2)"
-                            : "rgba(0,240,255,0.2)"}`,
-                        color: status === "success" ? "var(--accent-green)"
-                            : status === "error" ? "var(--accent-magenta)"
-                            : "var(--accent-cyan)",
-                        fontSize: "0.88rem", marginBottom: "16px",
+                        padding: "14px 18px", borderRadius: t.cardRadius,
+                        background: status === "success" ? t.statusSuccessBg
+                            : status === "error" ? t.statusErrorBg
+                            : `${t.accentPrimary}0d`,
+                        border: `1px solid ${status === "success" ? `${t.statusSuccess}33`
+                            : status === "error" ? `${t.statusError}33`
+                            : `${t.accentPrimary}33`}`,
+                        color: status === "success" ? t.statusSuccess
+                            : status === "error" ? t.statusError
+                            : t.accentPrimary,
+                        fontSize: "0.88rem", marginBottom: 16,
                     }}>
                         {msg}
                     </div>
                 )}
 
-                <Link href="/services/vps" style={{ color: "var(--text-muted)", fontSize: "0.85rem", textDecoration: "none", display: "flex", alignItems: "center", gap: 6 }}>
+                <Link href="/services/vps" style={{ color: t.textMuted, fontSize: "0.85rem", textDecoration: "none", display: "flex", alignItems: "center", gap: 6 }}>
                     <ArrowLeft style={{ width: 14, height: 14 }} /> Back to Plans
                 </Link>
             </div>

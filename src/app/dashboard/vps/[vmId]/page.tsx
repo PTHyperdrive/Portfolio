@@ -6,6 +6,7 @@ import Link from "next/link";
 import { WINDOWS_ISOS, getIsosByCategory } from "@/lib/windows-isos";
 import { useThemeTokens } from "@/lib/useThemeTokens";
 import { AlertTriangle, Play, X, Globe, Network, KeyRound, Eye, EyeOff, Copy, Check } from "lucide-react";
+import TwoFactorModal from "@/components/TwoFactorModal";
 
 /**
  * Tiny dependency-free sparkline. Plots a 0–100 series as a filled area + line,
@@ -96,12 +97,46 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
     const [showPwd, setShowPwd] = useState(false);
     const [copied, setCopied] = useState<"user" | "pass" | null>(null);
 
-    const loadCreds = useCallback(async () => {
+    // TOTP challenge state for credential reveal
+    const [show2fa, setShow2fa] = useState(false);
+    const [twoFaError, setTwoFaError] = useState("");
+    const [twoFaLoading, setTwoFaLoading] = useState(false);
+
+    const loadCreds = useCallback(async (totpToken?: string) => {
         setCredsLoading(true);
+        setTwoFaError("");
         try {
-            const res = await fetch(`/api/vps/${vmId}/credentials`);
-            const data = await res.json() as VmCredentials;
-            setCreds(res.ok ? data : { hasCredentials: false });
+            const res = await fetch(`/api/vps/${vmId}/credentials`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ totpToken }),
+            });
+            const data = await res.json() as VmCredentials & { error?: string; message?: string };
+
+            if (!res.ok) {
+                // Server says 2FA is required — show the modal
+                if (data.error === "2FA_REQUIRED") {
+                    setShow2fa(true);
+                    setCredsLoading(false);
+                    return;
+                }
+                // Invalid TOTP code — keep modal open, show error
+                if (data.error === "INVALID_2FA" || data.error === "2FA_RATE_LIMITED") {
+                    setTwoFaError(data.message || "Verification failed.");
+                    setTwoFaLoading(false);
+                    setCredsLoading(false);
+                    return;
+                }
+                // Other errors
+                setCreds({ hasCredentials: false });
+                setCredsLoading(false);
+                return;
+            }
+
+            // Success — close modal, set creds
+            setShow2fa(false);
+            setTwoFaLoading(false);
+            setCreds(data);
         } catch {
             setCreds({ hasCredentials: false });
         } finally {
@@ -336,7 +371,7 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
                                 <KeyRound style={{ width: 16, height: 16, color: t.accentPrimary }} /> Login Credentials
                             </h3>
                             {!creds && (
-                                <button onClick={loadCreds} disabled={credsLoading}
+                                <button onClick={() => loadCreds()} disabled={credsLoading}
                                     style={{ padding: "7px 16px", borderRadius: t.buttonRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textSecondary, fontWeight: 600, fontSize: "0.8rem", cursor: credsLoading ? "not-allowed" : "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
                                     <Eye style={{ width: 13, height: 13 }} /> {credsLoading ? "Loading…" : "Show credentials"}
                                 </button>
@@ -535,6 +570,15 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
                     </div>
                 </div>
             )}
+
+            {/* TOTP Modal for credential reveal */}
+            <TwoFactorModal
+                open={show2fa}
+                onClose={() => { setShow2fa(false); setTwoFaError(""); setTwoFaLoading(false); }}
+                onSubmit={(token) => { setTwoFaLoading(true); loadCreds(token); }}
+                loading={twoFaLoading}
+                error={twoFaError}
+            />
 
             {/* Destroy Modal */}
             {showDestroy && (
