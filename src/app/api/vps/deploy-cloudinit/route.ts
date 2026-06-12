@@ -16,6 +16,10 @@ import {
 } from "@/lib/proxmox";
 import { validateAndResolveTemplate, resolveTemplateVmid } from "@/config/templates";
 import { generateSecurePassword } from "@/lib/password-generator";
+// Cloud-init password is stored AES-256-GCM encrypted at rest (same scheme as
+// the TOTP secret) so it can be revealed to the owner later without keeping
+// plaintext in the DB.
+import { encryptTotpSecret as encryptSecret } from "@/lib/totp-crypto";
 
 /**
  * POST /api/vps/deploy-cloudinit
@@ -379,6 +383,8 @@ export async function POST(req: Request) {
                         name:      vm.hostname,
                         os:        templateName,
                         status:    "running",
+                        ciUsername: ciuser,
+                        ciPassword: encryptSecret(ciPassword),
                         ticketId:  ticket?.id ?? undefined,
                         expiresAt: ticket?.validUntil ?? expiresAt30d,
                         specs: {

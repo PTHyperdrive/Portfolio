@@ -5,7 +5,32 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { WINDOWS_ISOS, getIsosByCategory } from "@/lib/windows-isos";
 import { useThemeTokens } from "@/lib/useThemeTokens";
-import { AlertTriangle, Play, X, Globe, Network } from "lucide-react";
+import { AlertTriangle, Play, X, Globe, Network, KeyRound, Eye, EyeOff, Copy, Check } from "lucide-react";
+import TwoFactorModal from "@/components/TwoFactorModal";
+
+/**
+ * Tiny dependency-free sparkline. Plots a 0–100 series as a filled area + line,
+ * stretched to fill its container (percent values, newest sample on the right).
+ */
+function Sparkline({ data, color, height = 44 }: { data: number[]; color: string; height?: number }) {
+    if (data.length < 2) {
+        return <div style={{ height, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.7rem", opacity: 0.5 }}>collecting…</div>;
+    }
+    const w = 100;
+    const step = w / (data.length - 1);
+    const y = (v: number) => height - (Math.min(100, Math.max(0, v)) / 100) * height;
+    const pts = data.map((v, i) => `${(i * step).toFixed(2)},${y(v).toFixed(2)}`);
+    const line = `M${pts.join(" L")}`;
+    const area = `${line} L${w},${height} L0,${height} Z`;
+    return (
+        <svg viewBox={`0 0 ${w} ${height}`} preserveAspectRatio="none" style={{ width: "100%", height, display: "block" }}>
+            <path d={area} fill={color} opacity={0.12} />
+            <path d={line} fill="none" stroke={color} strokeWidth={1.5} vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+        </svg>
+    );
+}
+
+interface VmCredentials { hasCredentials: boolean; username?: string | null; password?: string | null; }
 
 interface VmDetail {
     id: string;
@@ -62,6 +87,70 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
     const [displayLoading, setDisplayLoading] = useState(false);
     const [displayMsg, setDisplayMsg] = useState("");
 
+    // Live usage history for the Overview sparklines (rolling, ~40 samples).
+    const [cpuHist, setCpuHist] = useState<number[]>([]);
+    const [memHist, setMemHist] = useState<number[]>([]);
+
+    // VM login credentials (revealed on demand from the encrypted store).
+    const [creds, setCreds] = useState<VmCredentials | null>(null);
+    const [credsLoading, setCredsLoading] = useState(false);
+    const [showPwd, setShowPwd] = useState(false);
+    const [copied, setCopied] = useState<"user" | "pass" | null>(null);
+
+    // TOTP challenge state for credential reveal
+    const [show2fa, setShow2fa] = useState(false);
+    const [twoFaError, setTwoFaError] = useState("");
+    const [twoFaLoading, setTwoFaLoading] = useState(false);
+
+    const loadCreds = useCallback(async (totpToken?: string) => {
+        setCredsLoading(true);
+        setTwoFaError("");
+        try {
+            const res = await fetch(`/api/vps/${vmId}/credentials`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ totpToken }),
+            });
+            const data = await res.json() as VmCredentials & { error?: string; message?: string };
+
+            if (!res.ok) {
+                // Server says 2FA is required — show the modal
+                if (data.error === "2FA_REQUIRED") {
+                    setShow2fa(true);
+                    setCredsLoading(false);
+                    return;
+                }
+                // Invalid TOTP code — keep modal open, show error
+                if (data.error === "INVALID_2FA" || data.error === "2FA_RATE_LIMITED") {
+                    setTwoFaError(data.message || "Verification failed.");
+                    setTwoFaLoading(false);
+                    setCredsLoading(false);
+                    return;
+                }
+                // Other errors
+                setCreds({ hasCredentials: false });
+                setCredsLoading(false);
+                return;
+            }
+
+            // Success — close modal, set creds
+            setShow2fa(false);
+            setTwoFaLoading(false);
+            setCreds(data);
+        } catch {
+            setCreds({ hasCredentials: false });
+        } finally {
+            setCredsLoading(false);
+        }
+    }, [vmId]);
+
+    const copyField = (which: "user" | "pass", value: string) => {
+        navigator.clipboard?.writeText(value).then(() => {
+            setCopied(which);
+            setTimeout(() => setCopied(null), 1500);
+        }).catch(() => { /* ignore */ });
+    };
+
     const loadVm = useCallback(async () => {
         try {
             const res = await fetch(`/api/proxmox/vms/${vmId}?node=${node}`);
@@ -88,7 +177,18 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
         loadVm();
         loadVpcData();
         const es = new EventSource(`/api/proxmox/vms/${vmId}/stream?node=${encodeURIComponent(node)}`);
-        es.onmessage = (event: MessageEvent<string>) => { try { const liveData = JSON.parse(event.data) as VmDetail["liveData"]; setVm(prev => prev ? { ...prev, liveData } : prev); } catch { /* ignore */ } };
+        es.onmessage = (event: MessageEvent<string>) => {
+            try {
+                const liveData = JSON.parse(event.data) as VmDetail["liveData"];
+                setVm(prev => prev ? { ...prev, liveData } : prev);
+                if (liveData) {
+                    const cpuPct = (liveData.cpu ?? 0) * 100;
+                    const memPct = liveData.maxmem ? (liveData.memory / liveData.maxmem) * 100 : 0;
+                    setCpuHist(h => [...h, cpuPct].slice(-40));
+                    setMemHist(h => [...h, memPct].slice(-40));
+                }
+            } catch { /* ignore */ }
+        };
         es.onerror = () => {};
         return () => es.close();
     }, [vmId, node, loadVm, loadVpcData]);
@@ -218,18 +318,25 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
                     {/* Resource bars */}
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 24 }}>
                         {[
-                            { label: "CPU Usage", value: `${cpuPercent.toFixed(1)}%`, pct: cpuPercent, sub: `${vm.specs?.vcpu || "—"} vCPU Cores` },
-                            { label: "Memory", value: formatBytes(memUsed), pct: memPercent, sub: `${formatBytes(memUsed)} / ${formatBytes(memTotal)}` },
-                            { label: "Disk", value: formatBytes(diskUsed), pct: diskPercent, sub: `${formatBytes(diskUsed)} / ${formatBytes(diskTotal)}` },
+                            { label: "CPU Usage", value: `${cpuPercent.toFixed(1)}%`, pct: cpuPercent, sub: `${vm.specs?.vcpu || "—"} vCPU Cores`, hist: cpuHist },
+                            { label: "Memory", value: formatBytes(memUsed), pct: memPercent, sub: `${formatBytes(memUsed)} / ${formatBytes(memTotal)}`, hist: memHist },
+                            { label: "Disk", value: formatBytes(diskUsed), pct: diskPercent, sub: `${formatBytes(diskUsed)} / ${formatBytes(diskTotal)}`, hist: null },
                         ].map(r => (
                             <div key={r.label} style={card}>
                                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
                                     <span style={{ color: t.textMuted, fontSize: "0.85rem", fontWeight: 600 }}>{r.label}</span>
                                     <span style={{ fontSize: "1.15rem", fontWeight: 700, color: t.accentPrimary, fontFamily: t.fontMono }}>{r.value}</span>
                                 </div>
-                                <div style={{ height: 6, borderRadius: 3, background: t.borderPrimary }}>
-                                    <div style={{ height: "100%", borderRadius: 3, background: t.accentPrimary, width: `${Math.min(100, r.pct)}%`, transition: "width 0.5s" }} />
-                                </div>
+                                {/* Live trend chart (CPU/Memory). Disk keeps the bar only — it barely moves. */}
+                                {r.hist ? (
+                                    <div style={{ marginBottom: 8 }}>
+                                        {isRunning ? <Sparkline data={r.hist} color={t.accentPrimary} /> : <div style={{ height: 44, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.72rem", color: t.textMuted }}>VM stopped</div>}
+                                    </div>
+                                ) : (
+                                    <div style={{ height: 6, borderRadius: 3, background: t.borderPrimary }}>
+                                        <div style={{ height: "100%", borderRadius: 3, background: t.accentPrimary, width: `${Math.min(100, r.pct)}%`, transition: "width 0.5s" }} />
+                                    </div>
+                                )}
                                 <p style={{ color: t.textMuted, fontSize: "0.75rem", marginTop: 8 }}>{r.sub}</p>
                             </div>
                         ))}
@@ -255,6 +362,64 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
                                 </div>
                             ))}
                         </div>
+                    </div>
+
+                    {/* Login Credentials */}
+                    <div style={{ ...card, marginTop: 16 }}>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <h3 style={{ fontSize: "1rem", fontWeight: 700, color: t.textSecondary, display: "flex", alignItems: "center", gap: 8 }}>
+                                <KeyRound style={{ width: 16, height: 16, color: t.accentPrimary }} /> Login Credentials
+                            </h3>
+                            {!creds && (
+                                <button onClick={() => loadCreds()} disabled={credsLoading}
+                                    style={{ padding: "7px 16px", borderRadius: t.buttonRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textSecondary, fontWeight: 600, fontSize: "0.8rem", cursor: credsLoading ? "not-allowed" : "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
+                                    <Eye style={{ width: 13, height: 13 }} /> {credsLoading ? "Loading…" : "Show credentials"}
+                                </button>
+                            )}
+                        </div>
+
+                        {creds && !creds.hasCredentials && (
+                            <p style={{ fontSize: "0.83rem", color: t.textMuted, marginTop: 12, lineHeight: 1.5 }}>
+                                No stored credentials for this VM — it was created before credential storage, or provisioned from an ISO where the login is set during install.
+                            </p>
+                        )}
+
+                        {creds?.hasCredentials && (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 10, marginTop: 14 }}>
+                                {/* Username */}
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", borderRadius: t.cardRadius, background: t.bgInput, border: `1px solid ${t.borderSecondary}` }}>
+                                    <span style={{ color: t.textMuted, fontSize: "0.82rem" }}>Username</span>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                        <code style={{ color: t.textPrimary, fontFamily: t.fontMono, fontSize: "0.88rem", userSelect: "all" }}>{creds.username || "—"}</code>
+                                        {creds.username && (
+                                            <button onClick={() => copyField("user", creds.username!)} title="Copy username" style={{ background: "transparent", border: "none", cursor: "pointer", color: copied === "user" ? t.statusSuccess : t.textMuted, display: "inline-flex" }}>
+                                                {copied === "user" ? <Check style={{ width: 15, height: 15 }} /> : <Copy style={{ width: 15, height: 15 }} />}
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+                                {/* Password */}
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 14px", borderRadius: t.cardRadius, background: t.bgInput, border: `1px solid ${t.borderSecondary}` }}>
+                                    <span style={{ color: t.textMuted, fontSize: "0.82rem" }}>Password</span>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                        <code style={{ color: t.textPrimary, fontFamily: t.fontMono, fontSize: "0.88rem", letterSpacing: showPwd ? 0 : "0.15em", userSelect: showPwd ? "all" : "none" }}>
+                                            {creds.password ? (showPwd ? creds.password : "••••••••••") : "—"}
+                                        </code>
+                                        {creds.password && (
+                                            <>
+                                                <button onClick={() => setShowPwd(s => !s)} title={showPwd ? "Hide" : "Reveal"} style={{ background: "transparent", border: "none", cursor: "pointer", color: t.textMuted, display: "inline-flex" }}>
+                                                    {showPwd ? <EyeOff style={{ width: 15, height: 15 }} /> : <Eye style={{ width: 15, height: 15 }} />}
+                                                </button>
+                                                <button onClick={() => copyField("pass", creds.password!)} title="Copy password" style={{ background: "transparent", border: "none", cursor: "pointer", color: copied === "pass" ? t.statusSuccess : t.textMuted, display: "inline-flex" }}>
+                                                    {copied === "pass" ? <Check style={{ width: 15, height: 15 }} /> : <Copy style={{ width: 15, height: 15 }} />}
+                                                </button>
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+                                <p style={{ fontSize: "0.72rem", color: t.textMuted }}>Stored encrypted. Keep it private — anyone with this can sign in to your VM.</p>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
@@ -405,6 +570,15 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
                     </div>
                 </div>
             )}
+
+            {/* TOTP Modal for credential reveal */}
+            <TwoFactorModal
+                open={show2fa}
+                onClose={() => { setShow2fa(false); setTwoFaError(""); setTwoFaLoading(false); }}
+                onSubmit={(token) => { setTwoFaLoading(true); loadCreds(token); }}
+                loading={twoFaLoading}
+                error={twoFaError}
+            />
 
             {/* Destroy Modal */}
             {showDestroy && (

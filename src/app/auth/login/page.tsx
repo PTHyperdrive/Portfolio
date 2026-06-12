@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 
-type Method = "otp" | "email";
+type Method = "otp" | "email" | "recovery";
 
 const METHOD_META: Record<Method, { label: string; subtitle: string; pick: string }> = {
     otp: {
@@ -17,6 +17,11 @@ const METHOD_META: Record<Method, { label: string; subtitle: string; pick: strin
         label: "Email code",
         subtitle: "Enter the 6-digit code we emailed you",
         pick: "Email me a code",
+    },
+    recovery: {
+        label: "Backup code",
+        subtitle: "Enter one of your saved backup codes",
+        pick: "Use a backup code",
     },
 };
 
@@ -30,6 +35,13 @@ export default function LoginPage() {
     const [activeMethod, setActiveMethod] = useState<Method>("otp");
     const [showPicker, setShowPicker] = useState(false);
     const [emailSent, setEmailSent] = useState(false);
+    // Backup codes locked (10 lifetime attempts exhausted) — steer to support.
+    const [recoveryLocked, setRecoveryLocked] = useState(false);
+    // "Lost access to everything" support-ticket escape hatch.
+    const [showHelp, setShowHelp] = useState(false);
+    const [helpBusy, setHelpBusy] = useState(false);
+    const [helpSent, setHelpSent] = useState(false);
+    const [helpNote, setHelpNote] = useState("");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const router = useRouter();
@@ -37,23 +49,28 @@ export default function LoginPage() {
     // Honour callbackUrl from middleware, default to Console overview
     const callbackUrl = searchParams?.get("callbackUrl") || "/dashboard";
 
+    const isRecovery = activeMethod === "recovery";
+
     // Completes the NextAuth sign-in. `authorize()` re-validates everything
     // server-side (the code), so this is the real gate — not the UI.
     const completeSignIn = async (verifyCode?: string, method?: Method) => {
         const result = await signIn("credentials", {
             email,
             password,
-            // OTP travels as `totp`; email codes as `emailCode`. The unused one
-            // is sent empty and ignored by authorize().
-            totp: method === "email" ? "" : (verifyCode ?? ""),
+            // OTP travels as `totp`, email codes as `emailCode`, backup codes as
+            // `recoveryCode`. The unused ones are sent empty and ignored by authorize().
+            totp: method === "otp" ? (verifyCode ?? "") : "",
             emailCode: method === "email" ? (verifyCode ?? "") : "",
+            recoveryCode: method === "recovery" ? (verifyCode ?? "") : "",
             redirect: false,
         });
 
         if (result?.error) {
             setError(
                 verifyCode !== undefined
-                    ? "Invalid code. Please try again."
+                    ? (method === "recovery"
+                        ? "Invalid or already-used backup code."
+                        : "Invalid code. Please try again.")
                     : "Invalid email or password.",
             );
             return;
@@ -83,6 +100,29 @@ export default function LoginPage() {
         setError("");
         setShowPicker(false);
         if (m === "email") { setEmailSent(false); sendEmailCode(); }
+    };
+
+    // Logged-out recovery: re-verify password server-side, file a support ticket.
+    const sendRecoveryTicket = async () => {
+        setHelpBusy(true);
+        setError("");
+        try {
+            const res = await fetch("/api/auth/recovery-ticket", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, password, message: helpNote }),
+            });
+            if (res.status === 401) {
+                setError("We couldn't verify your email and password.");
+                return;
+            }
+            // Generic success regardless (no account enumeration).
+            setHelpSent(true);
+        } catch {
+            setError("An unexpected error occurred.");
+        } finally {
+            setHelpBusy(false);
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -116,6 +156,7 @@ export default function LoginPage() {
                         : ["otp"];
                     setMethods(ms);
                     setActiveMethod(ms[0]);
+                    setRecoveryLocked(!!data.recoveryLocked);
                     setStep("challenge");
                     // If email is the primary method, dispatch a code immediately.
                     if (ms[0] === "email") { setEmailSent(false); sendEmailCode(); }
@@ -125,7 +166,12 @@ export default function LoginPage() {
                 await completeSignIn();
             } else {
                 // Step 2 — submit the 2FA code for the active method.
-                if (!/^\d{6}$/.test(code.trim())) {
+                if (isRecovery) {
+                    if (code.replace(/[^a-zA-Z0-9]/g, "").length < 8) {
+                        setError("Enter a full backup code.");
+                        return;
+                    }
+                } else if (!/^\d{6}$/.test(code.trim())) {
                     setError("Enter the 6-digit code.");
                     return;
                 }
@@ -143,6 +189,9 @@ export default function LoginPage() {
         setCode("");
         setError("");
         setShowPicker(false);
+        setShowHelp(false);
+        setHelpSent(false);
+        setRecoveryLocked(false);
     };
 
     return (
@@ -235,20 +284,34 @@ export default function LoginPage() {
                             <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "6px" }}>
                                 {METHOD_META[activeMethod].label}
                             </label>
-                            <input
-                                type="text"
-                                inputMode="numeric"
-                                pattern="\d{6}"
-                                maxLength={6}
-                                className="input-field"
-                                placeholder="123456"
-                                value={code}
-                                onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                                required
-                                autoFocus
-                                autoComplete="one-time-code"
-                                style={{ letterSpacing: "0.4em", textAlign: "center", fontFamily: "'JetBrains Mono', monospace" }}
-                            />
+                            {isRecovery ? (
+                                <input
+                                    type="text"
+                                    className="input-field"
+                                    placeholder="XXXXX-XXXXX"
+                                    value={code}
+                                    onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, "").slice(0, 11))}
+                                    required
+                                    autoFocus
+                                    autoComplete="one-time-code"
+                                    style={{ letterSpacing: "0.2em", textAlign: "center", fontFamily: "'JetBrains Mono', monospace", textTransform: "uppercase" }}
+                                />
+                            ) : (
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    pattern="\d{6}"
+                                    maxLength={6}
+                                    className="input-field"
+                                    placeholder="123456"
+                                    value={code}
+                                    onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                                    required
+                                    autoFocus
+                                    autoComplete="one-time-code"
+                                    style={{ letterSpacing: "0.4em", textAlign: "center", fontFamily: "'JetBrains Mono', monospace" }}
+                                />
+                            )}
 
                             {activeMethod === "email" && (
                                 <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "8px" }}>
@@ -260,6 +323,12 @@ export default function LoginPage() {
                                     >
                                         Resend
                                     </button>
+                                </p>
+                            )}
+
+                            {isRecovery && (
+                                <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "8px" }}>
+                                    Each backup code works once. You have a limited number of total backup-code attempts.
                                 </p>
                             )}
 
@@ -310,17 +379,78 @@ export default function LoginPage() {
                     </button>
 
                     {step === "challenge" && (
-                        <button
-                            type="button"
-                            onClick={resetToCredentials}
-                            disabled={loading}
-                            style={{
-                                background: "transparent", border: "none", cursor: "pointer",
-                                color: "var(--text-muted)", fontSize: "0.82rem", marginTop: "4px",
-                            }}
-                        >
-                            ← Back to login
-                        </button>
+                        <>
+                            {/* Lost-access escape hatch → files a support ticket */}
+                            <div style={{ marginTop: "4px", textAlign: "center" }}>
+                                {recoveryLocked && (
+                                    <p style={{ fontSize: "0.78rem", color: "var(--accent-magenta)", marginBottom: "6px" }}>
+                                        Backup codes are locked on this account. Use another method, or contact support.
+                                    </p>
+                                )}
+                                {!showHelp && !helpSent && (
+                                    <button
+                                        type="button"
+                                        onClick={() => { setShowHelp(true); setError(""); }}
+                                        style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--text-muted)", fontSize: "0.8rem", textDecoration: "underline" }}
+                                    >
+                                        Can&apos;t access any of your methods?
+                                    </button>
+                                )}
+                            </div>
+
+                            {showHelp && !helpSent && (
+                                <div style={{ padding: "14px 16px", borderRadius: "8px", border: "1px solid var(--glass-border)", background: "var(--glass-bg)", display: "flex", flexDirection: "column", gap: "10px" }}>
+                                    <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                                        We&apos;ll open a support ticket on your account so our team can verify your identity and restore access. Add anything that helps us reach you (optional).
+                                    </p>
+                                    <textarea
+                                        value={helpNote}
+                                        onChange={(e) => setHelpNote(e.target.value.slice(0, 2000))}
+                                        placeholder="Optional: details or an alternate contact"
+                                        rows={3}
+                                        className="input-field"
+                                        style={{ resize: "vertical", fontFamily: "inherit" }}
+                                    />
+                                    <div style={{ display: "flex", gap: "8px" }}>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowHelp(false)}
+                                            disabled={helpBusy}
+                                            style={{ flex: "0 0 auto", padding: "9px 16px", borderRadius: "8px", border: "1px solid var(--glass-border)", background: "transparent", color: "var(--text-secondary)", fontWeight: 600, fontSize: "0.82rem", cursor: "pointer" }}
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={sendRecoveryTicket}
+                                            disabled={helpBusy}
+                                            className="btn btn-primary"
+                                            style={{ flex: 1, opacity: helpBusy ? 0.7 : 1 }}
+                                        >
+                                            {helpBusy ? "Sending…" : "Send recovery request"}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {helpSent && (
+                                <div style={{ padding: "12px 16px", borderRadius: "8px", background: "rgba(0,200,120,0.1)", border: "1px solid rgba(0,200,120,0.25)", color: "var(--accent-cyan)", fontSize: "0.82rem", lineHeight: 1.5 }}>
+                                    If your email and password were correct, we&apos;ve filed a recovery ticket. Our team will reach out to verify your identity.
+                                </div>
+                            )}
+
+                            <button
+                                type="button"
+                                onClick={resetToCredentials}
+                                disabled={loading}
+                                style={{
+                                    background: "transparent", border: "none", cursor: "pointer",
+                                    color: "var(--text-muted)", fontSize: "0.82rem", marginTop: "4px",
+                                }}
+                            >
+                                ← Back to login
+                            </button>
+                        </>
                     )}
                 </form>
 
