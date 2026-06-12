@@ -47,8 +47,8 @@ export async function POST(req: Request) {
             select: {
                 passwordHash: true,
                 twoFactorEnabled: true,
-                loginWith2FA: true,
                 twoFactorSecret: true,
+                emailTwoFactorEnabled: true,
             },
         });
 
@@ -56,9 +56,13 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
         }
 
-        const requires2fa = !!(user.twoFactorEnabled && user.loginWith2FA && user.twoFactorSecret);
+        // Build the list of 2FA methods this account actually has. The UI shows
+        // these in the "use another method" switcher; the gate is in authorize().
+        const methods: ("otp" | "email")[] = [];
+        if (user.twoFactorEnabled && user.twoFactorSecret) methods.push("otp");
+        if (user.emailTwoFactorEnabled) methods.push("email");
 
-        return NextResponse.json({ ok: true, requires2fa });
+        return NextResponse.json({ ok: true, requires2fa: methods.length > 0, methods });
     } catch (error) {
         console.error("[precheck] error:", error);
         return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });

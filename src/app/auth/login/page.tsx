@@ -5,12 +5,31 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 
+type Method = "otp" | "email";
+
+const METHOD_META: Record<Method, { label: string; subtitle: string; pick: string }> = {
+    otp: {
+        label: "Authenticator code",
+        subtitle: "Enter the 6-digit code from your authenticator app",
+        pick: "Use my authenticator app",
+    },
+    email: {
+        label: "Email code",
+        subtitle: "Enter the 6-digit code we emailed you",
+        pick: "Email me a code",
+    },
+};
+
 export default function LoginPage() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
-    const [totp, setTotp] = useState("");
-    // "credentials" → email+password step. "totp" → authenticator-code step.
-    const [step, setStep] = useState<"credentials" | "totp">("credentials");
+    const [code, setCode] = useState("");
+    // "credentials" → email+password. "challenge" → 2FA code step.
+    const [step, setStep] = useState<"credentials" | "challenge">("credentials");
+    const [methods, setMethods] = useState<Method[]>([]);
+    const [activeMethod, setActiveMethod] = useState<Method>("otp");
+    const [showPicker, setShowPicker] = useState(false);
+    const [emailSent, setEmailSent] = useState(false);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const router = useRouter();
@@ -19,27 +38,51 @@ export default function LoginPage() {
     const callbackUrl = searchParams?.get("callbackUrl") || "/dashboard";
 
     // Completes the NextAuth sign-in. `authorize()` re-validates everything
-    // server-side (including the TOTP code), so this is the real gate.
-    const completeSignIn = async (code?: string) => {
+    // server-side (the code), so this is the real gate — not the UI.
+    const completeSignIn = async (verifyCode?: string, method?: Method) => {
         const result = await signIn("credentials", {
             email,
             password,
-            totp: code ?? "",
+            // OTP travels as `totp`; email codes as `emailCode`. The unused one
+            // is sent empty and ignored by authorize().
+            totp: method === "email" ? "" : (verifyCode ?? ""),
+            emailCode: method === "email" ? (verifyCode ?? "") : "",
             redirect: false,
         });
 
         if (result?.error) {
             setError(
-                code !== undefined
-                    ? "Invalid authenticator code. Please try again."
+                verifyCode !== undefined
+                    ? "Invalid code. Please try again."
                     : "Invalid email or password.",
             );
             return;
         }
 
-        // Fire-and-forget: log the login event
         fetch("/api/auth/log-login", { method: "POST" }).catch(() => {});
         router.push(callbackUrl);
+    };
+
+    // Request an email code for the login challenge (no session yet — the
+    // endpoint re-verifies the password before sending).
+    const sendEmailCode = async () => {
+        try {
+            await fetch("/api/auth/2fa/email/send", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email, password }),
+            });
+            setEmailSent(true);
+        } catch { /* non-fatal — user can resend */ }
+    };
+
+    // Switch to another enabled method; sending a fresh email code if needed.
+    const selectMethod = (m: Method) => {
+        setActiveMethod(m);
+        setCode("");
+        setError("");
+        setShowPicker(false);
+        if (m === "email") { setEmailSent(false); sendEmailCode(); }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -49,7 +92,7 @@ export default function LoginPage() {
 
         try {
             if (step === "credentials") {
-                // Step 1 — verify password and learn whether 2FA is required,
+                // Step 1 — verify password + learn the available 2FA methods,
                 // without creating a session yet.
                 const res = await fetch("/api/auth/precheck", {
                     method: "POST",
@@ -68,18 +111,25 @@ export default function LoginPage() {
 
                 const data = await res.json();
                 if (data.requires2fa) {
-                    setStep("totp");
+                    const ms: Method[] = Array.isArray(data.methods) && data.methods.length
+                        ? data.methods
+                        : ["otp"];
+                    setMethods(ms);
+                    setActiveMethod(ms[0]);
+                    setStep("challenge");
+                    // If email is the primary method, dispatch a code immediately.
+                    if (ms[0] === "email") { setEmailSent(false); sendEmailCode(); }
                     return;
                 }
 
                 await completeSignIn();
             } else {
-                // Step 2 — submit the authenticator code.
-                if (!/^\d{6}$/.test(totp.trim())) {
-                    setError("Enter the 6-digit code from your authenticator app.");
+                // Step 2 — submit the 2FA code for the active method.
+                if (!/^\d{6}$/.test(code.trim())) {
+                    setError("Enter the 6-digit code.");
                     return;
                 }
-                await completeSignIn(totp.trim());
+                await completeSignIn(code.trim(), activeMethod);
             }
         } catch {
             setError("An unexpected error occurred.");
@@ -90,8 +140,9 @@ export default function LoginPage() {
 
     const resetToCredentials = () => {
         setStep("credentials");
-        setTotp("");
+        setCode("");
         setError("");
+        setShowPicker(false);
     };
 
     return (
@@ -118,11 +169,11 @@ export default function LoginPage() {
                         NR
                     </div>
                     <h1 style={{ fontSize: "1.6rem", fontWeight: 800, marginBottom: "8px" }}>
-                        {step === "totp" ? "Two-Factor Verification" : "Welcome Back"}
+                        {step === "challenge" ? "Two-factor verification" : "Welcome Back"}
                     </h1>
                     <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
-                        {step === "totp"
-                            ? "Enter the 6-digit code from your authenticator app"
+                        {step === "challenge"
+                            ? METHOD_META[activeMethod].subtitle
                             : "Sign in to your account"}
                     </p>
                 </div>
@@ -182,7 +233,7 @@ export default function LoginPage() {
                     ) : (
                         <div>
                             <label style={{ display: "block", fontSize: "0.82rem", fontWeight: 600, color: "var(--text-secondary)", marginBottom: "6px" }}>
-                                Authenticator Code
+                                {METHOD_META[activeMethod].label}
                             </label>
                             <input
                                 type="text"
@@ -191,13 +242,59 @@ export default function LoginPage() {
                                 maxLength={6}
                                 className="input-field"
                                 placeholder="123456"
-                                value={totp}
-                                onChange={(e) => setTotp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                                value={code}
+                                onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
                                 required
                                 autoFocus
                                 autoComplete="one-time-code"
                                 style={{ letterSpacing: "0.4em", textAlign: "center", fontFamily: "'JetBrains Mono', monospace" }}
                             />
+
+                            {activeMethod === "email" && (
+                                <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "8px" }}>
+                                    {emailSent ? "We emailed a code to your address. " : "Sending a code to your email… "}
+                                    <button
+                                        type="button"
+                                        onClick={() => { setEmailSent(false); sendEmailCode(); }}
+                                        style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--accent-cyan)", fontSize: "0.78rem", fontWeight: 600, padding: 0 }}
+                                    >
+                                        Resend
+                                    </button>
+                                </p>
+                            )}
+
+                            {/* Choose another method — only the ones this account has */}
+                            {methods.length > 1 && (
+                                <div style={{ marginTop: "12px" }}>
+                                    {!showPicker ? (
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPicker(true)}
+                                            style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--accent-cyan)", fontSize: "0.82rem", fontWeight: 600, padding: 0 }}
+                                        >
+                                            Use another verification method
+                                        </button>
+                                    ) : (
+                                        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                                            {methods.filter((m) => m !== activeMethod).map((m) => (
+                                                <button
+                                                    key={m}
+                                                    type="button"
+                                                    onClick={() => selectMethod(m)}
+                                                    style={{
+                                                        textAlign: "left", padding: "10px 14px", cursor: "pointer",
+                                                        borderRadius: "8px", border: "1px solid var(--glass-border)",
+                                                        background: "var(--glass-bg)", color: "var(--text-primary)",
+                                                        fontSize: "0.85rem", fontWeight: 600,
+                                                    }}
+                                                >
+                                                    {METHOD_META[m].pick}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -208,11 +305,11 @@ export default function LoginPage() {
                         style={{ width: "100%", marginTop: "8px", opacity: loading ? 0.7 : 1 }}
                     >
                         {loading
-                            ? (step === "totp" ? "Verifying..." : "Signing in...")
-                            : (step === "totp" ? "Verify & Sign In" : "Sign In")}
+                            ? (step === "challenge" ? "Verifying..." : "Signing in...")
+                            : (step === "challenge" ? "Verify & Sign In" : "Sign In")}
                     </button>
 
-                    {step === "totp" && (
+                    {step === "challenge" && (
                         <button
                             type="button"
                             onClick={resetToCredentials}

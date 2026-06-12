@@ -6,7 +6,7 @@ import { UAParser } from "ua-parser-js";
 import { useThemeTokens } from "@/lib/useThemeTokens";
 import {
     User, Settings, Lock, ShieldCheck, Camera, AlertTriangle,
-    XCircle, CheckCircle, RefreshCw
+    XCircle, CheckCircle, RefreshCw, Mail
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -38,11 +38,15 @@ export default function AccountSettingsView() {
     // Preferences state
     const [language, setLanguage] = useState("en");
     const [network, setNetwork] = useState("auto");
-    const [loginWith2FA, setLoginWith2FA] = useState(false);
-    const [login2FASaving, setLogin2FASaving] = useState(false);
 
     // Security state — 2FA
     const [is2FAEnabled, setIs2FAEnabled] = useState(false);
+    // Email-code 2FA
+    const [isEmail2FAEnabled, setIsEmail2FAEnabled] = useState(false);
+    const [emailSetupSent, setEmailSetupSent] = useState(false);
+    const [emailSetupCode, setEmailSetupCode] = useState("");
+    const [emailBusy, setEmailBusy] = useState(false);
+    const [emailMsg, setEmailMsg] = useState<{ ok: boolean; text: string } | null>(null);
     const [setupOpen, setSetupOpen] = useState(false);
     const [twoFALoading, setTwoFALoading] = useState(false);
     const [twoFAError, setTwoFAError] = useState("");
@@ -62,12 +66,12 @@ export default function AccountSettingsView() {
     useEffect(() => {
         fetch("/api/overview")
             .then(r => r.json())
-            .then((d: { user?: { twoFactorEnabled?: boolean; loginWith2FA?: boolean } }) => {
+            .then((d: { user?: { twoFactorEnabled?: boolean; emailTwoFactorEnabled?: boolean } }) => {
                 if (d?.user?.twoFactorEnabled) {
                     setIs2FAEnabled(true);
                 }
-                if (d?.user?.loginWith2FA) {
-                    setLoginWith2FA(true);
+                if (d?.user?.emailTwoFactorEnabled) {
+                    setIsEmail2FAEnabled(true);
                 }
             })
             .catch(() => { /* non-critical — toggle stays off */ });
@@ -469,58 +473,87 @@ export default function AccountSettingsView() {
                         </button>
                     </div>
 
-                    {/* Login Security Preference */}
+                    {/* Email verification codes (2FA method) */}
                     <div style={{ ...card, padding: "28px", marginTop: 24 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
                             <div>
                                 <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "4px", color: t.textPrimary, display: "flex", alignItems: "center", gap: 8 }}>
-                                    <ShieldCheck style={{ width: 18, height: 18, color: t.accentPrimary }} />
-                                    Require 2FA at Login
+                                    <Mail style={{ width: 18, height: 18, color: t.accentPrimary }} />
+                                    Email verification codes
+                                    {isEmail2FAEnabled && (
+                                        <span style={{ fontSize: "0.62rem", fontWeight: 800, padding: "2px 8px", borderRadius: t.buttonRadius, background: t.statusSuccessBg, color: t.statusSuccess }}>ENABLED</span>
+                                    )}
                                 </h3>
-                                <p style={{ fontSize: "0.82rem", color: t.textMuted, maxWidth: 420 }}>
-                                    {is2FAEnabled
-                                        ? "When enabled, you must enter a 6-digit authenticator code every time you sign in."
-                                        : "You need to enable Two-Factor Authentication in the Security tab first."}
+                                <p style={{ fontSize: "0.82rem", color: t.textMuted, maxWidth: 460 }}>
+                                    Receive a 6-digit code by email at sign-in. Works on its own or alongside your authenticator app — at login you can pick whichever method you prefer.
                                 </p>
                             </div>
-                            <button
-                                id="login-2fa-toggle"
-                                onClick={async () => {
-                                    if (!is2FAEnabled) return;
-                                    setLogin2FASaving(true);
-                                    try {
-                                        const res = await fetch("/api/user/profile", {
-                                            method: "PATCH",
-                                            headers: { "Content-Type": "application/json" },
-                                            body: JSON.stringify({ loginWith2FA: !loginWith2FA }),
-                                        });
-                                        if (res.ok) setLoginWith2FA(!loginWith2FA);
-                                    } catch { /* silent */ } finally {
-                                        setLogin2FASaving(false);
-                                    }
-                                }}
-                                disabled={!is2FAEnabled || login2FASaving}
-                                aria-label={loginWith2FA ? "Disable login 2FA" : "Enable login 2FA"}
-                                style={{
-                                    width: 52, height: 28, borderRadius: 14, border: "none",
-                                    cursor: !is2FAEnabled || login2FASaving ? "not-allowed" : "pointer",
-                                    background: loginWith2FA ? t.accentPrimary : `${t.textMuted}33`,
-                                    position: "relative", transition: "background 0.25s", flexShrink: 0,
-                                    opacity: !is2FAEnabled ? 0.35 : login2FASaving ? 0.6 : 1,
-                                }}
-                            >
-                                <span style={{
-                                    position: "absolute", top: 4,
-                                    left: loginWith2FA ? 26 : 4,
-                                    width: 20, height: 20, borderRadius: "50%",
-                                    background: "#fff", transition: "left 0.25s",
-                                }} />
-                            </button>
+                            {isEmail2FAEnabled && (
+                                <button
+                                    onClick={async () => {
+                                        setEmailBusy(true); setEmailMsg(null);
+                                        try {
+                                            const res = await fetch("/api/auth/2fa/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "disable" }) });
+                                            if (res.ok) { setIsEmail2FAEnabled(false); setEmailSetupSent(false); setEmailSetupCode(""); }
+                                            else { const d = await res.json(); setEmailMsg({ ok: false, text: d.error || "Failed" }); }
+                                        } catch { setEmailMsg({ ok: false, text: "Network error" }); } finally { setEmailBusy(false); }
+                                    }}
+                                    disabled={emailBusy}
+                                    style={{ padding: "8px 16px", borderRadius: t.buttonRadius, border: `1px solid ${t.statusError}`, background: "transparent", color: t.statusError, fontSize: "0.8rem", fontWeight: 700, cursor: "pointer", flexShrink: 0 }}
+                                >
+                                    Disable
+                                </button>
+                            )}
                         </div>
-                        {loginWith2FA && is2FAEnabled && (
-                            <div style={{ marginTop: 14, padding: "12px 16px", borderRadius: t.cardRadius, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}33`, display: "flex", alignItems: "center", gap: 8 }}>
-                                <ShieldCheck style={{ width: 16, height: 16, color: t.statusSuccess, flexShrink: 0 }} />
-                                <p style={{ fontSize: "0.82rem", fontWeight: 600, color: t.statusSuccess }}>Login 2FA is active. A code will be required at every sign-in.</p>
+
+                        {!isEmail2FAEnabled && (
+                            <div style={{ marginTop: 16 }}>
+                                {!emailSetupSent ? (
+                                    <button
+                                        onClick={async () => {
+                                            setEmailBusy(true); setEmailMsg(null);
+                                            try {
+                                                const res = await fetch("/api/auth/2fa/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "setup" }) });
+                                                const d = await res.json();
+                                                if (res.ok) { setEmailSetupSent(true); setEmailMsg({ ok: true, text: "Code sent — check your email." }); }
+                                                else setEmailMsg({ ok: false, text: d.error || "Failed to send code" });
+                                            } catch { setEmailMsg({ ok: false, text: "Network error" }); } finally { setEmailBusy(false); }
+                                        }}
+                                        disabled={emailBusy}
+                                        style={{ padding: "10px 22px", borderRadius: t.buttonRadius, border: "none", background: t.accentPrimary, color: t.textInverse, fontWeight: 700, fontSize: "0.85rem", cursor: "pointer", opacity: emailBusy ? 0.6 : 1 }}
+                                    >
+                                        {emailBusy ? "Sending…" : "Send setup code"}
+                                    </button>
+                                ) : (
+                                    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                                        <input
+                                            value={emailSetupCode}
+                                            onChange={(e) => setEmailSetupCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                                            placeholder="123456"
+                                            inputMode="numeric"
+                                            style={{ ...inputStyle, width: 140, letterSpacing: "0.3em", textAlign: "center", fontFamily: t.fontMono }}
+                                        />
+                                        <button
+                                            onClick={async () => {
+                                                if (!/^\d{6}$/.test(emailSetupCode)) { setEmailMsg({ ok: false, text: "Enter the 6-digit code." }); return; }
+                                                setEmailBusy(true); setEmailMsg(null);
+                                                try {
+                                                    const res = await fetch("/api/auth/2fa/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "verify", code: emailSetupCode }) });
+                                                    const d = await res.json();
+                                                    if (res.ok) { setIsEmail2FAEnabled(true); setEmailSetupSent(false); setEmailSetupCode(""); setEmailMsg({ ok: true, text: "Email codes enabled." }); }
+                                                    else setEmailMsg({ ok: false, text: d.error || "Invalid code" });
+                                                } catch { setEmailMsg({ ok: false, text: "Network error" }); } finally { setEmailBusy(false); }
+                                            }}
+                                            disabled={emailBusy}
+                                            style={{ padding: "10px 20px", borderRadius: t.buttonRadius, border: "none", background: t.accentPrimary, color: t.textInverse, fontWeight: 700, fontSize: "0.85rem", cursor: "pointer", opacity: emailBusy ? 0.6 : 1 }}
+                                        >
+                                            {emailBusy ? "Verifying…" : "Verify & enable"}
+                                        </button>
+                                    </div>
+                                )}
+                                {emailMsg && (
+                                    <p style={{ fontSize: "0.8rem", marginTop: 10, fontWeight: 600, color: emailMsg.ok ? t.statusSuccess : t.statusError }}>{emailMsg.text}</p>
+                                )}
                             </div>
                         )}
                     </div>

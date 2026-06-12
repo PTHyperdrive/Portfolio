@@ -21,7 +21,7 @@ model User {
   hasUsedTrial  Boolean   @default(false)
   twoFactorEnabled Boolean @default(false)
   twoFactorSecret  String?
-  loginWith2FA     Boolean @default(false)
+  emailTwoFactorEnabled Boolean @default(false) // email-code 2FA at login
   canInvite     Boolean   @default(false) // Admin toggle: allows user to generate invite codes
   maxVpcs       Int       @default(3)    // Max VPCs per user (3 default, up to 5 via admin)
   trialExpiresAt DateTime?
@@ -44,6 +44,7 @@ model User {
   appliedPromos     AppliedPromoCode[]
   deploymentTickets DeploymentTicket[]
   deviceSessions    DeviceSession[]
+  emailOtpCodes     EmailOtpCode[]
   sshKeys              SshKey[]
   nextcloudStorage     UserNextcloudStorage?
   supportChats         SupportChat[]
@@ -100,6 +101,24 @@ model DeviceSession {
   createdAt  DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// Short-lived email 2FA codes. The 6-digit code is stored bcrypt-hashed and
+/// is single-use (consumedAt) with an attempt cap and a 10-minute expiry.
+model EmailOtpCode {
+  id         String    @id @default(cuid())
+  userId     String
+  codeHash   String                     // bcrypt hash of the 6-digit code
+  purpose    String                     // "login" | "setup"
+  attempts   Int       @default(0)      // wrong-guess counter (cap then invalidate)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
+  @@index([expiresAt])
 }
 
 // ─── SSH Key Management ──────────────────────────────────────────
