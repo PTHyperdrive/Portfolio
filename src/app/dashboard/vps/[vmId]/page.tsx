@@ -66,8 +66,8 @@ interface VpcAssignmentInfo {
 export default function VmDetailPage({ params }: { params: Promise<{ vmId: string }> }) {
     const { vmId } = use(params);
     const searchParams = useSearchParams();
-    const node = searchParams.get("node") || "";
-    const initialTab = searchParams.get("tab") || "overview";
+    const node = searchParams?.get("node") || "";
+    const initialTab = searchParams?.get("tab") || "overview";
     const t = useThemeTokens();
 
     const [vm, setVm] = useState<VmDetail | null>(null);

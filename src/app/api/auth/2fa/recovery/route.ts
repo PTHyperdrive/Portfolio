@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { audit } from "@/lib/audit";
 import { checkRateLimit } from "@/lib/security";
 import { generateRecoveryCodes, getRecoveryStatus } from "@/lib/recovery-codes";
+import { require2fa, twoFactorErrorResponse } from "@/lib/require2fa";
 
 /**
  * Manage backup recovery codes for the signed-in user.
@@ -51,6 +52,13 @@ export async function POST(req: Request) {
         if (body?.action !== "generate") {
             return NextResponse.json({ error: "Invalid action" }, { status: 400 });
         }
+
+        // Step-up: revealing a fresh set of backup codes is a critical action.
+        // Require a TOTP token if the user has an authenticator enabled (no-op
+        // for users without TOTP).
+        const totpToken = typeof body?.totpToken === "string" ? body.totpToken : undefined;
+        const stepUp = await require2fa(userId, totpToken);
+        if (!stepUp.ok) return twoFactorErrorResponse(stepUp.error!);
 
         const user = await prisma.user.findUnique({
             where: { id: userId },

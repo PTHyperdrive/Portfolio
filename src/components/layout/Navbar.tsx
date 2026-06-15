@@ -57,7 +57,7 @@ function MobileLink({ href, label, pathname, t }: {
 export default function Navbar() {
     const [scrolled, setScrolled] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
-    const pathname = usePathname();
+    const pathname = usePathname() ?? "";
     const { data: session, status } = useSession();
     const t = useThemeTokens();
     const { credits, loading: creditsLoading } = useCredits();

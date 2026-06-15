@@ -34,7 +34,7 @@ export const useDocs = () => useContext(DocsContext);
 
 export default function DocsLayout({ children }: { children: React.ReactNode }) {
     const t = useThemeTokens();
-    const pathname = usePathname();
+    const pathname = usePathname() ?? "";
     const [chapters, setChapters] = useState<Chapter[]>([]);
     const [loading, setLoading] = useState(true);
     const [expandedChapters, setExpandedChapters] = useState<Set<string>>(new Set());

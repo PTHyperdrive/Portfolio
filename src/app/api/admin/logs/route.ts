@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/admin-guard";
-import { Prisma } from "@prisma/client";
+import { Prisma, AuditAction } from "@/generated/prisma";
 
 /**
  * GET /api/admin/logs
@@ -46,15 +46,25 @@ export async function GET(req: Request) {
             where.outcome = outcome;
         }
 
-        // Free-text search — uses OR across multiple fields
+        // Free-text search — uses OR across multiple fields. `action` is an enum
+        // column (no substring match in Prisma), so we resolve the search term to
+        // matching enum values and filter with `in`; use the exact ?action= param
+        // for a precise single-action filter.
         if (search) {
+            const term = search.toLowerCase();
+            const matchingActions = (Object.values(AuditAction) as string[])
+                .filter((a) => a.toLowerCase().includes(term)) as AuditAction[];
+
+            // MySQL `contains` is already case-insensitive via the column
+            // collation — `mode: "insensitive"` is Postgres/Mongo-only and not
+            // part of the MySQL StringFilter type.
             where.OR = [
-                { action:       { contains: search, mode: "insensitive" } },
-                { resourceType: { contains: search, mode: "insensitive" } },
-                { outcome:      { contains: search, mode: "insensitive" } },
-                { ipAddress:    { contains: search, mode: "insensitive" } },
-                { user:         { email: { contains: search, mode: "insensitive" } } },
-                { user:         { name:  { contains: search, mode: "insensitive" } } },
+                ...(matchingActions.length ? [{ action: { in: matchingActions } }] : []),
+                { resourceType: { contains: search } },
+                { outcome:      { contains: search } },
+                { ipAddress:    { contains: search } },
+                { user:         { email: { contains: search } } },
+                { user:         { name:  { contains: search } } },
             ];
         }
 

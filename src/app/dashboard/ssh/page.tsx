@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useThemeTokens } from "@/lib/useThemeTokens";
+import TwoFactorModal from "@/components/TwoFactorModal";
 import {
     KeyRound, Plus, X, CheckCircle, AlertCircle,
     Trash2, Loader2, Star
@@ -68,6 +69,12 @@ export default function SshKeysPage() {
     const [deleteTarget, setDeleteTarget] = useState<SshKey | null>(null);
     const [deleting, setDeleting] = useState(false);
 
+    // TOTP step-up (only prompted when the account has an authenticator)
+    const [show2fa, setShow2fa] = useState(false);
+    const [twoFaError, setTwoFaError] = useState("");
+    const [twoFaLoading, setTwoFaLoading] = useState(false);
+    const [pending2fa, setPending2fa] = useState<"add" | "delete" | null>(null);
+
     const loadKeys = useCallback(async () => {
         try {
             const res = await fetch("/api/ssh-keys");
@@ -83,11 +90,9 @@ export default function SshKeysPage() {
 
     useEffect(() => { loadKeys(); }, [loadKeys]);
 
-    const handleAdd = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const submitAdd = async (token?: string) => {
         setFormError("");
         setSubmitting(true);
-
         try {
             const res = await fetch("/api/ssh-keys", {
                 method: "POST",
@@ -96,10 +101,16 @@ export default function SshKeysPage() {
                     name:       formName.trim(),
                     publicKey:  formKey.trim(),
                     setDefault: formDefault,
+                    totpToken:  token,
                 }),
             });
             const data = await res.json();
-            if (!res.ok) { setFormError(data.error || "Failed to add key."); return; }
+            if (!res.ok) {
+                if (data.error === "2FA_REQUIRED") { setPending2fa("add"); setShow2fa(true); return; }
+                if (data.error === "INVALID_2FA" || data.error === "2FA_RATE_LIMITED") { setTwoFaError(data.message || "Verification failed."); return; }
+                setFormError(data.error || "Failed to add key."); return;
+            }
+            setShow2fa(false); setPending2fa(null);
             setSuccess(`SSH key "${formName}" added.`);
             setFormName(""); setFormKey(""); setFormDefault(false); setShowForm(false);
             loadKeys();
@@ -107,8 +118,11 @@ export default function SshKeysPage() {
             setFormError("Network error. Please try again.");
         } finally {
             setSubmitting(false);
+            setTwoFaLoading(false);
         }
     };
+
+    const handleAdd = (e: React.FormEvent) => { e.preventDefault(); submitAdd(); };
 
     const handleSetDefault = async (key: SshKey) => {
         const res = await fetch(`/api/ssh-keys/${key.id}`, {
@@ -119,16 +133,29 @@ export default function SshKeysPage() {
         if (res.ok) { setSuccess(`"${key.name}" set as default.`); loadKeys(); }
     };
 
-    const handleDelete = async () => {
+    const handleDelete = async (token?: string) => {
         if (!deleteTarget) return;
         setDeleting(true);
-        const res = await fetch(`/api/ssh-keys/${deleteTarget.id}`, { method: "DELETE" });
-        if (res.ok) {
+        try {
+            const res = await fetch(`/api/ssh-keys/${deleteTarget.id}`, {
+                method: "DELETE",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ totpToken: token }),
+            });
+            const data = await res.json().catch(() => ({} as { error?: string; message?: string }));
+            if (!res.ok) {
+                if (data.error === "2FA_REQUIRED") { setPending2fa("delete"); setShow2fa(true); return; }
+                if (data.error === "INVALID_2FA" || data.error === "2FA_RATE_LIMITED") { setTwoFaError(data.message || "Verification failed."); return; }
+                setError(data.error || "Failed to remove key."); return;
+            }
+            setShow2fa(false); setPending2fa(null);
             setSuccess(`"${deleteTarget.name}" removed.`);
             setDeleteTarget(null);
             loadKeys();
+        } finally {
+            setDeleting(false);
+            setTwoFaLoading(false);
         }
-        setDeleting(false);
     };
 
     // ── Styles ─────────────────────────────────────────────────────
@@ -409,7 +436,7 @@ export default function SshKeysPage() {
                                 style={{ padding: "9px 20px", borderRadius: t.buttonRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.875rem", cursor: "pointer" }}>
                                 Cancel
                             </button>
-                            <button id="btn-confirm-delete-ssh" onClick={handleDelete} disabled={deleting}
+                            <button id="btn-confirm-delete-ssh" onClick={() => handleDelete()} disabled={deleting}
                                 style={{ padding: "9px 20px", borderRadius: t.buttonRadius, border: "none", background: t.statusError, color: "#fff", fontWeight: 700, fontSize: "0.875rem", cursor: deleting ? "not-allowed" : "pointer" }}>
                                 {deleting ? "Removing…" : "Remove Key"}
                             </button>
@@ -417,6 +444,15 @@ export default function SshKeysPage() {
                     </div>
                 </div>
             )}
+
+            {/* TOTP step-up for add/remove */}
+            <TwoFactorModal
+                open={show2fa}
+                onClose={() => { setShow2fa(false); setTwoFaError(""); setTwoFaLoading(false); setPending2fa(null); }}
+                onSubmit={(token) => { setTwoFaLoading(true); if (pending2fa === "add") submitAdd(token); else if (pending2fa === "delete") handleDelete(token); }}
+                loading={twoFaLoading}
+                error={twoFaError}
+            />
 
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>

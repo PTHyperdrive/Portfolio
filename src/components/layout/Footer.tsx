@@ -29,7 +29,7 @@ const FOOTER_LINKS = {
 };
 
 export default function Footer() {
-    const pathname = usePathname();
+    const pathname = usePathname() ?? "";
     const t = useThemeTokens();
     if (pathname.startsWith("/dashboard") || pathname.startsWith("/mmo") || pathname.startsWith("/adminsystemnrsp")) return null;
 

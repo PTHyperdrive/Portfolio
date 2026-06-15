@@ -48,7 +48,7 @@ export default function PaymentPage() {
     const { data: session } = useSession();
     const t = useThemeTokens();
 
-    const plan = params.get("plan") || "Cloud Starter";
+    const plan = params?.get("plan") || "Cloud Starter";
 
     const userMeta = session?.user as Record<string, unknown> | undefined;
     const hasUsedTrial = userMeta?.hasUsedTrial === true;

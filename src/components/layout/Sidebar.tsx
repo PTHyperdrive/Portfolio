@@ -77,7 +77,7 @@ const SIDEBAR_STRUCTURE: NavGroup[] = [
 ];
 
 export default function Sidebar() {
-    const pathname = usePathname();
+    const pathname = usePathname() ?? "";
     const router = useRouter();
     const { data: session } = useSession();
     const { realAdmin, viewAsUser, effectiveAdmin, setViewAsUser } = useViewMode();
