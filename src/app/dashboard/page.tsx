@@ -12,7 +12,7 @@ import {
     Server, HardDrive, Globe, Wallet, ShoppingBag,
     KeyRound, Users, MessageSquare, Plus, CreditCard,
     Ticket, CloudUpload, LayoutGrid,
-    AlertTriangle, ArrowRight, Shield
+    AlertTriangle, ArrowRight, Shield, Smartphone
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -404,6 +404,44 @@ export default function ConsoleHubPage() {
                         </p>
                         <p style={{ fontSize: "0.78rem", color: t.textMuted, marginTop: 2 }}>
                             Game accounts & digital assets
+                        </p>
+                    </div>
+                </div>
+                <ArrowRight style={{ width: 16, height: 16, color: t.textMuted }} />
+            </Link>
+
+            {/* ─── TimoSMS Banner ─── */}
+            <Link
+                href="/sms"
+                id="timosms-banner"
+                style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    padding: "18px 24px", marginBottom: 32,
+                    borderRadius: t.cardRadius,
+                    background: t.bgCard,
+                    border: `1px solid ${t.accentPrimary}33`,
+                    borderLeft: `3px solid ${t.accentPrimary}`,
+                    boxShadow: t.shadow,
+                    textDecoration: "none",
+                    transition: "all 0.15s",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = t.bgCardHover; }}
+                onMouseLeave={e => { e.currentTarget.style.background = t.bgCard; }}
+            >
+                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                    <div style={{
+                        width: 40, height: 40, borderRadius: t.cardRadius,
+                        background: t.accentPrimaryMuted,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                        <Smartphone style={{ width: 20, height: 20, color: t.accentPrimary }} />
+                    </div>
+                    <div>
+                        <p style={{ fontSize: "0.95rem", fontWeight: 700, color: t.textPrimary }}>
+                            TimoSMS — Rent a Number
+                        </p>
+                        <p style={{ fontSize: "0.78rem", color: t.textMuted, marginTop: 2 }}>
+                            Temporary numbers for one-time SMS codes
                         </p>
                     </div>
                 </div>

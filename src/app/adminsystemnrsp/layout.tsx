@@ -12,7 +12,7 @@ import {
     LayoutGrid, Server, Users, Tag, Receipt,
     ScrollText, MessageSquare, MessagesSquare, SlidersHorizontal,
     LogOut, ArrowLeft, Wallet, Shield, Store, FileText,
-    Activity, Network,
+    Activity, Network, Smartphone,
 } from "lucide-react";
 
 type NavItem = { label: string; href: string; Icon: React.ElementType; badge?: number };
@@ -36,6 +36,7 @@ const ADMIN_ITEMS: NavItem[] = [
     { label: "Billing & Invoices",href: "/adminsystemnrsp/billing",     Icon: Receipt          },
     { label: "Audit Logs",       href: "/adminsystemnrsp/audit-logs",   Icon: ScrollText       },
     { label: "MMO Admin",        href: "/adminsystemnrsp/mmo",          Icon: Store            },
+    { label: "TimoSMS",          href: "/adminsystemnrsp/sms",          Icon: Smartphone       },
     { label: "CMS",              href: "/adminsystemnrsp/cms",          Icon: FileText         },
     { label: "System Settings",  href: "/adminsystemnrsp/settings",     Icon: SlidersHorizontal},
 ];

@@ -64,6 +64,7 @@ model User {
   uploads              FileUpload[]
   wgPeers              WgPeer[]
   vpcs                 Vpc[]
+  smsRentals           SmsRental[]
 }
 
 model Account {
@@ -650,6 +651,11 @@ enum AuditAction {
   // WireGuard
   WG_PEER_CREATE
   WG_PEER_REVOKE
+  // TimoSMS — temporary SMS rental
+  SMS_RENT
+  SMS_CANCEL
+  SMS_CODE_RECEIVED
+  SMS_SERVICE_MODIFY
   // Misc
   REDIRECT_TO_PLANS
   TRIGGER_UPSELL_FLOW
@@ -934,4 +940,79 @@ model InvitationRedemption {
 
   @@unique([invitationCodeId, userId])    // One redemption per user per code
   @@index([userId])
+}
+
+// ─── TimoSMS — Temporary SMS-Receive Rental ──────────────────────
+
+enum SmsRentalStatus {
+  WAITING    // number issued, awaiting an inbound SMS
+  RECEIVED   // a valid code was delivered AND charged
+  CANCELLED  // user cancelled before any code
+  EXPIRED    // TTL elapsed with no code (never charged)
+  ERROR      // provider/allocation failure
+}
+
+/// A rentable target service (e.g. Google, Telegram) for a given country.
+/// Price is in prepaid credits (1 Credit = 1 VND); USD shown via exchange rate.
+/// `providerServiceCode` maps to the Telecom API's own service identifier.
+model SmsService {
+  id                  String   @id @default(cuid())
+  code                String                    // slug, e.g. "google"
+  name                String                    // display, e.g. "Google / Gmail"
+  country             String   @default("VN")   // ISO country of the numbers
+  priceCredits        Int                       // charged once a code is received
+  providerServiceCode String?                   // Telecom API service id
+  iconUrl             String?
+  active              Boolean  @default(true)
+  sortOrder           Int      @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  rentals SmsRental[]
+
+  @@unique([code, country])
+  @@index([active, sortOrder])
+}
+
+/// One rent-a-number transaction. Billing is charge-on-receipt: credits are
+/// only deducted when a valid code is delivered (status RECEIVED). The code is
+/// withheld until the charge succeeds. No charge on CANCELLED/EXPIRED.
+model SmsRental {
+  id               String          @id @default(cuid())
+  userId           String
+  serviceId        String
+  providerRentalId String?                          // Telecom API rental/activation id
+  phoneNumber      String?
+  country          String
+  status           SmsRentalStatus @default(WAITING)
+  priceCredits     Int                              // snapshot of service price at rent time
+  code             String?                          // revealed only when charged
+  charged          Boolean         @default(false)
+  createdAt        DateTime        @default(now())
+  expiresAt        DateTime                         // TTL — auto-expires if no code
+  completedAt      DateTime?
+  cancelledAt      DateTime?
+
+  user     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  service  SmsService   @relation(fields: [serviceId], references: [id])
+  messages SmsMessage[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+/// Raw inbound SMS messages for a rental. A rental may receive several; the
+/// extracted OTP (if any) is stored on both the message and the rental.
+model SmsMessage {
+  id         String   @id @default(cuid())
+  rentalId   String
+  sender     String?
+  text       String   @db.Text
+  code       String?
+  receivedAt DateTime @default(now())
+
+  rental SmsRental @relation(fields: [rentalId], references: [id], onDelete: Cascade)
+
+  @@index([rentalId])
 }
