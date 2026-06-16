@@ -65,6 +65,8 @@ model User {
   wgPeers              WgPeer[]
   vpcs                 Vpc[]
   smsRentals           SmsRental[]
+  notifications        Notification[]
+  vmAlertRules         VmAlertRule[]
 }
 
 model Account {
@@ -657,6 +659,8 @@ enum AuditAction {
   SMS_CANCEL
   SMS_CODE_RECEIVED
   SMS_SERVICE_MODIFY
+  // Monitoring
+  ALERT_FIRED
   // Misc
   REDIRECT_TO_PLANS
   TRIGGER_UPSELL_FLOW
@@ -1016,4 +1020,48 @@ model SmsMessage {
   rental SmsRental @relation(fields: [rentalId], references: [id], onDelete: Cascade)
 
   @@index([rentalId])
+}
+
+// ─── Monitoring & Alerts ─────────────────────────────────────────
+
+/// In-app notification (system/alert). Separate from TicketNotification so the
+/// bell can surface monitoring alerts alongside ticket updates.
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   @default("system") // "alert" | "system"
+  title     String
+  body      String   @db.Text
+  link      String?                      // optional in-app deep link
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+}
+
+/// A user-defined threshold alert on one VM metric. The monitoring sweep
+/// evaluates enabled rules and fires a Notification (+ email) on breach,
+/// rate-limited by lastFiredAt. `lastValue`/`lastValueAt` hold the previous
+/// sample so bandwidth (a rate) can be derived between sweeps.
+model VmAlertRule {
+  id          String    @id @default(cuid())
+  userId      String
+  vmId        String                       // Proxmox VMID
+  node        String
+  metric      String                       // "cpu" | "mem" | "disk" | "bandwidth"
+  comparison  String    @default("gt")      // "gt" | "lt"
+  threshold   Float                         // percent (cpu/mem/disk) or Mbps (bandwidth)
+  enabled     Boolean   @default(true)
+  lastValue   Float?                        // prior sample (bandwidth: cumulative bytes)
+  lastValueAt DateTime?
+  lastFiredAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, vmId, metric])
+  @@index([enabled])
 }

@@ -9,6 +9,7 @@ import { useIsMobile } from "@/lib/useIsMobile";
 import { useCredits } from "@/components/CreditProvider";
 import { useViewMode } from "@/components/ViewModeProvider";
 import AccountDropdown from "@/components/layout/AccountDropdown";
+import NotificationBell from "@/components/layout/NotificationBell";
 import {
     Server, HardDrive, Globe, Wallet, ShoppingBag,
     KeyRound, Users, MessageSquare, Plus, CreditCard,
@@ -213,8 +214,11 @@ export default function ConsoleHubPage() {
                     ))}
                 </div>
 
-                {/* Right — Account */}
-                <AccountDropdown />
+                {/* Right — Notifications + Account */}
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <NotificationBell />
+                    <AccountDropdown />
+                </div>
             </nav>
 
             {/* ─── Admin Banner ─── */}

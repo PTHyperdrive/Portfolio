@@ -139,6 +139,46 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
         }
     };
 
+    // Alert rules
+    interface AlertRule { id: string; metric: string; comparison: string; threshold: number; enabled: boolean; }
+    const [alertRules, setAlertRules] = useState<AlertRule[]>([]);
+    const [alertMetric, setAlertMetric] = useState("cpu");
+    const [alertComparison, setAlertComparison] = useState("gt");
+    const [alertThreshold, setAlertThreshold] = useState("");
+    const [alertBusy, setAlertBusy] = useState(false);
+    const [alertMsg, setAlertMsg] = useState("");
+
+    const loadAlerts = useCallback(async () => {
+        try {
+            const r = await fetch(`/api/monitoring/rules?vmId=${vmId}`);
+            if (r.ok) { const d = await r.json(); setAlertRules(d.rules ?? []); }
+        } catch { /* silent */ }
+    }, [vmId]);
+    useEffect(() => { if (tab === "settings") loadAlerts(); }, [tab, loadAlerts]);
+
+    const saveAlert = async () => {
+        const thr = Number(alertThreshold);
+        if (!Number.isFinite(thr) || thr <= 0) { setAlertMsg("Enter a positive threshold."); return; }
+        setAlertBusy(true); setAlertMsg("");
+        try {
+            const r = await fetch("/api/monitoring/rules", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ vmId, metric: alertMetric, comparison: alertComparison, threshold: thr }),
+            });
+            if (!r.ok) { const d = await r.json(); setAlertMsg(d.error || "Failed to save rule"); return; }
+            setAlertThreshold(""); loadAlerts();
+        } catch { setAlertMsg("Network error"); }
+        finally { setAlertBusy(false); }
+    };
+    const deleteAlert = async (id: string) => {
+        try { await fetch(`/api/monitoring/rules?id=${id}`, { method: "DELETE" }); } catch { /* silent */ }
+        loadAlerts();
+    };
+    const toggleAlert = async (id: string, enabled: boolean) => {
+        try { await fetch("/api/monitoring/rules", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, enabled }) }); } catch { /* silent */ }
+        loadAlerts();
+    };
+
     const loadCreds = useCallback(async (totpToken?: string) => {
         setCredsLoading(true);
         setTwoFaError("");
@@ -589,6 +629,59 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
                             </div>
                         );
                     })()}
+
+                    {/* Monitoring Alerts */}
+                    <div style={{ ...card, marginBottom: 20 }}>
+                        <h3 style={{ fontSize: "1.05rem", fontWeight: 700, marginBottom: 4, color: t.textPrimary, display: "flex", alignItems: "center", gap: 8 }}>
+                            <AlertTriangle style={{ width: 16, height: 16, color: t.accentPrimary }} /> Monitoring Alerts
+                        </h3>
+                        <p style={{ color: t.textMuted, fontSize: "0.85rem", marginBottom: 16 }}>
+                            Get an in-app notification (and email) when a metric crosses a threshold. Checked every few minutes.
+                        </p>
+
+                        {alertRules.length > 0 && (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+                                {alertRules.map(r => {
+                                    const unit = r.metric === "bandwidth" ? " Mbps" : "%";
+                                    const label = ({ cpu: "CPU", mem: "Memory", disk: "Disk", bandwidth: "Bandwidth" } as Record<string, string>)[r.metric] ?? r.metric;
+                                    return (
+                                        <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: t.cardRadius, background: t.bgInput, border: `1px solid ${t.borderSecondary}` }}>
+                                            <span style={{ fontSize: "0.85rem", color: t.textPrimary, fontWeight: 600, flex: 1 }}>
+                                                {label} {r.comparison === "lt" ? "<" : ">"} {r.threshold}{unit}
+                                            </span>
+                                            <button onClick={() => toggleAlert(r.id, !r.enabled)} title={r.enabled ? "Enabled" : "Disabled"}
+                                                style={{ fontSize: "0.7rem", fontWeight: 700, padding: "3px 10px", borderRadius: 20, cursor: "pointer", border: "none", background: r.enabled ? t.statusSuccessBg : t.bgTertiary, color: r.enabled ? t.statusSuccess : t.textMuted }}>
+                                                {r.enabled ? "ON" : "OFF"}
+                                            </button>
+                                            <button onClick={() => deleteAlert(r.id)} title="Delete" style={{ width: 28, height: 28, borderRadius: t.buttonRadius, border: `1px solid ${t.statusError}33`, background: t.statusErrorBg, color: t.statusError, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                                <X style={{ width: 13, height: 13 }} />
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                            <select value={alertMetric} onChange={e => setAlertMetric(e.target.value)} style={{ padding: "9px 12px", borderRadius: t.buttonRadius, background: t.bgInput, border: `1px solid ${t.borderPrimary}`, color: t.textPrimary, fontSize: "0.85rem", cursor: "pointer", outline: "none" }}>
+                                <option value="cpu">CPU %</option>
+                                <option value="mem">Memory %</option>
+                                <option value="disk">Disk %</option>
+                                <option value="bandwidth">Bandwidth Mbps</option>
+                            </select>
+                            <select value={alertComparison} onChange={e => setAlertComparison(e.target.value)} style={{ padding: "9px 12px", borderRadius: t.buttonRadius, background: t.bgInput, border: `1px solid ${t.borderPrimary}`, color: t.textPrimary, fontSize: "0.85rem", cursor: "pointer", outline: "none" }}>
+                                <option value="gt">above</option>
+                                <option value="lt">below</option>
+                            </select>
+                            <input value={alertThreshold} onChange={e => setAlertThreshold(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="80" inputMode="decimal"
+                                style={{ width: 90, padding: "9px 12px", borderRadius: t.buttonRadius, background: t.bgInput, border: `1px solid ${t.borderPrimary}`, color: t.textPrimary, fontSize: "0.85rem", fontFamily: t.fontMono, outline: "none" }} />
+                            <button onClick={saveAlert} disabled={alertBusy}
+                                style={{ padding: "9px 20px", borderRadius: t.buttonRadius, border: "none", background: t.accentPrimary, color: t.textInverse, fontWeight: 700, fontSize: "0.85rem", cursor: alertBusy ? "not-allowed" : "pointer", opacity: alertBusy ? 0.6 : 1 }}>
+                                {alertBusy ? "Saving…" : "Add rule"}
+                            </button>
+                        </div>
+                        {alertMsg && <p style={{ fontSize: "0.8rem", color: t.statusError, marginTop: 10 }}>{alertMsg}</p>}
+                    </div>
 
                     {/* Display Type */}
                     <div style={{ ...card, marginBottom: 20 }}>
