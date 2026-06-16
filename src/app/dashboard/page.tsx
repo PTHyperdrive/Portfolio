@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useSession } from "next-auth/react";
 import { useThemeTokens } from "@/lib/useThemeTokens";
+import { useIsMobile } from "@/lib/useIsMobile";
 import { useCredits } from "@/components/CreditProvider";
 import { useViewMode } from "@/components/ViewModeProvider";
 import AccountDropdown from "@/components/layout/AccountDropdown";
@@ -77,6 +78,7 @@ export default function ConsoleHubPage() {
     const [forecast, setForecast] = useState<BurnForecast | null>(null);
     const [loading, setLoading] = useState(true);
     const t = useThemeTokens();
+    const isMobile = useIsMobile();
     const { credits: globalCredits } = useCredits();
     const { data: session } = useSession();
 
@@ -156,7 +158,8 @@ export default function ConsoleHubPage() {
         <div style={{
             minHeight: "100vh",
             backgroundColor: t.bgPrimary,
-            padding: "0 48px 48px",
+            padding: isMobile ? "0 16px 32px" : "0 48px 48px",
+            overflowX: "hidden",
         }}>
             {/* ─── Top Navbar ─── */}
             <nav style={{
@@ -178,8 +181,8 @@ export default function ConsoleHubPage() {
                     </span>
                 </div>
 
-                {/* Center — Nav Links */}
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                {/* Center — Nav Links (hidden on mobile; available via marketing pages) */}
+                <div style={{ display: isMobile ? "none" : "flex", alignItems: "center", gap: 6 }}>
                     {[
                         { label: "News", href: "/news" },
                         { label: "Blogs", href: "/blog" },
@@ -220,6 +223,7 @@ export default function ConsoleHubPage() {
                     id="admin-banner"
                     style={{
                         display: "flex", alignItems: "center", justifyContent: "space-between",
+                        flexWrap: "wrap", gap: 12,
                         padding: "14px 20px", marginBottom: 16, borderRadius: t.cardRadius,
                         background: t.accentPrimaryMuted,
                         border: `1px solid ${t.accentPrimary}33`,
