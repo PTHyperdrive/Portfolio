@@ -741,6 +741,15 @@ h6 {
   }
 }
 
+/* Mobile dashboard: trim the wide desktop page padding so inline-styled page
+   roots get more horizontal room. Targets each page's top-level container. */
+@media (max-width: 768px) {
+  .dash-main-mobile > div {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    MONOCHROME DARK THEME — GCP-inspired
    ═══════════════════════════════════════════════════════════════════ */

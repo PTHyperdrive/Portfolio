@@ -316,7 +316,7 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
             {tab === "overview" && (
                 <div>
                     {/* Resource bars */}
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 24 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 24 }}>
                         {[
                             { label: "CPU Usage", value: `${cpuPercent.toFixed(1)}%`, pct: cpuPercent, sub: `${vm.specs?.vcpu || "—"} vCPU Cores`, hist: cpuHist },
                             { label: "Memory", value: formatBytes(memUsed), pct: memPercent, sub: `${formatBytes(memUsed)} / ${formatBytes(memTotal)}`, hist: memHist },
@@ -343,7 +343,7 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
                     </div>
 
                     {/* Info grid */}
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 }}>
                         <div style={card}>
                             <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: 14, color: t.textSecondary }}>Instance Details</h3>
                             {[["Status", live?.status || vm.status], ["Uptime", isRunning ? formatUptime(live?.uptime || 0) : "—"], ["OS", vm.os], ["IP Address", vm.ipAddress || "Not assigned"], ["Node", vm.node], ["VM ID", vm.vmId]].map(([l, v]) => (
@@ -444,7 +444,7 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
                                         <span style={{ fontWeight: 700, color: t.textPrimary, fontSize: "1rem" }}>{a.vpc.name}</span>
                                         <span style={{ fontSize: "0.68rem", fontWeight: 700, padding: "2px 8px", borderRadius: 4, background: a.vpc.status === "ACTIVE" ? t.statusSuccessBg : t.statusErrorBg, color: a.vpc.status === "ACTIVE" ? t.statusSuccess : t.statusError }}>{a.vpc.status}</span>
                                     </div>
-                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: "0.85rem" }}>
+                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8, fontSize: "0.85rem" }}>
                                         {[
                                             ["VLAN ID", String(a.vpc.vlanId)],
                                             ["Subnet", a.vpc.subnet],

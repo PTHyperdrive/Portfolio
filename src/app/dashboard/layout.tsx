@@ -6,20 +6,7 @@ import { Menu, X } from "lucide-react";
 import Sidebar from "@/components/layout/Sidebar";
 import SessionGuard from "@/components/SessionGuard";
 import { useThemeTokens } from "@/lib/useThemeTokens";
-
-/** Track whether the viewport is mobile-width (drawer mode). */
-function useIsMobile(breakpoint = 768) {
-    // Lazy init reads the real width on the first client render (SSR → false).
-    const [isMobile, setIsMobile] = useState(
-        () => typeof window !== "undefined" && window.innerWidth <= breakpoint,
-    );
-    useEffect(() => {
-        const check = () => setIsMobile(window.innerWidth <= breakpoint);
-        window.addEventListener("resize", check);
-        return () => window.removeEventListener("resize", check);
-    }, [breakpoint]);
-    return isMobile;
-}
+import { useIsMobile } from "@/lib/useIsMobile";
 
 export default function DashboardLayout({
     children,
@@ -117,7 +104,7 @@ export default function DashboardLayout({
                     <Sidebar />
                 </div>
 
-                <main style={{ minHeight: "calc(100dvh - 59px)", backgroundColor: t.bgPrimary }}>
+                <main className="dash-main-mobile" style={{ minHeight: "calc(100dvh - 59px)", backgroundColor: t.bgPrimary }}>
                     {children}
                 </main>
             </div>

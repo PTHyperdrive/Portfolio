@@ -121,7 +121,7 @@ export default function BillingPage() {
                 )}
 
                 {/* Stats Row */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "20px", marginBottom: "32px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "20px", marginBottom: "32px" }}>
                     {/* Active Plan */}
                     <div style={{ ...card, padding: "24px", display: "flex", flexDirection: "column" }}>
                         <div style={{ width: 36, height: 36, borderRadius: t.cardRadius, background: t.accentPrimaryMuted, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 12 }}>
@@ -241,7 +241,7 @@ export default function BillingPage() {
                                 : "No metered VMs running right now — hourly billing is paused."}
                         </p>
 
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px", marginBottom: "20px" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: "16px", marginBottom: "20px" }}>
                             {([
                                 ["Per hour", forecast.burn.hourly],
                                 ["Per day", forecast.burn.daily],

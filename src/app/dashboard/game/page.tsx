@@ -75,7 +75,7 @@ export default function GameHostingPage() {
                     <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search games..." style={{ ...inputStyle, width: "100%", paddingLeft: 32, boxSizing: "border-box" }} />
                 </div>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
                 {filtered.map(game => (
                     <div key={game.id} style={{ ...card, padding: "22px 24px", cursor: "pointer", transition: "border-color 0.15s" }}
                         onMouseEnter={e => (e.currentTarget.style.borderColor = `${t.accentPrimary}55`)}

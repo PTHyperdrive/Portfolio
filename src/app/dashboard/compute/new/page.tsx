@@ -9,6 +9,7 @@ import { Gift, Ticket, Tag, AlertTriangle, Sparkles, Key, Terminal, Cloud, User,
 import { CLOUD_TEMPLATES, getTemplatesForPlan } from "@/config/templates";
 import type { CloudTemplate } from "@/config/templates";
 import { useThemeTokens } from "@/lib/useThemeTokens";
+import { useIsMobile } from "@/lib/useIsMobile";
 import { useCredits } from "@/components/CreditProvider";
 
 // ── Data ─────────────────────────────────────────────────────────────────────
@@ -53,9 +54,10 @@ const FREE_TRIAL_PLAN = {
     vcpu: 1,  ram: 1,  disk: 40,  bw: "45 Mbps", price: 0,
 } as const;
 
+// Single datacenter — only the Timox-1 node is in service, so the location
+// picker is hidden. The node name still flows into the deploy payload.
 const LOCATIONS = [
-    { id: "hcm1", label: "Ho Chi Minh 1", sub: "Vietnam", iconPath: "/icons/vn-flag.svg", node: "pve-hcm1" },
-    { id: "hcm2", label: "Ho Chi Minh 2", sub: "Vietnam", iconPath: "/icons/vn-flag.svg", node: "pve-hcm2" },
+    { id: "timox-1", label: "Ho Chi Minh", sub: "Vietnam", iconPath: "/icons/vn-flag.svg", node: "Timox-1" },
 ];
 
 const OS_OPTIONS = [
@@ -116,6 +118,7 @@ function Check({ t }: { t: ReturnType<typeof useThemeTokens> }) {
 export default function ComputeNewPage() {
     const router = useRouter();
     const t = useThemeTokens();
+    const isMobile = useIsMobile();
     const { adjust: adjustCredits, refresh: refreshCredits } = useCredits();
     const { effectiveAdmin: isAdmin } = useViewMode();
 
@@ -128,7 +131,8 @@ export default function ComputeNewPage() {
     const useCloudInit = isAdmin ? adminUseCloudInit : true;
 
     const [selectedPlan,  setSelectedPlan]  = useState("Dev-Standard");
-    const [selectedLoc,   setSelectedLoc]   = useState("hcm1");
+    // Single node — no selector rendered; kept for the deploy payload + summary.
+    const [selectedLoc] = useState("timox-1");
     const [swTab,         setSwTab]          = useState("Operating System");
     const [selectedOs,    setSelectedOs]    = useState("ubuntu-24");
     const [selectedCycle, setSelectedCycle] = useState("monthly");
@@ -186,6 +190,7 @@ export default function ComputeNewPage() {
     const location         = LOCATIONS.find(l => l.id === selectedLoc)!;
     const os               = OS_OPTIONS.find(o => o.id === selectedOs)!;
     const cycle            = BILLING_CYCLES.find(c => c.id === selectedCycle)!;
+    const isWindowsTpl     = CLOUD_TEMPLATES.find(ct => ct.id === selectedOs)?.family === "windows";
 
     // ── Ticket math (mirrors backend logic exactly) ─────────────────
     const planTickets           = tickets.filter(t => t.planId === selectedPlan);
@@ -379,8 +384,8 @@ export default function ComputeNewPage() {
                 </div>
             )}
 
-            {/* Two-column grid */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 24, alignItems: "start" }}>
+            {/* Two-column grid — stacks on mobile so the form isn't crushed */}
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 340px", gap: 24, alignItems: "start" }}>
 
                 {/* ════════════════════════════════════════════
                     LEFT COLUMN
@@ -443,33 +448,7 @@ export default function ComputeNewPage() {
                         </div>
                     </div>
 
-                    {/* ── Location ── */}
-                    <div style={{ ...card, padding: 24 }}>
-                        <SectionHeader
-                            icon={<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={t.accentPrimary} strokeWidth="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" /><circle cx="12" cy="10" r="3" /></svg>}
-                            title="Location"
-                            sub="Choose the datacenter closest to your users"
-                            t={t}
-                        />
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                            {LOCATIONS.map(loc => {
-                                const active = selectedLoc === loc.id;
-                                return (
-                                    <div key={loc.id} onClick={() => setSelectedLoc(loc.id)}
-                                        style={{ ...cardBase, ...(active ? cardActive : {}), display: "flex", alignItems: "center", gap: 14 }}>
-                                        <div style={{ width: 38, height: 28, borderRadius: 4, overflow: "hidden", flexShrink: 0, border: "1px solid rgba(255,255,255,0.1)" }}>
-                                            <Image src={loc.iconPath} alt={loc.sub} width={38} height={28} style={{ objectFit: "cover", width: "100%", height: "100%" }} />
-                                        </div>
-                                        <div style={{ flex: 1 }}>
-                                            <p style={{ fontWeight: 700, color: t.textPrimary, fontSize: "0.875rem" }}>{loc.label}</p>
-                                            <p style={{ color: t.textMuted, fontSize: "0.75rem" }}>{loc.sub}</p>
-                                        </div>
-                                        {active && <Check t={t} />}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
+                    {/* Location selector hidden — single datacenter (Timox-1). */}
 
                     {/* ── Software / Template Selection ── */}
                     <div style={{ ...card, padding: 24 }}>
@@ -567,6 +546,16 @@ export default function ComputeNewPage() {
                                         </div>
                                     );
                                 })()}
+
+                                {/* ── Windows (Cloudbase-Init) notice ── */}
+                                {isWindowsTpl && (
+                                    <div style={{ padding: "10px 14px", borderRadius: t.cardRadius - 2, background: t.accentPrimaryMuted, border: `1px solid ${t.accentPrimary}33`, marginBottom: 20, display: "flex", gap: 8 }}>
+                                        <Cloud style={{ width: 14, height: 14, color: t.accentPrimary, flexShrink: 0, marginTop: 2 }} />
+                                        <p style={{ fontSize: "0.72rem", color: t.textSecondary, lineHeight: 1.5 }}>
+                                            Windows uses <strong style={{ color: t.textPrimary }}>Cloudbase-Init</strong>: the username below becomes the local administrator and a password is always set (shown once after deploy). SSH keys apply only if OpenSSH Server is enabled in the image — otherwise sign in over the console/RDP with the password.
+                                        </p>
+                                    </div>
+                                )}
 
                                 {/* ── Hostname ── */}
                                 <div style={{ marginBottom: 18 }}>
