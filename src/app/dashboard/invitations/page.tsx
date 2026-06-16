@@ -196,7 +196,7 @@ export default function InvitationsPage() {
             )}
 
             {/* Stats */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 20 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
                 {[
                     { label: "Total Codes", val: codes.length, color: t.accentPrimary },
                     { label: "Total Redeemed", val: totalUsed, color: t.statusSuccess },

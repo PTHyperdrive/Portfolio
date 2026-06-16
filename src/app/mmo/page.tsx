@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import Image from "next/image";
 import { useThemeTokens } from "@/lib/useThemeTokens";
+import { useIsMobile } from "@/lib/useIsMobile";
 import { useCredits } from "@/components/CreditProvider";
 import {
     ShoppingBag, Package, Search, Grid3X3,
@@ -46,6 +47,7 @@ import {
 /* ═══ Component ═══ */
 export default function MmoStorePage() {
     const t = useThemeTokens();
+    const isMobile = useIsMobile();
     const { data: session, status: authStatus } = useSession();
     const isAuthenticated = authStatus === "authenticated";
     const isLoading = authStatus === "loading";
@@ -481,7 +483,7 @@ export default function MmoStorePage() {
                     </p>
                 </div>
             ) : (
-                <div style={{ display: "grid", gridTemplateColumns: `repeat(${gridCols}, 1fr)`, gap: gridCols >= 5 ? 12 : 16 }}>
+                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "repeat(auto-fill, minmax(150px, 1fr))" : `repeat(${gridCols}, 1fr)`, gap: gridCols >= 5 ? 12 : 16 }}>
                     {displayed.map(cat => (
                         <div key={cat.id} style={{ ...card, overflow: "hidden", display: "flex", flexDirection: "column", transition: "all 0.2s ease" }}
                             onMouseEnter={e => { e.currentTarget.style.borderColor = t.accentPrimary; e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.25)"; }}

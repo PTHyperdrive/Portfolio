@@ -105,7 +105,7 @@ export default function AdminBillingPage() {
 
             {/* Summary stats */}
             {mode === "invoices" && summary && (
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 20 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 12, marginBottom: 20 }}>
                     {[
                         { label: "Total Revenue", val: `${(summary.totalRevenue ?? 0).toLocaleString()} VND`, color: t.statusSuccess },
                         { label: "Completed Txns", val: summary.completedCount, color: t.accentPrimary },

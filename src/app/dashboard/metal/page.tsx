@@ -67,7 +67,7 @@ export default function BareMetalPage() {
                         </div>
                         {selectedTier === tier.name && (
                             <div style={{ padding: "20px 28px", borderTop: `1px solid ${t.borderSecondary}`, background: t.bgSecondary }}>
-                                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 20 }}>
+                                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 16, marginBottom: 20 }}>
                                     {[
                                         { Icon: Globe, label: "Network", value: tier.network },
                                         { Icon: Shield, label: "Security", value: "Hardware RAID + IPMI" },

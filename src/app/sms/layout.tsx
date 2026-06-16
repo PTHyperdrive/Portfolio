@@ -7,7 +7,8 @@ import { useSession, signOut } from "next-auth/react";
 import { useThemeTokens } from "@/lib/useThemeTokens";
 import { useCredits } from "@/components/CreditProvider";
 import ThemeToggle from "@/components/ThemeToggle";
-import { Smartphone, Inbox, ArrowLeft, Home, Wallet, LogOut } from "lucide-react";
+import DrawerShell from "@/components/layout/DrawerShell";
+import { Smartphone, Inbox, ArrowLeft, Wallet, LogOut } from "lucide-react";
 
 export default function SmsLayout({ children }: { children: React.ReactNode }) {
     const t = useThemeTokens();
@@ -36,10 +37,10 @@ export default function SmsLayout({ children }: { children: React.ReactNode }) {
     };
 
     return (
-        <div style={{
-            display: "flex", height: "100vh", width: "100%", overflow: "hidden",
-            backgroundColor: t.bgPrimary, color: t.textPrimary, fontFamily: t.fontFamily,
-        }}>
+        <DrawerShell
+            sidebarWidth={sidebarWidth}
+            title={<>Timo<span style={{ color: t.accentPrimary }}>SMS</span></>}
+            sidebar={
             <aside style={{
                 width: sidebarWidth, minWidth: sidebarWidth, height: "100vh",
                 overflowY: "auto", display: "flex", flexDirection: "column",
@@ -103,10 +104,9 @@ export default function SmsLayout({ children }: { children: React.ReactNode }) {
                     )}
                 </div>
             </aside>
-
-            <main style={{ flex: 1, overflowY: "auto", backgroundColor: t.bgPrimary }}>
-                {children}
-            </main>
-        </div>
+            }
+        >
+            {children}
+        </DrawerShell>
     );
 }

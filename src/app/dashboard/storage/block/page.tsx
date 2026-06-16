@@ -91,7 +91,7 @@ export default function BlockStoragePage() {
                     {infoLoading ? <div style={{ padding: 32, display: "flex", alignItems: "center", justifyContent: "center", color: t.textMuted }}>Loading disk info…</div> : info && (
                         <>
                             {/* Stats */}
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
                                 {[{ label: "Extra Disks", value: `${info.usedSlots} / 5` }, { label: "Extra Storage", value: `${info.totalExtraGb} GB` }, { label: "Free Slots", value: `${info.freeSlots} remaining` }].map(stat => (
                                     <div key={stat.label} style={{ ...card, padding: "18px 22px" }}>
                                         <p style={{ fontSize: "0.7rem", color: t.textMuted, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>{stat.label}</p>
@@ -124,7 +124,7 @@ export default function BlockStoragePage() {
                                     <h2 style={{ fontSize: "1rem", fontWeight: 700, color: t.textPrimary, marginBottom: 4 }}>Attach New Disk</h2>
                                     <p style={{ fontSize: "0.8rem", color: t.textMuted, marginBottom: 20 }}>Will be provisioned as <code style={{ color: t.accentPrimary }}>sata{info.usedSlots + 1}</code> on node <strong style={{ color: t.textSecondary }}>{info.node}</strong>.</p>
                                     <form onSubmit={handlePurchase} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+                                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 16 }}>
                                             <div>
                                                 <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 600, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Storage Tier</label>
                                                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

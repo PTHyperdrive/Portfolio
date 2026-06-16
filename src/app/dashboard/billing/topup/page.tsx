@@ -144,7 +144,7 @@ export default function TopUpPage() {
                             <p style={{ fontWeight: 700, color: t.textPrimary, fontSize: "0.95rem" }}>Choose credit amount</p>
                         </div>
 
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 12 }}>
                             {PACKAGES.map(pkg => {
                                 const isActive = !custom && selected === pkg.credits;
                                 return (

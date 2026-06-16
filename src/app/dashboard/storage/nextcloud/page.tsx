@@ -75,7 +75,7 @@ export default function NextcloudStoragePage() {
                     {data.provisioned && (
                         <>
                             {/* Stats */}
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
                                 {[{ label: "Total Quota", value: `${data.totalGb} GB`, sub: `of ${data.maxTotalGb} GB max` }, { label: "Free Included", value: `${data.freeGb} GB`, sub: "permanent" }, { label: "Available to Add", value: `${data.remainingGb ?? (data.maxTotalGb - data.totalGb)} GB`, sub: "in 5 GB steps" }].map(stat => (
                                     <div key={stat.label} style={{ ...card, padding: "20px 24px" }}>
                                         <p style={{ fontSize: "0.72rem", color: t.textMuted, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>{stat.label}</p>
@@ -103,7 +103,7 @@ export default function NextcloudStoragePage() {
                                     <h2 style={{ fontSize: "1rem", fontWeight: 700, color: t.textPrimary, marginBottom: 4 }}>Expand Storage</h2>
                                     <p style={{ fontSize: "0.8rem", color: t.textMuted, marginBottom: 20 }}>Must be in {data.stepGb} GB blocks. Current paid: {data.paidGb} GB.</p>
                                     <form onSubmit={handleExpand} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+                                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 16 }}>
                                             <div>
                                                 <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 600, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Storage Tier</label>
                                                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

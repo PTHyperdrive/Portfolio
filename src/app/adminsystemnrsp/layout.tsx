@@ -8,6 +8,7 @@ import { useSession, signOut } from "next-auth/react";
 import { useThemeTokens } from "@/lib/useThemeTokens";
 import { useCredits } from "@/components/CreditProvider";
 import ThemeToggle from "@/components/ThemeToggle";
+import DrawerShell from "@/components/layout/DrawerShell";
 import {
     LayoutGrid, Server, Users, Tag, Receipt,
     ScrollText, MessageSquare, MessagesSquare, SlidersHorizontal,
@@ -113,11 +114,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         );
     };
     return (
-        <div style={{
-            display: "flex", height: "100vh", width: "100%", overflow: "hidden",
-            backgroundColor: t.bgPrimary, color: t.textPrimary, fontFamily: t.fontFamily,
-        }}>
-            {/* ── Sidebar ── */}
+        <DrawerShell
+            sidebarWidth={264}
+            title={<>NRSP<span style={{ color: t.statusWarning }}> Admin</span></>}
+            sidebar={
             <aside style={{
                 width: 264, minWidth: 264, height: "100vh", overflowY: "auto",
                 display: "flex", flexDirection: "column",
@@ -212,14 +212,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     )}
                 </div>
             </aside>
-
-            {/* ── Main Content ── */}
-            <main style={{
-                flex: 1, overflowY: "auto", position: "relative",
-                backgroundColor: t.bgPrimary,
-            }}>
-                {children}
-            </main>
-        </div>
+            }
+        >
+            {children}
+        </DrawerShell>
     );
 }

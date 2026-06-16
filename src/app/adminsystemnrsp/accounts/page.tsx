@@ -201,7 +201,7 @@ export default function AdminAccountsPage() {
             </div>
 
             {/* Stats */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 20 }}>
                 {[
                     { label: "Total Users", val: users.length, color: t.accentPrimary },
                     { label: "Admins", val: adminCount, color: t.statusWarning },
