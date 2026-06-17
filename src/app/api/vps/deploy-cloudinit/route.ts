@@ -16,6 +16,10 @@ import {
 } from "@/lib/proxmox";
 import { validateAndResolveTemplate, resolveTemplateVmid } from "@/config/templates";
 import { generateSecurePassword } from "@/lib/password-generator";
+// Cloud-init password is stored AES-256-GCM encrypted at rest (same scheme as
+// the TOTP secret) so it can be revealed to the owner later without keeping
+// plaintext in the DB.
+import { encryptTotpSecret as encryptSecret } from "@/lib/totp-crypto";
 
 /**
  * POST /api/vps/deploy-cloudinit
@@ -147,11 +151,13 @@ export async function POST(req: Request) {
         // ── 2. Resolve template ──────────────────────────────────────
         let templateName: string;
         let templateInfo: { defaultUser: string };
+        let family: "linux" | "windows" = "linux";
         let knownVmid: number | null = null;
         try {
             const resolved = validateAndResolveTemplate(plan, templateId, planCfg);
             templateName = resolved.templateName;
             templateInfo = { defaultUser: resolved.template.defaultUser };
+            family = resolved.template.family;
             // Fast VMID resolution — skips API name-search for templates
             // with hardcoded VMIDs (e.g. Ubuntu 24.04 = 9000, 22.04 = 9001)
             knownVmid = resolveTemplateVmid(templateId, planCfg.requiresGpu);
@@ -264,15 +270,21 @@ export async function POST(req: Request) {
                 net0Rate: rateMBs > 0 ? rateMBs : undefined,
             });
 
-            // d) Set Cloud-Init configuration
+            // d) Set Cloud-Init configuration.
+            // Windows guests run Cloudbase-Init, which only reads the
+            // ConfigDrive datasource → citype must be "configdrive2". Linux uses
+            // the NoCloud default. The password is always set (auto-generated if
+            // the user left it blank) because Windows has no SSH-only login path.
             const ciConfig: Parameters<typeof setCloudInitConfig>[2] = {
                 ciuser:     ciuser,
                 cipassword: ciPassword,
                 ipconfig0:  "ip=dhcp",
                 nameserver: "8.8.8.8 1.1.1.1",
+                citype:     family === "windows" ? "configdrive2" : "nocloud",
             };
 
-            // Inject SSH key if provided
+            // Inject SSH key for both families — on Windows it's applied to the
+            // OpenSSH server's authorized_keys when that role is present in the image.
             if (sshPublicKeys.trim()) {
                 ciConfig.sshkeys = encodeURIComponent(sshPublicKeys.trim());
             }
@@ -379,6 +391,8 @@ export async function POST(req: Request) {
                         name:      vm.hostname,
                         os:        templateName,
                         status:    "running",
+                        ciUsername: ciuser,
+                        ciPassword: encryptSecret(ciPassword),
                         ticketId:  ticket?.id ?? undefined,
                         expiresAt: ticket?.validUntil ?? expiresAt30d,
                         specs: {

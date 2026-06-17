@@ -44,7 +44,7 @@ export default function FaqBuilder() {
     const inputStyle: React.CSSProperties = {
         width: "100%", boxSizing: "border-box" as const,
         background: t.bgInput, border: `1px solid ${t.borderPrimary}`,
-        borderRadius: t.isMono ? 4 : 8, color: t.textPrimary,
+        borderRadius: t.cardRadius, color: t.textPrimary,
         fontSize: "0.88rem", padding: "10px 14px", outline: "none",
     };
 
@@ -296,7 +296,7 @@ export default function FaqBuilder() {
                                             </div>
                                             <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
                                                 <button onClick={() => startEdit(entry)} title="Edit" style={{
-                                                    width: 30, height: 30, borderRadius: t.isMono ? 4 : 7,
+                                                    width: 30, height: 30, borderRadius: t.buttonRadius,
                                                     display: "flex", alignItems: "center", justifyContent: "center",
                                                     border: `1px solid ${t.borderPrimary}`, background: "transparent",
                                                     color: t.textSecondary, cursor: "pointer",
@@ -304,7 +304,7 @@ export default function FaqBuilder() {
                                                     <Save style={{ width: 12, height: 12 }} />
                                                 </button>
                                                 <button onClick={() => handleTogglePublish(entry.id, entry.published)} title={entry.published ? "Unpublish" : "Publish"} style={{
-                                                    width: 30, height: 30, borderRadius: t.isMono ? 4 : 7,
+                                                    width: 30, height: 30, borderRadius: t.buttonRadius,
                                                     display: "flex", alignItems: "center", justifyContent: "center",
                                                     border: `1px solid ${t.borderPrimary}`, background: "transparent",
                                                     color: entry.published ? t.statusSuccess : t.textMuted, cursor: "pointer",
@@ -312,7 +312,7 @@ export default function FaqBuilder() {
                                                     {entry.published ? <Eye style={{ width: 12, height: 12 }} /> : <EyeOff style={{ width: 12, height: 12 }} />}
                                                 </button>
                                                 <button onClick={() => handleDelete(entry.id)} title="Delete" style={{
-                                                    width: 30, height: 30, borderRadius: t.isMono ? 4 : 7,
+                                                    width: 30, height: 30, borderRadius: t.buttonRadius,
                                                     display: "flex", alignItems: "center", justifyContent: "center",
                                                     border: `1px solid ${t.borderPrimary}`, background: "transparent",
                                                     color: t.statusError, cursor: "pointer",

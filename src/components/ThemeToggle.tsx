@@ -4,9 +4,11 @@ import { useTheme, type ThemeId } from "@/components/ThemeProvider";
 import { Palette, Moon, Sun } from "lucide-react";
 
 const THEME_META: Record<ThemeId, { label: string; shortLabel: string; Icon: typeof Palette }> = {
+    "pro-dark": { label: "Pro Dark", Icon: Moon, shortLabel: "PRO" },
+    "pro-light": { label: "Pro Light", Icon: Sun, shortLabel: "PRO" },
+    "mono-dark": { label: "Mono Dark", Icon: Moon, shortLabel: "MONO" },
+    "mono-light": { label: "Mono Light", Icon: Sun, shortLabel: "MONO" },
     slop: { label: "Slop Theme", Icon: Palette, shortLabel: "SLOP" },
-    "mono-dark": { label: "OLED Dark", Icon: Moon, shortLabel: "DARK" },
-    "mono-light": { label: "Mono Light", Icon: Sun, shortLabel: "LIGHT" },
 };
 
 /**

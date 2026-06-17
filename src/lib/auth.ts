@@ -5,6 +5,9 @@ import speakeasy from 'speakeasy';
 import prisma from '@/lib/db';
 import { verifyPassword, checkRateLimit } from '@/lib/security';
 import { safeDecryptTotpSecret } from '@/lib/totp-crypto';
+import { verifyEmailOtp } from '@/lib/email-otp';
+import { verifyRecoveryCode } from '@/lib/recovery-codes';
+import { audit } from '@/lib/audit';
 import { loginSchema } from '@/lib/validation';
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
@@ -22,6 +25,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 email: { label: 'Email', type: 'email' },
                 password: { label: 'Password', type: 'password' },
                 totp: { label: 'Authenticator code', type: 'text' },
+                emailCode: { label: 'Email code', type: 'text' },
+                recoveryCode: { label: 'Backup code', type: 'text' },
             },
             async authorize(credentials) {
                 const parsed = loginSchema.safeParse(credentials);
@@ -41,31 +46,58 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 if (!isValid) return null;
 
                 // ── Login 2FA gate ───────────────────────────────────────
-                // When the user has 2FA enabled AND opted into login 2FA, a
-                // valid TOTP code is mandatory. This is the real enforcement
-                // point — the precheck endpoint only decides whether the UI
-                // shows the code field; it cannot be bypassed by skipping it.
-                // We require a stored secret too, so a stray `loginWith2FA`
-                // flag without a configured authenticator never locks anyone out.
-                if (user.twoFactorEnabled && user.loginWith2FA && user.twoFactorSecret) {
-                    const totp =
-                        typeof (credentials as Record<string, unknown>).totp === 'string'
-                            ? ((credentials as Record<string, unknown>).totp as string).trim()
-                            : '';
-                    if (!/^\d{6}$/.test(totp)) return null;
+                // Login 2FA gate — the REAL enforcement point (precheck only
+                // decides what the UI shows; it can't be bypassed by skipping
+                // it). If the account has ANY method enabled, a valid code from
+                // ONE of its enabled methods is mandatory.
+                const otpOn = !!(user.twoFactorEnabled && user.twoFactorSecret);
+                const emailOn = !!user.emailTwoFactorEnabled;
 
-                    // Throttle code guessing: 5 attempts / 60s per account.
-                    const rl = checkRateLimit(`login-2fa:${user.id}`, 5, 60_000);
-                    if (!rl.allowed) return null;
+                if (otpOn || emailOn) {
+                    // Throttle guessing: 5/60s burst + 15/15min sustained per
+                    // account — slows a brute-forcer to a crawl across methods.
+                    const burst = checkRateLimit(`login-2fa:${user.id}`, 5, 60_000);
+                    const sustained = checkRateLimit(`login-2fa-15m:${user.id}`, 15, 15 * 60_000);
+                    if (!burst.allowed || !sustained.allowed) return null;
 
-                    const secret = safeDecryptTotpSecret(user.twoFactorSecret);
-                    const ok = speakeasy.totp.verify({
-                        secret,
-                        encoding: 'base32',
-                        token: totp,
-                        window: 1,
-                    });
-                    if (!ok) return null;
+                    const cred = credentials as Record<string, unknown>;
+                    const totp = typeof cred.totp === 'string' ? cred.totp.trim() : '';
+                    const emailCode = typeof cred.emailCode === 'string' ? cred.emailCode.trim() : '';
+                    const recoveryCode = typeof cred.recoveryCode === 'string' ? cred.recoveryCode.trim() : '';
+
+                    let verified = false;
+
+                    if (otpOn && /^\d{6}$/.test(totp)) {
+                        verified = speakeasy.totp.verify({
+                            secret: safeDecryptTotpSecret(user.twoFactorSecret!),
+                            encoding: 'base32',
+                            token: totp,
+                            window: 1,
+                        });
+                    }
+
+                    if (!verified && emailOn && /^\d{6}$/.test(emailCode)) {
+                        verified = await verifyEmailOtp(user.id, 'login', emailCode);
+                    }
+
+                    // ── Last line: backup recovery code ──────────────────
+                    // Only when the primary methods didn't pass. The lifetime
+                    // cap + lock are enforced inside verifyRecoveryCode, which
+                    // counts EVERY submission (right or wrong) toward the 10.
+                    if (!verified && recoveryCode) {
+                        const r = await verifyRecoveryCode(user.id, recoveryCode);
+                        verified = r.ok;
+                        void audit({
+                            userId: user.id,
+                            action: r.locked ? 'TFA_RECOVERY_LOCKED' : 'TFA_RECOVERY_USED',
+                            resourceType: 'UserAccount',
+                            resourceId: user.id,
+                            outcome: r.ok ? 'SUCCESS' : 'FAILED',
+                            metadata: { remainingAttempts: r.remainingAttempts, locked: r.locked },
+                        });
+                    }
+
+                    if (!verified) return null;
                 }
 
                 return {

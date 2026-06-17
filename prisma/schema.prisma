@@ -21,7 +21,15 @@ model User {
   hasUsedTrial  Boolean   @default(false)
   twoFactorEnabled Boolean @default(false)
   twoFactorSecret  String?
-  loginWith2FA     Boolean @default(false)
+  emailTwoFactorEnabled Boolean @default(false) // email-code 2FA at login
+  // ── Backup recovery codes (last-line 2FA) ──────────────────────
+  // Lifetime guard: every backup-code submission at login (right OR wrong)
+  // increments recoveryAttempts. At 10 the method is locked forever
+  // (recoveryLockedAt) and the user must fall back to another method or a
+  // support ticket. Generating a fresh set (authenticated) resets the counter.
+  recoveryAttempts         Int       @default(0)  // lifetime backup-code submissions
+  recoveryLockedAt         DateTime?              // set when the 10-attempt cap is hit
+  recoveryCodesGeneratedAt DateTime?              // when the current set was issued
   canInvite     Boolean   @default(false) // Admin toggle: allows user to generate invite codes
   maxVpcs       Int       @default(3)    // Max VPCs per user (3 default, up to 5 via admin)
   trialExpiresAt DateTime?
@@ -44,6 +52,8 @@ model User {
   appliedPromos     AppliedPromoCode[]
   deploymentTickets DeploymentTicket[]
   deviceSessions    DeviceSession[]
+  emailOtpCodes     EmailOtpCode[]
+  recoveryCodes     RecoveryCode[]
   sshKeys              SshKey[]
   nextcloudStorage     UserNextcloudStorage?
   supportChats         SupportChat[]
@@ -54,6 +64,9 @@ model User {
   uploads              FileUpload[]
   wgPeers              WgPeer[]
   vpcs                 Vpc[]
+  smsRentals           SmsRental[]
+  notifications        Notification[]
+  vmAlertRules         VmAlertRule[]
 }
 
 model Account {
@@ -100,6 +113,38 @@ model DeviceSession {
   createdAt  DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+/// Short-lived email 2FA codes. The 6-digit code is stored bcrypt-hashed and
+/// is single-use (consumedAt) with an attempt cap and a 10-minute expiry.
+model EmailOtpCode {
+  id         String    @id @default(cuid())
+  userId     String
+  codeHash   String                     // bcrypt hash of the 6-digit code
+  purpose    String                     // "login" | "setup"
+  attempts   Int       @default(0)      // wrong-guess counter (cap then invalidate)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose])
+  @@index([expiresAt])
+}
+
+/// Single-use 2FA backup recovery codes. High-entropy, SHA-256 hashed at rest.
+/// Generating a fresh set replaces all prior codes for that user.
+model RecoveryCode {
+  id        String    @id @default(cuid())
+  userId    String
+  codeHash  String                      // sha256(normalized code)
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 // ─── SSH Key Management ──────────────────────────────────────────
@@ -248,6 +293,8 @@ model VpsInstance {
   status         String    @default("stopped") // running, stopped, provisioning
   displayType    String    @default("novnc")   // novnc | spice
   specs          Json?     // {vcpu, ram_gb, disk_gb, gpu}
+  ciUsername     String?   // cloud-init login user (shown on the VM Overview)
+  ciPassword     String?   @db.Text // cloud-init password, AES-256-GCM encrypted at rest
   ipAddress      String?
   expiresAt      DateTime?
   ticketId       String?   @unique  // Links to DeploymentTicket
@@ -542,6 +589,10 @@ enum AuditAction {
   ACCOUNT_CREATED
   TFA_ENABLED
   TFA_DISABLED
+  TFA_RECOVERY_GENERATED
+  TFA_RECOVERY_USED
+  TFA_RECOVERY_LOCKED
+  TFA_LOCKOUT_TICKET
   PASSWORD_CHANGED
   SESSION_REVOKED
   // VM Lifecycle
@@ -551,6 +602,7 @@ enum AuditAction {
   VM_REBOOT
   VM_DESTROY
   VM_REINSTALL
+  VM_RESIZE
   VM_DISPLAY_CHANGE
   VM_GPU_ALLOCATE
   VM_GPU_RELEASE
@@ -602,6 +654,13 @@ enum AuditAction {
   // WireGuard
   WG_PEER_CREATE
   WG_PEER_REVOKE
+  // TimoSMS — temporary SMS rental
+  SMS_RENT
+  SMS_CANCEL
+  SMS_CODE_RECEIVED
+  SMS_SERVICE_MODIFY
+  // Monitoring
+  ALERT_FIRED
   // Misc
   REDIRECT_TO_PLANS
   TRIGGER_UPSELL_FLOW
@@ -886,4 +945,123 @@ model InvitationRedemption {
 
   @@unique([invitationCodeId, userId])    // One redemption per user per code
   @@index([userId])
+}
+
+// ─── TimoSMS — Temporary SMS-Receive Rental ──────────────────────
+
+enum SmsRentalStatus {
+  WAITING    // number issued, awaiting an inbound SMS
+  RECEIVED   // a valid code was delivered AND charged
+  CANCELLED  // user cancelled before any code
+  EXPIRED    // TTL elapsed with no code (never charged)
+  ERROR      // provider/allocation failure
+}
+
+/// A rentable target service (e.g. Google, Telegram) for a given country.
+/// Price is in prepaid credits (1 Credit = 1 VND); USD shown via exchange rate.
+/// `providerServiceCode` maps to the Telecom API's own service identifier.
+model SmsService {
+  id                  String   @id @default(cuid())
+  code                String                    // slug, e.g. "google"
+  name                String                    // display, e.g. "Google / Gmail"
+  country             String   @default("VN")   // ISO country of the numbers
+  priceCredits        Int                       // charged once a code is received
+  providerServiceCode String?                   // Telecom API service id
+  iconUrl             String?
+  active              Boolean  @default(true)
+  sortOrder           Int      @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  rentals SmsRental[]
+
+  @@unique([code, country])
+  @@index([active, sortOrder])
+}
+
+/// One rent-a-number transaction. Billing is charge-on-receipt: credits are
+/// only deducted when a valid code is delivered (status RECEIVED). The code is
+/// withheld until the charge succeeds. No charge on CANCELLED/EXPIRED.
+model SmsRental {
+  id               String          @id @default(cuid())
+  userId           String
+  serviceId        String
+  providerRentalId String?                          // Telecom API rental/activation id
+  phoneNumber      String?
+  country          String
+  status           SmsRentalStatus @default(WAITING)
+  priceCredits     Int                              // snapshot of service price at rent time
+  code             String?                          // revealed only when charged
+  charged          Boolean         @default(false)
+  createdAt        DateTime        @default(now())
+  expiresAt        DateTime                         // TTL — auto-expires if no code
+  completedAt      DateTime?
+  cancelledAt      DateTime?
+
+  user     User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  service  SmsService   @relation(fields: [serviceId], references: [id])
+  messages SmsMessage[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+/// Raw inbound SMS messages for a rental. A rental may receive several; the
+/// extracted OTP (if any) is stored on both the message and the rental.
+model SmsMessage {
+  id         String   @id @default(cuid())
+  rentalId   String
+  sender     String?
+  text       String   @db.Text
+  code       String?
+  receivedAt DateTime @default(now())
+
+  rental SmsRental @relation(fields: [rentalId], references: [id], onDelete: Cascade)
+
+  @@index([rentalId])
+}
+
+// ─── Monitoring & Alerts ─────────────────────────────────────────
+
+/// In-app notification (system/alert). Separate from TicketNotification so the
+/// bell can surface monitoring alerts alongside ticket updates.
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   @default("system") // "alert" | "system"
+  title     String
+  body      String   @db.Text
+  link      String?                      // optional in-app deep link
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
+}
+
+/// A user-defined threshold alert on one VM metric. The monitoring sweep
+/// evaluates enabled rules and fires a Notification (+ email) on breach,
+/// rate-limited by lastFiredAt. `lastValue`/`lastValueAt` hold the previous
+/// sample so bandwidth (a rate) can be derived between sweeps.
+model VmAlertRule {
+  id          String    @id @default(cuid())
+  userId      String
+  vmId        String                       // Proxmox VMID
+  node        String
+  metric      String                       // "cpu" | "mem" | "disk" | "bandwidth"
+  comparison  String    @default("gt")      // "gt" | "lt"
+  threshold   Float                         // percent (cpu/mem/disk) or Mbps (bandwidth)
+  enabled     Boolean   @default(true)
+  lastValue   Float?                        // prior sample (bandwidth: cumulative bytes)
+  lastValueAt DateTime?
+  lastFiredAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, vmId, metric])
+  @@index([enabled])
 }

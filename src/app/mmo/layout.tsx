@@ -8,9 +8,10 @@ import { useSession, signOut } from "next-auth/react";
 import { useThemeTokens } from "@/lib/useThemeTokens";
 import { useCredits } from "@/components/CreditProvider";
 import ThemeToggle from "@/components/ThemeToggle";
+import DrawerShell from "@/components/layout/DrawerShell";
 import {
-    ShoppingBag, SlidersHorizontal, Tag, ArrowLeft, ChevronDown,
-    LogOut, LayoutGrid, User, Home, Wallet, Layers
+    SlidersHorizontal, Tag, ArrowLeft, ChevronDown,
+    LogOut, LayoutGrid, Home, Wallet, Layers
 } from "lucide-react";
 
 type CategoryMeta = {
@@ -86,11 +87,10 @@ export default function MmoLayout({ children }: { children: React.ReactNode }) {
     });
 
     return (
-        <div style={{
-            display: "flex", height: "100vh", width: "100%", overflow: "hidden",
-            backgroundColor: t.bgPrimary, color: t.textPrimary, fontFamily: t.fontFamily,
-        }}>
-            {/* ═══════════════════ SIDEBAR ═══════════════════ */}
+        <DrawerShell
+            sidebarWidth={sidebarWidth}
+            title={<>Not<span style={{ color: t.accentPrimary }}>Respond</span></>}
+            sidebar={
             <aside style={{
                 width: sidebarWidth, minWidth: sidebarWidth, height: "100vh",
                 overflowY: "auto", display: "flex", flexDirection: "column",
@@ -149,7 +149,7 @@ export default function MmoLayout({ children }: { children: React.ReactNode }) {
                     }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
                             <div style={{
-                                width: 34, height: 34, borderRadius: t.isMono ? 6 : 10,
+                                width: 34, height: 34, borderRadius: t.cardRadius,
                                 background: t.accentPrimaryMuted, border: `1px solid ${t.accentPrimary}33`,
                                 display: "flex", alignItems: "center", justifyContent: "center",
                                 fontSize: "0.82rem", fontWeight: 800, color: t.accentPrimary,
@@ -292,19 +292,12 @@ export default function MmoLayout({ children }: { children: React.ReactNode }) {
                     )}
                 </div>
             </aside>
-
-            {/* ═══════════════════ MAIN CONTENT ═══════════════════ */}
-            <main
-                data-mmo-filters={JSON.stringify({
-                    sortBy, priceMin, priceMax, stockFilter, selectedCategory,
-                })}
-                style={{
-                    flex: 1, overflowY: "auto", position: "relative",
-                    backgroundColor: t.bgPrimary,
-                }}
-            >
+            }
+        >
+            {/* data-mmo-filters bridges the sidebar filters to the storefront page */}
+            <div data-mmo-filters={JSON.stringify({ sortBy, priceMin, priceMax, stockFilter, selectedCategory })}>
                 {children}
-            </main>
-        </div>
+            </div>
+        </DrawerShell>
     );
 }

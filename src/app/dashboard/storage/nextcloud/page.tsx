@@ -42,8 +42,8 @@ export default function NextcloudStoragePage() {
                 <p style={{ marginTop: 6, fontSize: "0.83rem", color: t.textMuted, maxWidth: 520 }}>Cloud file storage accessible from any device. 5 GB free with any active VM lease. Expand in 5 GB blocks up to 100 GB total.</p>
             </div>
 
-            {success && <div style={{ padding: "12px 16px", borderRadius: t.isMono ? 4 : 9, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}33`, color: t.statusSuccess, marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}><span style={{ display: "flex", alignItems: "center", gap: 6 }}><CheckCircle2 style={{ width: 14, height: 14, flexShrink: 0 }} /> {success}</span><button onClick={() => setSuccess("")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", display: "flex", alignItems: "center" }}><X style={{ width: 14, height: 14 }} /></button></div>}
-            {error && <div style={{ padding: "12px 16px", borderRadius: t.isMono ? 4 : 9, background: t.statusErrorBg, border: `1px solid ${t.statusError}33`, color: t.statusError, marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}><span style={{ display: "flex", alignItems: "center", gap: 6 }}><AlertCircle style={{ width: 14, height: 14, flexShrink: 0 }} /> {error}</span><button onClick={() => setError("")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", display: "flex", alignItems: "center" }}><X style={{ width: 14, height: 14 }} /></button></div>}
+            {success && <div style={{ padding: "12px 16px", borderRadius: t.buttonRadius, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}33`, color: t.statusSuccess, marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}><span style={{ display: "flex", alignItems: "center", gap: 6 }}><CheckCircle2 style={{ width: 14, height: 14, flexShrink: 0 }} /> {success}</span><button onClick={() => setSuccess("")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", display: "flex", alignItems: "center" }}><X style={{ width: 14, height: 14 }} /></button></div>}
+            {error && <div style={{ padding: "12px 16px", borderRadius: t.buttonRadius, background: t.statusErrorBg, border: `1px solid ${t.statusError}33`, color: t.statusError, marginBottom: 20, fontSize: "0.875rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}><span style={{ display: "flex", alignItems: "center", gap: 6 }}><AlertCircle style={{ width: 14, height: 14, flexShrink: 0 }} /> {error}</span><button onClick={() => setError("")} style={{ background: "none", border: "none", color: "inherit", cursor: "pointer", display: "flex", alignItems: "center" }}><X style={{ width: 14, height: 14 }} /></button></div>}
 
             {loading ? <div style={{ padding: 60, display: "flex", alignItems: "center", justifyContent: "center", color: t.textMuted }}>Loading…</div> : !data ? null : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
@@ -75,7 +75,7 @@ export default function NextcloudStoragePage() {
                     {data.provisioned && (
                         <>
                             {/* Stats */}
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
                                 {[{ label: "Total Quota", value: `${data.totalGb} GB`, sub: `of ${data.maxTotalGb} GB max` }, { label: "Free Included", value: `${data.freeGb} GB`, sub: "permanent" }, { label: "Available to Add", value: `${data.remainingGb ?? (data.maxTotalGb - data.totalGb)} GB`, sub: "in 5 GB steps" }].map(stat => (
                                     <div key={stat.label} style={{ ...card, padding: "20px 24px" }}>
                                         <p style={{ fontSize: "0.72rem", color: t.textMuted, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>{stat.label}</p>
@@ -103,12 +103,12 @@ export default function NextcloudStoragePage() {
                                     <h2 style={{ fontSize: "1rem", fontWeight: 700, color: t.textPrimary, marginBottom: 4 }}>Expand Storage</h2>
                                     <p style={{ fontSize: "0.8rem", color: t.textMuted, marginBottom: 20 }}>Must be in {data.stepGb} GB blocks. Current paid: {data.paidGb} GB.</p>
                                     <form onSubmit={handleExpand} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16 }}>
+                                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 16 }}>
                                             <div>
                                                 <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 600, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 8 }}>Storage Tier</label>
                                                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                                                     {(Object.keys(TIER_LABELS) as StorageType[]).map(tt => (
-                                                        <label key={tt} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: t.isMono ? 4 : 8, border: `1px solid ${expandType === tt ? t.accentPrimary + "55" : t.borderPrimary}`, background: expandType === tt ? t.accentPrimaryMuted : "transparent", cursor: "pointer", transition: "all 0.15s" }}>
+                                                        <label key={tt} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: t.cardRadius, border: `1px solid ${expandType === tt ? t.accentPrimary + "55" : t.borderPrimary}`, background: expandType === tt ? t.accentPrimaryMuted : "transparent", cursor: "pointer", transition: "all 0.15s" }}>
                                                             <input type="radio" name="tier" value={tt} checked={expandType === tt} onChange={() => setExpandType(tt)} style={{ display: "none" }} />
                                                             <div style={{ width: 8, height: 8, borderRadius: "50%", background: expandType === tt ? t.accentPrimary : t.textMuted, flexShrink: 0 }} />
                                                             <div>

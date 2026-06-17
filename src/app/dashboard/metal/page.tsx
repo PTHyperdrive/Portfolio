@@ -35,7 +35,7 @@ export default function BareMetalPage() {
                             <p style={{ fontSize: "0.83rem", color: t.textMuted }}>Dedicated physical servers with full hardware access. No hypervisor overhead.</p>
                         </div>
                     </div>
-                    <span style={{ padding: "6px 14px", borderRadius: t.isMono ? 4 : 8, background: t.statusWarningBg, border: `1px solid ${t.statusWarning}33`, color: t.statusWarning, fontSize: "0.78rem", fontWeight: 700 }}>
+                    <span style={{ padding: "6px 14px", borderRadius: t.cardRadius, background: t.statusWarningBg, border: `1px solid ${t.statusWarning}33`, color: t.statusWarning, fontSize: "0.78rem", fontWeight: 700 }}>
                         COMING SOON
                     </span>
                 </div>
@@ -67,7 +67,7 @@ export default function BareMetalPage() {
                         </div>
                         {selectedTier === tier.name && (
                             <div style={{ padding: "20px 28px", borderTop: `1px solid ${t.borderSecondary}`, background: t.bgSecondary }}>
-                                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 20 }}>
+                                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 16, marginBottom: 20 }}>
                                     {[
                                         { Icon: Globe, label: "Network", value: tier.network },
                                         { Icon: Shield, label: "Security", value: "Hardware RAID + IPMI" },

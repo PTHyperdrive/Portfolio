@@ -46,7 +46,7 @@ export default function ResourceLimitsPage() {
             </div>
 
             {/* Quota Cards */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 24 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 24 }}>
                 {quotas.map(q => {
                     const pct = q.max > 0 ? Math.round((q.used / q.max) * 100) : 0;
                     return (

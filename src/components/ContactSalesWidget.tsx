@@ -24,7 +24,7 @@ const EXCLUDED_PREFIXES = ["/adminsystemnrsp", "/console-window", "/auth"];
 
 export default function ContactSalesWidget() {
     const t = useThemeTokens();
-    const pathname = usePathname();
+    const pathname = usePathname() ?? "";
     const { status: authStatus } = useSession();
     const isAuthenticated = authStatus === "authenticated";
 

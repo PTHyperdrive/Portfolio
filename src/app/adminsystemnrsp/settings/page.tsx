@@ -84,7 +84,7 @@ export default function AdminSettingsPage() {
     const update = (key: SettingKey, val: string) => setSettings(s => ({ ...s, [key]: val }));
 
     const card: React.CSSProperties = { background: t.bgCard, border: `1px solid ${t.borderPrimary}`, borderRadius: t.cardRadius, boxShadow: t.shadow, marginBottom: 16 };
-    const inp: React.CSSProperties = { background: t.bgInput, border: `1px solid ${t.borderPrimary}`, borderRadius: t.isMono ? 4 : 8, color: t.textPrimary, fontSize: "0.875rem", outline: "none", padding: "9px 12px", fontFamily: t.fontFamily, width: "100%", boxSizing: "border-box" as const };
+    const inp: React.CSSProperties = { background: t.bgInput, border: `1px solid ${t.borderPrimary}`, borderRadius: t.cardRadius, color: t.textPrimary, fontSize: "0.875rem", outline: "none", padding: "9px 12px", fontFamily: t.fontFamily, width: "100%", boxSizing: "border-box" as const };
     const label: React.CSSProperties = { fontSize: "0.75rem", fontWeight: 700, color: t.textSecondary, display: "block", marginBottom: 6, letterSpacing: "0.02em" };
 
     return (
@@ -101,15 +101,15 @@ export default function AdminSettingsPage() {
                             <p style={{ fontSize: "0.82rem", color: t.textMuted }}>Global platform configuration variables.</p>
                         </div>
                     </div>
-                    <button onClick={load} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: t.isMono ? 4 : 8, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>
+                    <button onClick={load} style={{ display: "flex", alignItems: "center", gap: 6, padding: "7px 14px", borderRadius: t.cardRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>
                         <RefreshCw style={{ width: 13, height: 13 }} /> Refresh
                     </button>
                 </div>
             </div>
 
             {/* Toasts */}
-            {success && <div style={{ padding: "10px 16px", borderRadius: t.isMono ? 4 : 8, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}33`, color: t.statusSuccess, marginBottom: 16, fontSize: "0.875rem", display: "flex", alignItems: "center", gap: 8 }}><CheckCircle2 style={{ width: 14, height: 14 }} />{success}</div>}
-            {error && <div style={{ padding: "10px 16px", borderRadius: t.isMono ? 4 : 8, background: t.statusErrorBg, border: `1px solid ${t.statusError}33`, color: t.statusError, marginBottom: 16, fontSize: "0.875rem", display: "flex", alignItems: "center", gap: 8 }}><AlertCircle style={{ width: 14, height: 14 }} />{error}</div>}
+            {success && <div style={{ padding: "10px 16px", borderRadius: t.cardRadius, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}33`, color: t.statusSuccess, marginBottom: 16, fontSize: "0.875rem", display: "flex", alignItems: "center", gap: 8 }}><CheckCircle2 style={{ width: 14, height: 14 }} />{success}</div>}
+            {error && <div style={{ padding: "10px 16px", borderRadius: t.cardRadius, background: t.statusErrorBg, border: `1px solid ${t.statusError}33`, color: t.statusError, marginBottom: 16, fontSize: "0.875rem", display: "flex", alignItems: "center", gap: 8 }}><AlertCircle style={{ width: 14, height: 14 }} />{error}</div>}
 
             {loading ? (
                 <div style={{ padding: "60px", textAlign: "center", color: t.textMuted, display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { audit } from "@/lib/audit";
+import { require2fa, twoFactorErrorResponse } from "@/lib/require2fa";
 
 const MAX_KEYS_PER_USER = 10;
 
@@ -59,8 +60,12 @@ export async function POST(req: NextRequest) {
     }
 
     const userId = session.user.id;
-    const body = await req.json() as { name?: string; publicKey?: string; setDefault?: boolean };
+    const body = await req.json() as { name?: string; publicKey?: string; setDefault?: boolean; totpToken?: string };
     const { name, publicKey, setDefault = false } = body;
+
+    // Step-up: adding a key grants VM access — require TOTP if the user has it.
+    const stepUp = await require2fa(userId, body.totpToken);
+    if (!stepUp.ok) return twoFactorErrorResponse(stepUp.error!);
 
     if (!name?.trim()) {
         return NextResponse.json({ error: "Key name is required." }, { status: 400 });

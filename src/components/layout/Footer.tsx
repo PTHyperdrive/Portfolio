@@ -29,7 +29,7 @@ const FOOTER_LINKS = {
 };
 
 export default function Footer() {
-    const pathname = usePathname();
+    const pathname = usePathname() ?? "";
     const t = useThemeTokens();
     if (pathname.startsWith("/dashboard") || pathname.startsWith("/mmo") || pathname.startsWith("/adminsystemnrsp")) return null;
 
@@ -82,7 +82,7 @@ export default function Footer() {
                                     style={{
                                         width: 36,
                                         height: 36,
-                                        borderRadius: t.isMono ? 4 : 8,
+                                        borderRadius: t.cardRadius,
                                         background: t.isMono ? "transparent" : t.bgCard,
                                         border: `1px solid ${t.borderPrimary}`,
                                         display: "flex",

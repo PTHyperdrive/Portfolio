@@ -8,11 +8,12 @@ import { useSession, signOut } from "next-auth/react";
 import { useThemeTokens } from "@/lib/useThemeTokens";
 import { useCredits } from "@/components/CreditProvider";
 import ThemeToggle from "@/components/ThemeToggle";
+import DrawerShell from "@/components/layout/DrawerShell";
 import {
     LayoutGrid, Server, Users, Tag, Receipt,
     ScrollText, MessageSquare, MessagesSquare, SlidersHorizontal,
     LogOut, ArrowLeft, Wallet, Shield, Store, FileText,
-    Activity, Network,
+    Activity, Network, Smartphone,
 } from "lucide-react";
 
 type NavItem = { label: string; href: string; Icon: React.ElementType; badge?: number };
@@ -36,6 +37,7 @@ const ADMIN_ITEMS: NavItem[] = [
     { label: "Billing & Invoices",href: "/adminsystemnrsp/billing",     Icon: Receipt          },
     { label: "Audit Logs",       href: "/adminsystemnrsp/audit-logs",   Icon: ScrollText       },
     { label: "MMO Admin",        href: "/adminsystemnrsp/mmo",          Icon: Store            },
+    { label: "TimoSMS",          href: "/adminsystemnrsp/sms",          Icon: Smartphone       },
     { label: "CMS",              href: "/adminsystemnrsp/cms",          Icon: FileText         },
     { label: "System Settings",  href: "/adminsystemnrsp/settings",     Icon: SlidersHorizontal},
 ];
@@ -80,7 +82,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         const active = isActive(href);
         return {
             display: "flex", alignItems: "center", gap: 10,
-            padding: "8px 12px", borderRadius: t.isMono ? 4 : 8,
+            padding: "8px 12px", borderRadius: t.cardRadius,
             textDecoration: "none", fontSize: "0.85rem", fontWeight: 600,
             color: active ? t.statusWarning : t.textSecondary,
             background: active ? t.statusWarningBg : "transparent",
@@ -112,15 +114,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         );
     };
     return (
-        <div style={{
-            display: "flex", height: "100vh", width: "100%", overflow: "hidden",
-            backgroundColor: t.bgPrimary, color: t.textPrimary, fontFamily: t.fontFamily,
-        }}>
-            {/* ── Sidebar ── */}
+        <DrawerShell
+            sidebarWidth={264}
+            title={<>NRSP<span style={{ color: t.statusWarning }}> Admin</span></>}
+            sidebar={
             <aside style={{
                 width: 264, minWidth: 264, height: "100vh", overflowY: "auto",
                 display: "flex", flexDirection: "column",
-                background: t.isMono ? (t.isLight ? "#fafafa" : "#000000") : "rgba(8,8,12,0.99)",
+                background: t.bgSecondary,
                 borderRight: `1px solid ${t.borderPrimary}`,
             }}>
                 {/* Brand */}
@@ -144,7 +145,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <div style={{ padding: "8px 8px 0" }}>
                     <Link href="/dashboard/vps" style={{
                         display: "flex", alignItems: "center", gap: 7, padding: "7px 12px",
-                        borderRadius: t.isMono ? 4 : 8, textDecoration: "none",
+                        borderRadius: t.cardRadius, textDecoration: "none",
                         color: t.textMuted, fontSize: "0.78rem", fontWeight: 500,
                     }}>
                         <ArrowLeft style={{ width: 13, height: 13 }} /> Back to Dashboard
@@ -168,7 +169,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     {/* Credit display */}
                     <div style={{
                         display: "flex", alignItems: "center", gap: 6,
-                        padding: "7px 10px", borderRadius: t.isMono ? 4 : 8,
+                        padding: "7px 10px", borderRadius: t.cardRadius,
                         background: t.bgSecondary, border: `1px solid ${t.borderSecondary}`,
                         marginBottom: 8,
                     }}>
@@ -185,7 +186,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     {session?.user && (
                         <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8 }}>
                             <div style={{
-                                width: 28, height: 28, borderRadius: t.isMono ? 4 : 7,
+                                width: 28, height: 28, borderRadius: t.buttonRadius,
                                 background: t.statusWarningBg, display: "flex",
                                 alignItems: "center", justifyContent: "center",
                                 fontSize: "0.72rem", fontWeight: 800, color: t.statusWarning, flexShrink: 0,
@@ -200,7 +201,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                                 <p style={{ fontSize: "0.62rem", color: t.statusWarning, fontWeight: 600 }}>Administrator</p>
                             </div>
                             <button onClick={() => signOut({ callbackUrl: "/" })} title="Sign out" style={{
-                                width: 26, height: 26, borderRadius: t.isMono ? 4 : 6, flexShrink: 0,
+                                width: 26, height: 26, borderRadius: t.buttonRadius, flexShrink: 0,
                                 border: `1px solid ${t.borderPrimary}`, background: "transparent",
                                 color: t.textMuted, cursor: "pointer",
                                 display: "flex", alignItems: "center", justifyContent: "center",
@@ -211,14 +212,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     )}
                 </div>
             </aside>
-
-            {/* ── Main Content ── */}
-            <main style={{
-                flex: 1, overflowY: "auto", position: "relative",
-                backgroundColor: t.bgPrimary,
-            }}>
-                {children}
-            </main>
-        </div>
+            }
+        >
+            {children}
+        </DrawerShell>
     );
 }

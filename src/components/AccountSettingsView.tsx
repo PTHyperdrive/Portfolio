@@ -4,9 +4,10 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { UAParser } from "ua-parser-js";
 import { useThemeTokens } from "@/lib/useThemeTokens";
+import TwoFactorModal from "@/components/TwoFactorModal";
 import {
     User, Settings, Lock, ShieldCheck, Camera, AlertTriangle,
-    XCircle, CheckCircle, RefreshCw
+    XCircle, CheckCircle, RefreshCw, Mail, KeyRound
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -38,11 +39,15 @@ export default function AccountSettingsView() {
     // Preferences state
     const [language, setLanguage] = useState("en");
     const [network, setNetwork] = useState("auto");
-    const [loginWith2FA, setLoginWith2FA] = useState(false);
-    const [login2FASaving, setLogin2FASaving] = useState(false);
 
     // Security state — 2FA
     const [is2FAEnabled, setIs2FAEnabled] = useState(false);
+    // Email-code 2FA
+    const [isEmail2FAEnabled, setIsEmail2FAEnabled] = useState(false);
+    const [emailSetupSent, setEmailSetupSent] = useState(false);
+    const [emailSetupCode, setEmailSetupCode] = useState("");
+    const [emailBusy, setEmailBusy] = useState(false);
+    const [emailMsg, setEmailMsg] = useState<{ ok: boolean; text: string } | null>(null);
     const [setupOpen, setSetupOpen] = useState(false);
     const [twoFALoading, setTwoFALoading] = useState(false);
     const [twoFAError, setTwoFAError] = useState("");
@@ -56,18 +61,82 @@ export default function AccountSettingsView() {
     const [disableError, setDisableError] = useState("");
     const [successMsg, setSuccessMsg] = useState("");
 
+    // Backup recovery codes
+    type RecoveryStatus = { generated: boolean; totalRemaining: number; attemptsUsed: number; attemptsMax: number; locked: boolean };
+    const [recoveryStatus, setRecoveryStatus] = useState<RecoveryStatus | null>(null);
+    const [generatedCodes, setGeneratedCodes] = useState<string[] | null>(null);
+    const [recoveryBusy, setRecoveryBusy] = useState(false);
+    const [recoveryMsg, setRecoveryMsg] = useState<{ ok: boolean; text: string } | null>(null);
+    // TOTP step-up for revealing a fresh backup-code set
+    const [recovery2faShow, setRecovery2faShow] = useState(false);
+    const [recovery2faError, setRecovery2faError] = useState("");
+    const [recovery2faLoading, setRecovery2faLoading] = useState(false);
+
+    const loadRecoveryStatus = () => {
+        fetch("/api/auth/2fa/recovery")
+            .then(r => r.json())
+            .then((d: { status?: RecoveryStatus }) => { if (d?.status) setRecoveryStatus(d.status); })
+            .catch(() => { /* non-critical */ });
+    };
+
+    const handleGenerateRecovery = async (token?: string) => {
+        setRecoveryBusy(true);
+        setRecoveryMsg(null);
+        setRecovery2faError("");
+        try {
+            const res = await fetch("/api/auth/2fa/recovery", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "generate", totpToken: token }),
+            });
+            const d = await res.json();
+            if (!res.ok) {
+                if (d.error === "2FA_REQUIRED") { setRecovery2faShow(true); return; }
+                if (d.error === "INVALID_2FA" || d.error === "2FA_RATE_LIMITED") { setRecovery2faError(d.message || "Verification failed."); return; }
+                throw new Error(d.error ?? "Failed to generate backup codes");
+            }
+            setRecovery2faShow(false);
+            setGeneratedCodes(d.codes as string[]);
+            loadRecoveryStatus();
+        } catch (err) {
+            setRecoveryMsg({ ok: false, text: err instanceof Error ? err.message : "Failed to generate backup codes" });
+        } finally {
+            setRecoveryBusy(false);
+            setRecovery2faLoading(false);
+        }
+    };
+
+    const copyRecoveryCodes = () => {
+        if (!generatedCodes) return;
+        navigator.clipboard?.writeText(generatedCodes.join("\n")).then(
+            () => setRecoveryMsg({ ok: true, text: "Codes copied to clipboard." }),
+            () => setRecoveryMsg({ ok: false, text: "Couldn't copy — select and copy manually." }),
+        );
+    };
+
+    const downloadRecoveryCodes = () => {
+        if (!generatedCodes) return;
+        const body = `NotRespond backup codes\nGenerated: ${new Date().toISOString()}\n\n${generatedCodes.join("\n")}\n\nEach code works once. Keep them somewhere safe and offline.\n`;
+        const url = URL.createObjectURL(new Blob([body], { type: "text/plain" }));
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "notrespond-backup-codes.txt";
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+
     const user = session?.user as Record<string, unknown> | undefined;
 
     // Sync toggle from DB on mount — session JWT does not carry twoFactorEnabled
     useEffect(() => {
         fetch("/api/overview")
             .then(r => r.json())
-            .then((d: { user?: { twoFactorEnabled?: boolean; loginWith2FA?: boolean } }) => {
+            .then((d: { user?: { twoFactorEnabled?: boolean; emailTwoFactorEnabled?: boolean } }) => {
                 if (d?.user?.twoFactorEnabled) {
                     setIs2FAEnabled(true);
                 }
-                if (d?.user?.loginWith2FA) {
-                    setLoginWith2FA(true);
+                if (d?.user?.emailTwoFactorEnabled) {
+                    setIsEmail2FAEnabled(true);
                 }
             })
             .catch(() => { /* non-critical — toggle stays off */ });
@@ -174,9 +243,9 @@ export default function AccountSettingsView() {
             .finally(() => setSessionsLoading(false));
     };
 
-    // Load sessions when the Security tab is opened
+    // Load sessions + backup-code status when the Security tab is opened
     useEffect(() => {
-        if (activeTab === "security") loadSessions();
+        if (activeTab === "security") { loadSessions(); loadRecoveryStatus(); }
     }, [activeTab]);
 
 
@@ -270,7 +339,7 @@ export default function AccountSettingsView() {
         padding: "10px 14px",
         background: t.bgInput,
         border: `1px solid ${t.borderPrimary}`,
-        borderRadius: t.isMono ? 4 : 8,
+        borderRadius: t.cardRadius,
         color: t.textPrimary,
         fontSize: "0.9rem",
         outline: "none",
@@ -362,7 +431,7 @@ export default function AccountSettingsView() {
                         <div style={{ ...card, padding: "24px" }}>
                             <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "16px", color: t.textPrimary }}>Avatar</h3>
                             <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-                                <div style={{ width: 72, height: 72, borderRadius: t.isMono ? 12 : 16, background: t.isMono ? t.bgTertiary : "linear-gradient(135deg, #3b82f6, #6366f1)", border: t.isMono ? `1px solid ${t.borderPrimary}` : "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.8rem", fontWeight: 800, color: t.isLight ? t.textPrimary : "#fff" }}>
+                                <div style={{ width: 72, height: 72, borderRadius: t.cardRadius, background: t.isMono ? t.bgTertiary : "linear-gradient(135deg, #3b82f6, #6366f1)", border: t.isMono ? `1px solid ${t.borderPrimary}` : "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.8rem", fontWeight: 800, color: t.isLight ? t.textPrimary : "#fff" }}>
                                     {(session?.user?.name || session?.user?.email || "U")[0].toUpperCase()}
                                 </div>
                                 <div>
@@ -469,58 +538,87 @@ export default function AccountSettingsView() {
                         </button>
                     </div>
 
-                    {/* Login Security Preference */}
+                    {/* Email verification codes (2FA method) */}
                     <div style={{ ...card, padding: "28px", marginTop: 24 }}>
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
                             <div>
                                 <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "4px", color: t.textPrimary, display: "flex", alignItems: "center", gap: 8 }}>
-                                    <ShieldCheck style={{ width: 18, height: 18, color: t.accentPrimary }} />
-                                    Require 2FA at Login
+                                    <Mail style={{ width: 18, height: 18, color: t.accentPrimary }} />
+                                    Email verification codes
+                                    {isEmail2FAEnabled && (
+                                        <span style={{ fontSize: "0.62rem", fontWeight: 800, padding: "2px 8px", borderRadius: t.buttonRadius, background: t.statusSuccessBg, color: t.statusSuccess }}>ENABLED</span>
+                                    )}
                                 </h3>
-                                <p style={{ fontSize: "0.82rem", color: t.textMuted, maxWidth: 420 }}>
-                                    {is2FAEnabled
-                                        ? "When enabled, you must enter a 6-digit authenticator code every time you sign in."
-                                        : "You need to enable Two-Factor Authentication in the Security tab first."}
+                                <p style={{ fontSize: "0.82rem", color: t.textMuted, maxWidth: 460 }}>
+                                    Receive a 6-digit code by email at sign-in. Works on its own or alongside your authenticator app — at login you can pick whichever method you prefer.
                                 </p>
                             </div>
-                            <button
-                                id="login-2fa-toggle"
-                                onClick={async () => {
-                                    if (!is2FAEnabled) return;
-                                    setLogin2FASaving(true);
-                                    try {
-                                        const res = await fetch("/api/user/profile", {
-                                            method: "PATCH",
-                                            headers: { "Content-Type": "application/json" },
-                                            body: JSON.stringify({ loginWith2FA: !loginWith2FA }),
-                                        });
-                                        if (res.ok) setLoginWith2FA(!loginWith2FA);
-                                    } catch { /* silent */ } finally {
-                                        setLogin2FASaving(false);
-                                    }
-                                }}
-                                disabled={!is2FAEnabled || login2FASaving}
-                                aria-label={loginWith2FA ? "Disable login 2FA" : "Enable login 2FA"}
-                                style={{
-                                    width: 52, height: 28, borderRadius: 14, border: "none",
-                                    cursor: !is2FAEnabled || login2FASaving ? "not-allowed" : "pointer",
-                                    background: loginWith2FA ? t.accentPrimary : `${t.textMuted}33`,
-                                    position: "relative", transition: "background 0.25s", flexShrink: 0,
-                                    opacity: !is2FAEnabled ? 0.35 : login2FASaving ? 0.6 : 1,
-                                }}
-                            >
-                                <span style={{
-                                    position: "absolute", top: 4,
-                                    left: loginWith2FA ? 26 : 4,
-                                    width: 20, height: 20, borderRadius: "50%",
-                                    background: "#fff", transition: "left 0.25s",
-                                }} />
-                            </button>
+                            {isEmail2FAEnabled && (
+                                <button
+                                    onClick={async () => {
+                                        setEmailBusy(true); setEmailMsg(null);
+                                        try {
+                                            const res = await fetch("/api/auth/2fa/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "disable" }) });
+                                            if (res.ok) { setIsEmail2FAEnabled(false); setEmailSetupSent(false); setEmailSetupCode(""); }
+                                            else { const d = await res.json(); setEmailMsg({ ok: false, text: d.error || "Failed" }); }
+                                        } catch { setEmailMsg({ ok: false, text: "Network error" }); } finally { setEmailBusy(false); }
+                                    }}
+                                    disabled={emailBusy}
+                                    style={{ padding: "8px 16px", borderRadius: t.buttonRadius, border: `1px solid ${t.statusError}`, background: "transparent", color: t.statusError, fontSize: "0.8rem", fontWeight: 700, cursor: "pointer", flexShrink: 0 }}
+                                >
+                                    Disable
+                                </button>
+                            )}
                         </div>
-                        {loginWith2FA && is2FAEnabled && (
-                            <div style={{ marginTop: 14, padding: "12px 16px", borderRadius: t.isMono ? 4 : 8, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}33`, display: "flex", alignItems: "center", gap: 8 }}>
-                                <ShieldCheck style={{ width: 16, height: 16, color: t.statusSuccess, flexShrink: 0 }} />
-                                <p style={{ fontSize: "0.82rem", fontWeight: 600, color: t.statusSuccess }}>Login 2FA is active. A code will be required at every sign-in.</p>
+
+                        {!isEmail2FAEnabled && (
+                            <div style={{ marginTop: 16 }}>
+                                {!emailSetupSent ? (
+                                    <button
+                                        onClick={async () => {
+                                            setEmailBusy(true); setEmailMsg(null);
+                                            try {
+                                                const res = await fetch("/api/auth/2fa/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "setup" }) });
+                                                const d = await res.json();
+                                                if (res.ok) { setEmailSetupSent(true); setEmailMsg({ ok: true, text: "Code sent — check your email." }); }
+                                                else setEmailMsg({ ok: false, text: d.error || "Failed to send code" });
+                                            } catch { setEmailMsg({ ok: false, text: "Network error" }); } finally { setEmailBusy(false); }
+                                        }}
+                                        disabled={emailBusy}
+                                        style={{ padding: "10px 22px", borderRadius: t.buttonRadius, border: "none", background: t.accentPrimary, color: t.textInverse, fontWeight: 700, fontSize: "0.85rem", cursor: "pointer", opacity: emailBusy ? 0.6 : 1 }}
+                                    >
+                                        {emailBusy ? "Sending…" : "Send setup code"}
+                                    </button>
+                                ) : (
+                                    <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                                        <input
+                                            value={emailSetupCode}
+                                            onChange={(e) => setEmailSetupCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                                            placeholder="123456"
+                                            inputMode="numeric"
+                                            style={{ ...inputStyle, width: 140, letterSpacing: "0.3em", textAlign: "center", fontFamily: t.fontMono }}
+                                        />
+                                        <button
+                                            onClick={async () => {
+                                                if (!/^\d{6}$/.test(emailSetupCode)) { setEmailMsg({ ok: false, text: "Enter the 6-digit code." }); return; }
+                                                setEmailBusy(true); setEmailMsg(null);
+                                                try {
+                                                    const res = await fetch("/api/auth/2fa/email", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "verify", code: emailSetupCode }) });
+                                                    const d = await res.json();
+                                                    if (res.ok) { setIsEmail2FAEnabled(true); setEmailSetupSent(false); setEmailSetupCode(""); setEmailMsg({ ok: true, text: "Email codes enabled." }); }
+                                                    else setEmailMsg({ ok: false, text: d.error || "Invalid code" });
+                                                } catch { setEmailMsg({ ok: false, text: "Network error" }); } finally { setEmailBusy(false); }
+                                            }}
+                                            disabled={emailBusy}
+                                            style={{ padding: "10px 20px", borderRadius: t.buttonRadius, border: "none", background: t.accentPrimary, color: t.textInverse, fontWeight: 700, fontSize: "0.85rem", cursor: "pointer", opacity: emailBusy ? 0.6 : 1 }}
+                                        >
+                                            {emailBusy ? "Verifying…" : "Verify & enable"}
+                                        </button>
+                                    </div>
+                                )}
+                                {emailMsg && (
+                                    <p style={{ fontSize: "0.8rem", marginTop: 10, fontWeight: 600, color: emailMsg.ok ? t.statusSuccess : t.statusError }}>{emailMsg.text}</p>
+                                )}
                             </div>
                         )}
                     </div>
@@ -535,7 +633,7 @@ export default function AccountSettingsView() {
 
                             {/* Success / status toast */}
                             {successMsg && (
-                                <div style={{ marginBottom: "16px", padding: "12px 16px", borderRadius: t.isMono ? 4 : 8, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}4d`, color: t.statusSuccess, fontSize: "0.86rem", fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
+                                <div style={{ marginBottom: "16px", padding: "12px 16px", borderRadius: t.cardRadius, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}4d`, color: t.statusSuccess, fontSize: "0.86rem", fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
                                     <CheckCircle style={{ width: 16, height: 16, flexShrink: 0 }} />
                                     {successMsg}
                                 </div>
@@ -572,7 +670,7 @@ export default function AccountSettingsView() {
 
                             {/* Enabled badge */}
                             {is2FAEnabled && !isDisableModalOpen && !setupOpen && (
-                                <div style={{ padding: "14px 18px", borderRadius: t.isMono ? 4 : 8, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}33`, display: "flex", alignItems: "center", gap: 10 }}>
+                                <div style={{ padding: "14px 18px", borderRadius: t.cardRadius, background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}33`, display: "flex", alignItems: "center", gap: 10 }}>
                                     <ShieldCheck style={{ width: 22, height: 22, color: t.statusSuccess, flexShrink: 0 }} />
                                     <div>
                                         <p style={{ fontSize: "0.88rem", fontWeight: 700, color: t.statusSuccess }}>2FA is active</p>
@@ -583,7 +681,7 @@ export default function AccountSettingsView() {
 
                             {/* ── Setup flow (QR + verify) ── */}
                             {setupOpen && !is2FAEnabled && (
-                                <div style={{ marginTop: "24px", padding: "24px", borderRadius: t.isMono ? 4 : 8, background: t.accentPrimaryMuted, border: `1px solid ${t.accentPrimary}1f` }}>
+                                <div style={{ marginTop: "24px", padding: "24px", borderRadius: t.cardRadius, background: t.accentPrimaryMuted, border: `1px solid ${t.accentPrimary}1f` }}>
                                     {twoFALoading && !qrCodeUrl && (
                                         <p style={{ textAlign: "center", fontSize: "0.9rem", color: t.textMuted, padding: "20px 0" }}>Generating QR code…</p>
                                     )}
@@ -641,7 +739,7 @@ export default function AccountSettingsView() {
 
                             {/* ── Disable modal (inline) ── */}
                             {isDisableModalOpen && (
-                                <div style={{ marginTop: "20px", padding: "24px", borderRadius: t.isMono ? 4 : 8, background: t.statusErrorBg, border: `1px solid ${t.statusError}40` }}>
+                                <div style={{ marginTop: "20px", padding: "24px", borderRadius: t.cardRadius, background: t.statusErrorBg, border: `1px solid ${t.statusError}40` }}>
                                     <p style={{ fontSize: "0.9rem", fontWeight: 700, color: t.statusError, marginBottom: "6px", display: "flex", alignItems: "center", gap: 8 }}>
                                         <AlertTriangle style={{ width: 16, height: 16 }} />
                                         Disable Two-Factor Authentication
@@ -691,6 +789,82 @@ export default function AccountSettingsView() {
                             )}
                         </div>
 
+                        {/* Backup recovery codes */}
+                        <div style={{ ...card, padding: "28px" }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, marginBottom: "12px" }}>
+                                <div>
+                                    <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "4px", color: t.textPrimary, display: "flex", alignItems: "center", gap: 8 }}>
+                                        <KeyRound style={{ width: 18, height: 18, color: t.accentPrimary }} />
+                                        Backup recovery codes
+                                        {recoveryStatus?.locked && (
+                                            <span style={{ fontSize: "0.62rem", fontWeight: 800, padding: "2px 8px", borderRadius: t.buttonRadius, background: t.statusErrorBg, color: t.statusError }}>LOCKED</span>
+                                        )}
+                                    </h3>
+                                    <p style={{ fontSize: "0.82rem", color: t.textMuted, maxWidth: 480, lineHeight: 1.5 }}>
+                                        One-time codes to sign in if you lose your authenticator and email access. You get 10 codes and 10 total backup-code attempts — after that they lock, and you&apos;ll need another method or a support ticket.
+                                    </p>
+                                </div>
+                            </div>
+
+                            {!is2FAEnabled && !isEmail2FAEnabled ? (
+                                <p style={{ fontSize: "0.82rem", color: t.textMuted, padding: "12px 14px", borderRadius: t.cardRadius, background: t.bgInput, border: `1px solid ${t.borderSecondary}` }}>
+                                    Enable an authenticator app or email codes first — backup codes are a fallback for those.
+                                </p>
+                            ) : generatedCodes ? (
+                                <div style={{ padding: "18px", borderRadius: t.cardRadius, background: t.accentPrimaryMuted, border: `1px solid ${t.accentPrimary}1f` }}>
+                                    <p style={{ fontSize: "0.82rem", fontWeight: 700, color: t.textPrimary, marginBottom: "4px", display: "flex", alignItems: "center", gap: 6 }}>
+                                        <AlertTriangle style={{ width: 14, height: 14, color: t.accentPrimary }} />
+                                        Save these now — they won&apos;t be shown again.
+                                    </p>
+                                    <p style={{ fontSize: "0.78rem", color: t.textMuted, marginBottom: "14px" }}>Each code works once. Store them offline, somewhere safe.</p>
+                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "16px" }}>
+                                        {generatedCodes.map((c) => (
+                                            <code key={c} style={{ padding: "8px 12px", borderRadius: 8, background: t.bgInput, border: `1px solid ${t.borderPrimary}`, color: t.textPrimary, fontSize: "0.9rem", fontWeight: 700, letterSpacing: "0.08em", textAlign: "center", userSelect: "all", fontFamily: t.fontMono }}>
+                                                {c}
+                                            </code>
+                                        ))}
+                                    </div>
+                                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                                        <button onClick={copyRecoveryCodes} style={{ padding: "8px 18px", borderRadius: t.buttonRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textSecondary, fontWeight: 600, fontSize: "0.82rem", cursor: "pointer" }}>Copy</button>
+                                        <button onClick={downloadRecoveryCodes} style={{ padding: "8px 18px", borderRadius: t.buttonRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textSecondary, fontWeight: 600, fontSize: "0.82rem", cursor: "pointer" }}>Download .txt</button>
+                                        <button onClick={() => { setGeneratedCodes(null); setRecoveryMsg(null); }} style={{ padding: "8px 18px", borderRadius: t.buttonRadius, border: "none", background: t.accentPrimary, color: t.textInverse, fontWeight: 700, fontSize: "0.82rem", cursor: "pointer", marginLeft: "auto" }}>I&apos;ve saved them</button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div>
+                                    {recoveryStatus?.generated && (
+                                        <div style={{ display: "flex", gap: 18, flexWrap: "wrap", marginBottom: "14px", fontSize: "0.82rem" }}>
+                                            <span style={{ color: t.textSecondary }}>
+                                                <strong style={{ color: t.textPrimary }}>{recoveryStatus.totalRemaining}</strong> of 10 codes left
+                                            </span>
+                                            <span style={{ color: t.textSecondary }}>
+                                                Attempts used: <strong style={{ color: recoveryStatus.locked ? t.statusError : t.textPrimary }}>{recoveryStatus.attemptsUsed}/{recoveryStatus.attemptsMax}</strong>
+                                            </span>
+                                        </div>
+                                    )}
+                                    {recoveryStatus?.locked && (
+                                        <p style={{ fontSize: "0.8rem", color: t.statusError, marginBottom: "12px", display: "flex", alignItems: "center", gap: 6 }}>
+                                            <AlertTriangle style={{ width: 14, height: 14 }} /> Backup codes are locked. Generate a fresh set to re-enable them.
+                                        </p>
+                                    )}
+                                    <button
+                                        onClick={() => handleGenerateRecovery()}
+                                        disabled={recoveryBusy}
+                                        style={{ padding: "10px 22px", borderRadius: t.buttonRadius, border: "none", background: t.accentPrimary, color: t.textInverse, fontWeight: 700, fontSize: "0.85rem", cursor: recoveryBusy ? "not-allowed" : "pointer", opacity: recoveryBusy ? 0.6 : 1 }}
+                                    >
+                                        {recoveryBusy ? "Generating…" : recoveryStatus?.generated ? "Regenerate backup codes" : "Generate backup codes"}
+                                    </button>
+                                    {recoveryStatus?.generated && (
+                                        <p style={{ fontSize: "0.76rem", color: t.textMuted, marginTop: "8px" }}>Regenerating replaces your current codes and resets the attempt counter.</p>
+                                    )}
+                                </div>
+                            )}
+
+                            {recoveryMsg && (
+                                <p style={{ fontSize: "0.8rem", marginTop: 12, fontWeight: 600, color: recoveryMsg.ok ? t.statusSuccess : t.statusError }}>{recoveryMsg.text}</p>
+                            )}
+                        </div>
+
 
                         {/* Active Sessions */}
                         <div style={{ ...card, padding: "28px" }}>
@@ -732,7 +906,7 @@ export default function AccountSettingsView() {
                             {!sessionsLoading && deviceSessions.length > 0 && (
                                 <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                                     {deviceSessions.map((ds, idx) => (
-                                        <div key={ds.id} style={{ padding: "14px 16px", borderRadius: t.isMono ? 4 : 8, background: t.bgInput, border: `1px solid ${t.borderSecondary}`, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                                        <div key={ds.id} style={{ padding: "14px 16px", borderRadius: t.cardRadius, background: t.bgInput, border: `1px solid ${t.borderSecondary}`, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
                                             <div style={{ minWidth: 0 }}>
                                                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                                                     <p style={{ fontSize: "0.88rem", fontWeight: 600, color: t.textPrimary }}>
@@ -768,6 +942,15 @@ export default function AccountSettingsView() {
 
                     </div>
                 )}
+
+                {/* TOTP step-up for revealing a fresh backup-code set */}
+                <TwoFactorModal
+                    open={recovery2faShow}
+                    onClose={() => { setRecovery2faShow(false); setRecovery2faError(""); setRecovery2faLoading(false); }}
+                    onSubmit={(token) => { setRecovery2faLoading(true); handleGenerateRecovery(token); }}
+                    loading={recovery2faLoading}
+                    error={recovery2faError}
+                />
         </div>
     );
 }

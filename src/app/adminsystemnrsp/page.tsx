@@ -82,14 +82,14 @@ export default function AdminDashboardPage() {
                             <p style={{ fontSize: "0.83rem", color: t.textMuted }}>Platform management, users, billing, and infrastructure oversight.</p>
                         </div>
                     </div>
-                    <button onClick={() => loadStats()} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: t.isMono ? 4 : 8, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>
+                    <button onClick={() => loadStats()} style={{ display: "flex", alignItems: "center", gap: 6, padding: "8px 16px", borderRadius: t.cardRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>
                         <RefreshCw style={{ width: 13, height: 13 }} /> Refresh
                     </button>
                 </div>
             </div>
 
             {/* Role Warning */}
-            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 20px", borderRadius: t.isMono ? 4 : 8, background: t.statusWarningBg, border: `1px solid ${t.statusWarning}33`, color: t.statusWarning, fontSize: "0.83rem", marginBottom: 24 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 20px", borderRadius: t.cardRadius, background: t.statusWarningBg, border: `1px solid ${t.statusWarning}33`, color: t.statusWarning, fontSize: "0.83rem", marginBottom: 24 }}>
                 <AlertTriangle style={{ width: 16, height: 16, flexShrink: 0 }} />
                 <span>You are operating in administrator mode. All actions are logged in the audit trail.</span>
             </div>
@@ -112,7 +112,7 @@ export default function AdminDashboardPage() {
 
             {/* Quick Access Grid */}
             <h2 style={{ fontSize: "1rem", fontWeight: 700, color: t.textSecondary, marginBottom: 14 }}>Management</h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14 }}>
                 {ADMIN_SECTIONS.map(section => (
                     <Link key={section.title} href={section.href} style={{ ...card, padding: "22px 24px", textDecoration: "none", display: "block", transition: "border-color 0.15s" }}
                         onMouseEnter={e => (e.currentTarget.style.borderColor = `${t.accentPrimary}55`)}
@@ -135,7 +135,7 @@ export default function AdminDashboardPage() {
                     <Server style={{ width: 16, height: 16, color: t.accentPrimary }} />
                     <span style={{ fontWeight: 700, color: t.textPrimary, fontSize: "0.95rem" }}>Infrastructure Health</span>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 0 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 0 }}>
                     {[
                         { label: "Proxmox Cluster", status: "Healthy", color: t.statusSuccess },
                         { label: "TrueNAS Storage", status: "Healthy", color: t.statusSuccess },

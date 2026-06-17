@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Script from "next/script";
 import { Keyboard, Maximize2, Monitor, AlertTriangle, Unplug, RotateCcw } from "lucide-react";
+import { useThemeTokens } from "@/lib/useThemeTokens";
 
 type ConnectionStatus = "connecting" | "connected" | "disconnected" | "error";
 
@@ -31,7 +32,8 @@ declare global {
 export default function ConsolePage({ params }: { params: Promise<{ vmId: string }> }) {
     const { vmId } = use(params);
     const searchParams = useSearchParams();
-    const node = searchParams.get("node") ?? "";
+    const node = searchParams?.get("node") ?? "";
+    const t = useThemeTokens();
 
     const viewerRef = useRef<HTMLDivElement>(null);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -164,22 +166,27 @@ export default function ConsolePage({ params }: { params: Promise<{ vmId: string
         }
     };
 
-    // ── Status dot colour ─────────────────────────────────────────────
+    // ── Status dot colour (theme-aware) ───────────────────────────────
     const dotColor: Record<ConnectionStatus, string> = {
-        connecting: "#f59e0b",
-        connected: "#00ff88",
-        disconnected: "#ef4444",
-        error: "#ef4444",
+        connecting: t.statusWarning,
+        connected: t.statusSuccess,
+        disconnected: t.statusError,
+        error: t.statusError,
     };
-    const dotGlow: Record<ConnectionStatus, string> = {
-        connecting: "0 0 8px #f59e0b66",
-        connected: "0 0 12px #00ff88aa",
-        disconnected: "none",
-        error: "none",
-    };
+    // Glow only on non-mono themes (mono is flat by design).
+    const glow = (c: string) => (t.isMono ? "none" : `0 0 12px ${c}aa`);
+
+    // Button shared style
+    const btn = (active: boolean, accent: string): React.CSSProperties => ({
+        padding: "8px 16px", borderRadius: t.buttonRadius, fontSize: "0.82rem", fontWeight: 600,
+        border: `1px solid ${accent}55`, background: `${accent}14`,
+        color: active ? accent : t.textMuted,
+        cursor: active ? "pointer" : "not-allowed", opacity: active ? 1 : 0.5,
+        transition: "all 0.15s", display: "inline-flex", alignItems: "center", gap: 6,
+    });
 
     return (
-        <div style={{ minHeight: "100vh", background: "#0d1117", padding: "24px", fontFamily: "var(--font-inter), sans-serif" }}>
+        <div style={{ minHeight: "100vh", background: t.bgPrimary, padding: "24px", fontFamily: t.fontFamily }}>
 
             {/* Load pre-bundled noVNC (IIFE → window.RFBModule) */}
             <Script
@@ -197,23 +204,23 @@ export default function ConsolePage({ params }: { params: Promise<{ vmId: string
                 <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
                     <Link
                         href={`/dashboard/vps/${vmId}?node=${node}&tab=console`}
-                        style={{ color: "var(--text-muted)", fontSize: "0.85rem", textDecoration: "none" }}
+                        style={{ color: t.textMuted, fontSize: "0.85rem", textDecoration: "none" }}
                     >
                         ← Back to {vmName}
                     </Link>
-                    <span style={{ color: "var(--glass-border)" }}>|</span>
+                    <span style={{ color: t.borderPrimary }}>|</span>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                         {/* Animated pulsing dot for connecting state */}
                         <div style={{
                             width: 10, height: 10, borderRadius: "50%",
-                            background: isPoppedOut ? "#a78bfa" : dotColor[status],
-                            boxShadow: isPoppedOut ? "0 0 8px #a78bfa66" : dotGlow[status],
+                            background: isPoppedOut ? t.accentSecondary : dotColor[status],
+                            boxShadow: isPoppedOut ? glow(t.accentSecondary) : glow(dotColor[status]),
                             animation: status === "connecting" && !isPoppedOut ? "pulse 1.5s ease-in-out infinite" : "none",
                         }} />
-                        <span style={{ fontSize: "0.88rem", fontWeight: 600, color: "var(--text-secondary)" }}>
+                        <span style={{ fontSize: "0.88rem", fontWeight: 600, color: t.textSecondary }}>
                             {vmName}
                         </span>
-                        <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
+                        <span style={{ fontSize: "0.8rem", color: t.textMuted }}>
                             · {isPoppedOut ? "Console in pop-out window" : statusMsg}
                         </span>
                     </div>
@@ -223,39 +230,21 @@ export default function ConsolePage({ params }: { params: Promise<{ vmId: string
                     <button
                         onClick={handleCtrlAltDel}
                         disabled={status !== "connected" || isPoppedOut}
-                        style={{
-                            padding: "8px 16px", borderRadius: 6, fontSize: "0.82rem", fontWeight: 600,
-                            border: "1px solid var(--glass-border)", background: "rgba(255,255,255,0.05)",
-                            color: status === "connected" && !isPoppedOut ? "var(--text-secondary)" : "var(--text-muted)",
-                            cursor: status === "connected" && !isPoppedOut ? "pointer" : "not-allowed",
-                            opacity: status === "connected" && !isPoppedOut ? 1 : 0.45,
-                            transition: "all 0.15s",
-                        }}
+                        style={btn(status === "connected" && !isPoppedOut, t.textSecondary)}
                     >
                         <Keyboard style={{ width: 14, height: 14 }} /> Ctrl+Alt+Del
                     </button>
                     <button
                         onClick={handlePopOut}
                         disabled={isPoppedOut}
-                        style={{
-                            padding: "8px 16px", borderRadius: 6, fontSize: "0.82rem", fontWeight: 600,
-                            border: "1px solid rgba(167,139,250,0.3)", background: "rgba(167,139,250,0.08)",
-                            color: isPoppedOut ? "var(--text-muted)" : "#a78bfa",
-                            cursor: isPoppedOut ? "not-allowed" : "pointer",
-                            opacity: isPoppedOut ? 0.5 : 1, transition: "all 0.15s",
-                        }}
+                        style={btn(!isPoppedOut, t.accentSecondary)}
                     >
                         <Maximize2 style={{ width: 14, height: 14 }} /> {isPoppedOut ? "Popped Out" : "Pop Out"}
                     </button>
                     <button
                         onClick={() => void connect()}
                         disabled={status === "connecting" || isPoppedOut}
-                        style={{
-                            padding: "8px 16px", borderRadius: 6, fontSize: "0.82rem", fontWeight: 600,
-                            border: "1px solid rgba(0,240,255,0.25)", background: "rgba(0,240,255,0.07)",
-                            color: "var(--accent-cyan)", cursor: status === "connecting" || isPoppedOut ? "not-allowed" : "pointer",
-                            opacity: status === "connecting" || isPoppedOut ? 0.5 : 1, transition: "all 0.15s",
-                        }}
+                        style={btn(!(status === "connecting" || isPoppedOut), t.accentPrimary)}
                     >
                         <RotateCcw style={{ width: 14, height: 14 }} /> Reconnect
                     </button>
@@ -266,8 +255,8 @@ export default function ConsolePage({ params }: { params: Promise<{ vmId: string
             <div style={{
                 width: "100%", height: "75vh", minHeight: 500,
                 background: "#000",
-                borderRadius: 10,
-                border: "1px solid #334155",
+                borderRadius: t.cardRadius,
+                border: `1px solid ${t.borderPrimary}`,
                 overflow: "hidden",
                 position: "relative",
                 display: "flex", alignItems: "center", justifyContent: "center",
@@ -285,11 +274,11 @@ export default function ConsolePage({ params }: { params: Promise<{ vmId: string
                         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
                         background: "rgba(0,0,0,0.9)", backdropFilter: "blur(6px)", gap: 16,
                     }}>
-                        <Maximize2 style={{ width: 48, height: 48, color: "#a78bfa" }} />
-                        <p style={{ fontWeight: 700, color: "#a78bfa", fontSize: "1.1rem" }}>
+                        <Maximize2 style={{ width: 48, height: 48, color: t.accentSecondary }} />
+                        <p style={{ fontWeight: 700, color: t.accentSecondary, fontSize: "1.1rem" }}>
                             Console is in pop-out window
                         </p>
-                        <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", maxWidth: 400, textAlign: "center" }}>
+                        <p style={{ color: "#9a9a9a", fontSize: "0.85rem", maxWidth: 400, textAlign: "center" }}>
                             Close the pop-out window to return the console here
                         </p>
                     </div>
@@ -305,30 +294,29 @@ export default function ConsolePage({ params }: { params: Promise<{ vmId: string
                     }}>
                         {status === "connecting" && (
                             <>
-                                <Monitor style={{ width: 40, height: 40, color: "var(--accent-cyan)" }} />
-                                <p style={{ fontWeight: 600, color: "var(--text-primary)", fontSize: "1rem" }}>
+                                <Monitor style={{ width: 40, height: 40, color: t.accentPrimary }} />
+                                <p style={{ fontWeight: 600, color: "#ededed", fontSize: "1rem" }}>
                                     {statusMsg}
                                 </p>
                                 <div style={{
-                                    width: 40, height: 40, border: "3px solid rgba(0,240,255,0.2)",
-                                    borderTopColor: "var(--accent-cyan)", borderRadius: "50%",
+                                    width: 40, height: 40, border: `3px solid ${t.accentPrimary}33`,
+                                    borderTopColor: t.accentPrimary, borderRadius: "50%",
                                     animation: "spin 0.9s linear infinite",
                                 }} />
                             </>
                         )}
                         {(status === "disconnected" || status === "error") && (
                             <>
-                                {status === "error" ? <AlertTriangle style={{ width: 40, height: 40, color: "#f87171" }} /> : <Unplug style={{ width: 40, height: 40, color: "var(--text-muted)" }} />}
-                                <p style={{ fontWeight: 700, color: status === "error" ? "#f87171" : "var(--text-primary)", fontSize: "1rem" }}>
+                                {status === "error" ? <AlertTriangle style={{ width: 40, height: 40, color: t.statusError }} /> : <Unplug style={{ width: 40, height: 40, color: "#9a9a9a" }} />}
+                                <p style={{ fontWeight: 700, color: status === "error" ? t.statusError : "#ededed", fontSize: "1rem" }}>
                                     {status === "error" ? "Connection Error" : "Disconnected"}
                                 </p>
-                                <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", maxWidth: 400, textAlign: "center" }}>
+                                <p style={{ color: "#9a9a9a", fontSize: "0.85rem", maxWidth: 400, textAlign: "center" }}>
                                     {statusMsg}
                                 </p>
                                 <button
                                     onClick={() => void connect()}
-                                    className="btn btn-primary"
-                                    style={{ marginTop: 8 }}
+                                    style={{ marginTop: 8, padding: "10px 22px", borderRadius: t.buttonRadius, border: "none", background: t.accentPrimary, color: t.textInverse, fontWeight: 700, fontSize: "0.85rem", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}
                                 >
                                     <RotateCcw style={{ width: 14, height: 14 }} /> Try Again
                                 </button>

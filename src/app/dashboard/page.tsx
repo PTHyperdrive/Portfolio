@@ -5,14 +5,16 @@ import Link from "next/link";
 import Image from "next/image";
 import { useSession } from "next-auth/react";
 import { useThemeTokens } from "@/lib/useThemeTokens";
+import { useIsMobile } from "@/lib/useIsMobile";
 import { useCredits } from "@/components/CreditProvider";
 import { useViewMode } from "@/components/ViewModeProvider";
 import AccountDropdown from "@/components/layout/AccountDropdown";
+import NotificationBell from "@/components/layout/NotificationBell";
 import {
     Server, HardDrive, Globe, Wallet, ShoppingBag,
     KeyRound, Users, MessageSquare, Plus, CreditCard,
     Ticket, CloudUpload, LayoutGrid,
-    AlertTriangle, ArrowRight, Shield
+    AlertTriangle, ArrowRight, Shield, Smartphone
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -77,6 +79,7 @@ export default function ConsoleHubPage() {
     const [forecast, setForecast] = useState<BurnForecast | null>(null);
     const [loading, setLoading] = useState(true);
     const t = useThemeTokens();
+    const isMobile = useIsMobile();
     const { credits: globalCredits } = useCredits();
     const { data: session } = useSession();
 
@@ -156,7 +159,8 @@ export default function ConsoleHubPage() {
         <div style={{
             minHeight: "100vh",
             backgroundColor: t.bgPrimary,
-            padding: "0 48px 48px",
+            padding: isMobile ? "0 16px 32px" : "0 48px 48px",
+            overflowX: "hidden",
         }}>
             {/* ─── Top Navbar ─── */}
             <nav style={{
@@ -178,8 +182,8 @@ export default function ConsoleHubPage() {
                     </span>
                 </div>
 
-                {/* Center — Nav Links */}
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                {/* Center — Nav Links (hidden on mobile; available via marketing pages) */}
+                <div style={{ display: isMobile ? "none" : "flex", alignItems: "center", gap: 6 }}>
                     {[
                         { label: "News", href: "/news" },
                         { label: "Blogs", href: "/blog" },
@@ -191,7 +195,7 @@ export default function ConsoleHubPage() {
                             href={link.href}
                             id={`nav-${link.label.toLowerCase()}`}
                             style={{
-                                padding: "8px 16px", borderRadius: t.isMono ? 4 : 8,
+                                padding: "8px 16px", borderRadius: t.cardRadius,
                                 fontSize: "0.85rem", fontWeight: 600,
                                 color: t.textSecondary, textDecoration: "none",
                                 transition: "all 0.15s",
@@ -210,8 +214,11 @@ export default function ConsoleHubPage() {
                     ))}
                 </div>
 
-                {/* Right — Account */}
-                <AccountDropdown />
+                {/* Right — Notifications + Account */}
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                    <NotificationBell />
+                    <AccountDropdown />
+                </div>
             </nav>
 
             {/* ─── Admin Banner ─── */}
@@ -220,6 +227,7 @@ export default function ConsoleHubPage() {
                     id="admin-banner"
                     style={{
                         display: "flex", alignItems: "center", justifyContent: "space-between",
+                        flexWrap: "wrap", gap: 12,
                         padding: "14px 20px", marginBottom: 16, borderRadius: t.cardRadius,
                         background: t.accentPrimaryMuted,
                         border: `1px solid ${t.accentPrimary}33`,
@@ -290,7 +298,7 @@ export default function ConsoleHubPage() {
                 <div style={{ ...card, padding: "20px 24px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                         <div style={{
-                            width: 36, height: 36, borderRadius: t.isMono ? 6 : 10,
+                            width: 36, height: 36, borderRadius: t.cardRadius,
                             background: t.statusWarningBg, display: "flex",
                             alignItems: "center", justifyContent: "center",
                         }}>
@@ -322,7 +330,7 @@ export default function ConsoleHubPage() {
                 <div style={{ ...card, padding: "20px 24px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                         <div style={{
-                            width: 36, height: 36, borderRadius: t.isMono ? 6 : 10,
+                            width: 36, height: 36, borderRadius: t.cardRadius,
                             background: t.accentPrimaryMuted, display: "flex",
                             alignItems: "center", justifyContent: "center",
                         }}>
@@ -344,7 +352,7 @@ export default function ConsoleHubPage() {
                 <div style={{ ...card, padding: "20px 24px" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
                         <div style={{
-                            width: 36, height: 36, borderRadius: t.isMono ? 6 : 10,
+                            width: 36, height: 36, borderRadius: t.cardRadius,
                             background: t.statusSuccessBg, display: "flex",
                             alignItems: "center", justifyContent: "center",
                         }}>
@@ -392,7 +400,7 @@ export default function ConsoleHubPage() {
             >
                 <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                     <div style={{
-                        width: 40, height: 40, borderRadius: t.isMono ? 6 : 10,
+                        width: 40, height: 40, borderRadius: t.cardRadius,
                         background: `${t.statusError}1a`,
                         display: "flex", alignItems: "center", justifyContent: "center",
                     }}>
@@ -404,6 +412,44 @@ export default function ConsoleHubPage() {
                         </p>
                         <p style={{ fontSize: "0.78rem", color: t.textMuted, marginTop: 2 }}>
                             Game accounts & digital assets
+                        </p>
+                    </div>
+                </div>
+                <ArrowRight style={{ width: 16, height: 16, color: t.textMuted }} />
+            </Link>
+
+            {/* ─── TimoSMS Banner ─── */}
+            <Link
+                href="/sms"
+                id="timosms-banner"
+                style={{
+                    display: "flex", alignItems: "center", justifyContent: "space-between",
+                    padding: "18px 24px", marginBottom: 32,
+                    borderRadius: t.cardRadius,
+                    background: t.bgCard,
+                    border: `1px solid ${t.accentPrimary}33`,
+                    borderLeft: `3px solid ${t.accentPrimary}`,
+                    boxShadow: t.shadow,
+                    textDecoration: "none",
+                    transition: "all 0.15s",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = t.bgCardHover; }}
+                onMouseLeave={e => { e.currentTarget.style.background = t.bgCard; }}
+            >
+                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                    <div style={{
+                        width: 40, height: 40, borderRadius: t.cardRadius,
+                        background: t.accentPrimaryMuted,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                        <Smartphone style={{ width: 20, height: 20, color: t.accentPrimary }} />
+                    </div>
+                    <div>
+                        <p style={{ fontSize: "0.95rem", fontWeight: 700, color: t.textPrimary }}>
+                            TimoSMS — Rent a Number
+                        </p>
+                        <p style={{ fontSize: "0.78rem", color: t.textMuted, marginTop: 2 }}>
+                            Temporary numbers for one-time SMS codes
                         </p>
                     </div>
                 </div>
@@ -475,7 +521,7 @@ export default function ConsoleHubPage() {
                             }}
                         >
                             <div style={{
-                                width: 40, height: 40, borderRadius: t.isMono ? 6 : 10,
+                                width: 40, height: 40, borderRadius: t.cardRadius,
                                 background: svc.color + "18",
                                 display: "flex", alignItems: "center", justifyContent: "center",
                                 flexShrink: 0,

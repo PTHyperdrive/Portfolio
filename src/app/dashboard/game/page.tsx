@@ -20,7 +20,7 @@ export default function GameHostingPage() {
 
     const filtered = GAME_TEMPLATES.filter(g => g.name.toLowerCase().includes(search.toLowerCase()));
     const card: React.CSSProperties = { background: t.bgCard, border: `1px solid ${t.borderPrimary}`, borderRadius: t.cardRadius, boxShadow: t.shadow };
-    const inputStyle: React.CSSProperties = { background: t.bgInput, border: `1px solid ${t.borderPrimary}`, borderRadius: t.isMono ? 4 : 8, color: t.textPrimary, fontSize: "0.875rem", outline: "none", padding: "9px 13px" };
+    const inputStyle: React.CSSProperties = { background: t.bgInput, border: `1px solid ${t.borderPrimary}`, borderRadius: t.cardRadius, color: t.textPrimary, fontSize: "0.875rem", outline: "none", padding: "9px 13px" };
 
     return (
         <div style={{ padding: "32px 36px", minHeight: "100vh", backgroundColor: t.bgPrimary }}>
@@ -54,7 +54,7 @@ export default function GameHostingPage() {
                         <span style={{ fontWeight: 700, color: t.textPrimary, fontSize: "0.95rem" }}>Active Servers</span>
                         <span style={{ padding: "2px 8px", borderRadius: 10, background: t.accentPrimaryMuted, color: t.accentPrimary, fontSize: "0.72rem", fontWeight: 700 }}>0</span>
                     </div>
-                    <button style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: t.isMono ? 4 : 7, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>
+                    <button style={{ display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: t.buttonRadius, border: `1px solid ${t.borderPrimary}`, background: "transparent", color: t.textMuted, fontSize: "0.8rem", cursor: "pointer" }}>
                         <RefreshCw style={{ width: 12, height: 12 }} /> Refresh
                     </button>
                 </div>
@@ -75,7 +75,7 @@ export default function GameHostingPage() {
                     <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search games..." style={{ ...inputStyle, width: "100%", paddingLeft: 32, boxSizing: "border-box" }} />
                 </div>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
                 {filtered.map(game => (
                     <div key={game.id} style={{ ...card, padding: "22px 24px", cursor: "pointer", transition: "border-color 0.15s" }}
                         onMouseEnter={e => (e.currentTarget.style.borderColor = `${t.accentPrimary}55`)}

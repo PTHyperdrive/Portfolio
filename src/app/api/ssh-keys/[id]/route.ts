@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { audit } from "@/lib/audit";
+import { require2fa, twoFactorErrorResponse } from "@/lib/require2fa";
 
 /**
  * DELETE /api/ssh-keys/[id]
@@ -18,6 +19,12 @@ export async function DELETE(
 
     const userId = session.user.id;
     const { id } = await params;
+
+    // Step-up: removing a key is a critical security change — require TOTP if
+    // the user has it. Token travels in an optional JSON body.
+    const delBody = await req.json().catch(() => ({} as { totpToken?: string }));
+    const stepUp = await require2fa(userId, delBody?.totpToken);
+    if (!stepUp.ok) return twoFactorErrorResponse(stepUp.error!);
 
     const key = await prisma.sshKey.findFirst({
         where: { id, userId },

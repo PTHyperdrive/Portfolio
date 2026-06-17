@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import prisma from "@/lib/db";
 import { verifyPassword, checkRateLimit } from "@/lib/security";
 import { loginSchema } from "@/lib/validation";
+import { getRecoveryStatus, recoveryAvailable } from "@/lib/recovery-codes";
 
 /**
  * POST /api/auth/precheck
@@ -45,10 +46,11 @@ export async function POST(req: Request) {
         const user = await prisma.user.findUnique({
             where: { email: parsed.data.email },
             select: {
+                id: true,
                 passwordHash: true,
                 twoFactorEnabled: true,
-                loginWith2FA: true,
                 twoFactorSecret: true,
+                emailTwoFactorEnabled: true,
             },
         });
 
@@ -56,9 +58,25 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
         }
 
-        const requires2fa = !!(user.twoFactorEnabled && user.loginWith2FA && user.twoFactorSecret);
+        // Build the list of 2FA methods this account actually has. The UI shows
+        // these in the "use another method" switcher; the gate is in authorize().
+        const methods: ("otp" | "email" | "recovery")[] = [];
+        if (user.twoFactorEnabled && user.twoFactorSecret) methods.push("otp");
+        if (user.emailTwoFactorEnabled) methods.push("email");
 
-        return NextResponse.json({ ok: true, requires2fa });
+        // Backup codes are the last-line fallback — only offered when a primary
+        // method is enabled AND the user has usable, non-locked codes. We also
+        // surface recoveryLocked so the UI can point a locked-out user at the
+        // support-ticket path.
+        const requires2fa = methods.length > 0;
+        let recoveryLocked = false;
+        if (requires2fa) {
+            const rec = await getRecoveryStatus(user.id);
+            if (recoveryAvailable(rec)) methods.push("recovery");
+            recoveryLocked = rec.generated && rec.locked;
+        }
+
+        return NextResponse.json({ ok: true, requires2fa, methods, recoveryLocked });
     } catch (error) {
         console.error("[precheck] error:", error);
         return NextResponse.json({ error: "Invalid email or password." }, { status: 401 });
