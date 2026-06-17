@@ -110,13 +110,15 @@ export const securityHeaders = {
         // SECURITY: 'unsafe-eval' removed — it enables eval-based XSS vectors.
         // Next.js production mode does not require it. If development HMR breaks,
         // the dev server already injects its own permissive CSP.
-        "script-src 'self' 'unsafe-inline'",
+        // Cloudflare Web Analytics injects beacon.min.js from static.cloudflareinsights.com.
+        "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com",
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
         "font-src 'self' https://fonts.gstatic.com",
         "img-src 'self' data: blob: https:",
         // 'wss:' required for noVNC WebSocket connections to Proxmox VE.
+        // cloudflareinsights.com = the Web Analytics beacon report endpoint.
         // Shkeeper base URL added if configured (for crypto gateway polling).
-        `connect-src 'self' wss:${process.env.SHKEEPER_BASE_URL ? ` ${process.env.SHKEEPER_BASE_URL}` : ""}`,
+        `connect-src 'self' wss: https://cloudflareinsights.com${process.env.SHKEEPER_BASE_URL ? ` ${process.env.SHKEEPER_BASE_URL}` : ""}`,
         "frame-ancestors 'none'",
     ].join('; '),
 };

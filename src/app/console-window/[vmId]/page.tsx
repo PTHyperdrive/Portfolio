@@ -34,6 +34,7 @@ export default function ConsoleWindowPage({ params }: { params: Promise<{ vmId: 
     const viewerRef = useRef<HTMLDivElement>(null);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rfbRef = useRef<any>(null);
+    const startedRef = useRef(false);
 
     const [status, setStatus] = useState<ConnectionStatus>("connecting");
     const [statusMsg, setStatusMsg] = useState("Loading noVNC…");
@@ -114,19 +115,22 @@ export default function ConsoleWindowPage({ params }: { params: Promise<{ vmId: 
         }
     }, [vmId, node]);
 
+    // Connect once, after the script is ready and node is known (guards against
+    // a searchParams-hydration re-run tearing down the first WebSocket).
     useEffect(() => {
-        if (!scriptReady && window.RFBModule) {
-            setScriptReady(true);
+        if (!scriptReady) {
+            if (window.RFBModule) setScriptReady(true);
             return;
         }
-        if (scriptReady) {
-            void connect();
-        }
-        return () => {
-            try { rfbRef.current?.disconnect(); } catch { /* ok */ }
-            rfbRef.current = null;
-        };
-    }, [connect, scriptReady]);
+        if (!node || startedRef.current) return;
+        startedRef.current = true;
+        void connect();
+    }, [scriptReady, node, connect]);
+
+    useEffect(() => () => {
+        try { rfbRef.current?.disconnect(); } catch { /* ok */ }
+        rfbRef.current = null;
+    }, []);
 
     // Rescale on window resize
     useEffect(() => {

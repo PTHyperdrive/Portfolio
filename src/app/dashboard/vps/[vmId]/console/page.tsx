@@ -38,6 +38,7 @@ export default function ConsolePage({ params }: { params: Promise<{ vmId: string
     const viewerRef = useRef<HTMLDivElement>(null);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const rfbRef = useRef<any>(null);
+    const startedRef = useRef(false);
 
     const [status, setStatus] = useState<ConnectionStatus>("connecting");
     const [statusMsg, setStatusMsg] = useState("Loading noVNC…");
@@ -122,22 +123,26 @@ export default function ConsolePage({ params }: { params: Promise<{ vmId: string
         }
     }, [vmId, node]);
 
-    // Auto-connect once the script has loaded
+    // Auto-connect ONCE, after the script is ready and the node param is known.
+    // The single-connect guard matters: useSearchParams() can yield node="" on
+    // the first client render, then the real value — that flips `connect` and
+    // re-runs this effect. Without the guard, the second connect tears down the
+    // first WebSocket mid-handshake ("closed before established"), and the
+    // replacement races a stale ticket. Disconnect only on real unmount.
     useEffect(() => {
-        // If the script was already loaded from a previous mount, onLoad won't fire again.
-        // Detect this and set scriptReady immediately.
-        if (!scriptReady && window.RFBModule) {
-            setScriptReady(true);
+        if (!scriptReady) {
+            if (window.RFBModule) setScriptReady(true);
             return;
         }
-        if (scriptReady) {
-            void connect();
-        }
-        return () => {
-            try { rfbRef.current?.disconnect(); } catch { /* already disconnected */ }
-            rfbRef.current = null;
-        };
-    }, [connect, scriptReady]);
+        if (!node || startedRef.current) return;
+        startedRef.current = true;
+        void connect();
+    }, [scriptReady, node, connect]);
+
+    useEffect(() => () => {
+        try { rfbRef.current?.disconnect(); } catch { /* already disconnected */ }
+        rfbRef.current = null;
+    }, []);
 
     const handleCtrlAltDel = () => {
         rfbRef.current?.sendCtrlAltDel();

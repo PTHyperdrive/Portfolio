@@ -79,7 +79,11 @@ export function middleware(request: NextRequest) {
     }
 
     // ── CSRF Origin Validation for all API POST/PUT/PATCH/DELETE ──
-    if (pathname.startsWith('/api/') && !validateCsrfOrigin(request)) {
+    // Internal cron endpoints are server-to-server (no Origin header) and are
+    // authenticated by their own secret header (x-*-cron-secret), so they're
+    // exempt from the browser-oriented CSRF origin check — otherwise they 403.
+    const csrfExempt = pathname === '/api/billing/cycle' || pathname === '/api/monitoring/sweep';
+    if (pathname.startsWith('/api/') && !csrfExempt && !validateCsrfOrigin(request)) {
         return NextResponse.json(
             { error: 'CSRF validation failed: invalid origin' },
             { status: 403 },

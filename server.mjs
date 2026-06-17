@@ -123,6 +123,15 @@ app.prepare().then(() => {
             // Send any buffered data from the client
             if (head && head.length > 0) upstream.write(head);
 
+            // Log Proxmox's first response line once (101 = OK; 401/403 = auth/
+            // ticket/permission; anything else points at the upstream, not Cloudflare).
+            let logged = false;
+            upstream.on("data", (chunk) => {
+                if (logged) return;
+                logged = true;
+                console.log(`[vnc-proxy] upstream: ${chunk.toString("latin1").split("\r\n")[0]}`);
+            });
+
             // Pipe bidirectionally (raw TCP tunnel, no frame parsing)
             upstream.pipe(socket);
             socket.pipe(upstream);
