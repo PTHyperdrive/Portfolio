@@ -112,7 +112,7 @@ export default function AdminDashboardPage() {
 
             {/* Quick Access Grid */}
             <h2 style={{ fontSize: "1rem", fontWeight: 700, color: t.textSecondary, marginBottom: 14 }}>Management</h2>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14 }}>
                 {ADMIN_SECTIONS.map(section => (
                     <Link key={section.title} href={section.href} style={{ ...card, padding: "22px 24px", textDecoration: "none", display: "block", transition: "border-color 0.15s" }}
                         onMouseEnter={e => (e.currentTarget.style.borderColor = `${t.accentPrimary}55`)}
@@ -135,7 +135,7 @@ export default function AdminDashboardPage() {
                     <Server style={{ width: 16, height: 16, color: t.accentPrimary }} />
                     <span style={{ fontWeight: 700, color: t.textPrimary, fontSize: "0.95rem" }}>Infrastructure Health</span>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 0 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 0 }}>
                     {[
                         { label: "Proxmox Cluster", status: "Healthy", color: t.statusSuccess },
                         { label: "TrueNAS Storage", status: "Healthy", color: t.statusSuccess },

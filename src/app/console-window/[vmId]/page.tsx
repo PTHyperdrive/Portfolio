@@ -28,7 +28,7 @@ declare global {
 export default function ConsoleWindowPage({ params }: { params: Promise<{ vmId: string }> }) {
     const { vmId } = use(params);
     const searchParams = useSearchParams();
-    const node = searchParams.get("node") ?? "";
+    const node = searchParams?.get("node") ?? "";
     const t = useThemeTokens();
 
     const viewerRef = useRef<HTMLDivElement>(null);

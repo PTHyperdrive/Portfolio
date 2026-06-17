@@ -20,7 +20,7 @@ interface SectionData {
 
 export default function DocsSection() {
     const t = useThemeTokens();
-    const { chapterSlug, sectionSlug } = useParams<{ chapterSlug: string; sectionSlug: string }>();
+    const { chapterSlug, sectionSlug } = useParams<{ chapterSlug: string; sectionSlug: string }>() ?? { chapterSlug: "", sectionSlug: "" };
     const { chapters } = useDocs();
 
     const [section, setSection] = useState<SectionData | null>(null);

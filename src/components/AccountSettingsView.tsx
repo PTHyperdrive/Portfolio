@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { UAParser } from "ua-parser-js";
 import { useThemeTokens } from "@/lib/useThemeTokens";
+import TwoFactorModal from "@/components/TwoFactorModal";
 import {
     User, Settings, Lock, ShieldCheck, Camera, AlertTriangle,
     XCircle, CheckCircle, RefreshCw, Mail, KeyRound
@@ -66,6 +67,10 @@ export default function AccountSettingsView() {
     const [generatedCodes, setGeneratedCodes] = useState<string[] | null>(null);
     const [recoveryBusy, setRecoveryBusy] = useState(false);
     const [recoveryMsg, setRecoveryMsg] = useState<{ ok: boolean; text: string } | null>(null);
+    // TOTP step-up for revealing a fresh backup-code set
+    const [recovery2faShow, setRecovery2faShow] = useState(false);
+    const [recovery2faError, setRecovery2faError] = useState("");
+    const [recovery2faLoading, setRecovery2faLoading] = useState(false);
 
     const loadRecoveryStatus = () => {
         fetch("/api/auth/2fa/recovery")
@@ -74,23 +79,30 @@ export default function AccountSettingsView() {
             .catch(() => { /* non-critical */ });
     };
 
-    const handleGenerateRecovery = async () => {
+    const handleGenerateRecovery = async (token?: string) => {
         setRecoveryBusy(true);
         setRecoveryMsg(null);
+        setRecovery2faError("");
         try {
             const res = await fetch("/api/auth/2fa/recovery", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "generate" }),
+                body: JSON.stringify({ action: "generate", totpToken: token }),
             });
             const d = await res.json();
-            if (!res.ok) throw new Error(d.error ?? "Failed to generate backup codes");
+            if (!res.ok) {
+                if (d.error === "2FA_REQUIRED") { setRecovery2faShow(true); return; }
+                if (d.error === "INVALID_2FA" || d.error === "2FA_RATE_LIMITED") { setRecovery2faError(d.message || "Verification failed."); return; }
+                throw new Error(d.error ?? "Failed to generate backup codes");
+            }
+            setRecovery2faShow(false);
             setGeneratedCodes(d.codes as string[]);
             loadRecoveryStatus();
         } catch (err) {
             setRecoveryMsg({ ok: false, text: err instanceof Error ? err.message : "Failed to generate backup codes" });
         } finally {
             setRecoveryBusy(false);
+            setRecovery2faLoading(false);
         }
     };
 
@@ -836,7 +848,7 @@ export default function AccountSettingsView() {
                                         </p>
                                     )}
                                     <button
-                                        onClick={handleGenerateRecovery}
+                                        onClick={() => handleGenerateRecovery()}
                                         disabled={recoveryBusy}
                                         style={{ padding: "10px 22px", borderRadius: t.buttonRadius, border: "none", background: t.accentPrimary, color: t.textInverse, fontWeight: 700, fontSize: "0.85rem", cursor: recoveryBusy ? "not-allowed" : "pointer", opacity: recoveryBusy ? 0.6 : 1 }}
                                     >
@@ -930,6 +942,15 @@ export default function AccountSettingsView() {
 
                     </div>
                 )}
+
+                {/* TOTP step-up for revealing a fresh backup-code set */}
+                <TwoFactorModal
+                    open={recovery2faShow}
+                    onClose={() => { setRecovery2faShow(false); setRecovery2faError(""); setRecovery2faLoading(false); }}
+                    onSubmit={(token) => { setRecovery2faLoading(true); handleGenerateRecovery(token); }}
+                    loading={recovery2faLoading}
+                    error={recovery2faError}
+                />
         </div>
     );
 }

@@ -45,7 +45,7 @@ export default function BandwidthPage() {
             </div>
 
             {/* Summary Stats */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 24 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 14, marginBottom: 24 }}>
                 {[
                     { Icon: ArrowUpDown, label: "Total Transfer", value: "0 B", sub: `Last ${range}` },
                     { Icon: ArrowUp, label: "Outbound (TX)", value: "0 B", sub: "Egress" },
@@ -88,11 +88,13 @@ export default function BandwidthPage() {
                     <Globe style={{ width: 16, height: 16, color: t.accentPrimary }} />
                     <span style={{ fontWeight: 700, color: t.textPrimary, fontSize: "0.95rem" }}>Per-Instance Breakdown</span>
                 </div>
-                {/* Table header */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 120px 120px 120px 100px", gap: 12, padding: "10px 24px", borderBottom: `1px solid ${t.borderSecondary}` }}>
-                    {["Instance", "Inbound", "Outbound", "Total", "Status"].map(h => (
-                        <span key={h} style={{ fontSize: "0.72rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.06em" }}>{h}</span>
-                    ))}
+                {/* Table header (scrolls horizontally on narrow screens) */}
+                <div style={{ overflowX: "auto" }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "minmax(140px,1fr) 120px 120px 120px 100px", gap: 12, padding: "10px 24px", borderBottom: `1px solid ${t.borderSecondary}`, minWidth: 560 }}>
+                        {["Instance", "Inbound", "Outbound", "Total", "Status"].map(h => (
+                            <span key={h} style={{ fontSize: "0.72rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.06em" }}>{h}</span>
+                        ))}
+                    </div>
                 </div>
                 <div style={{ padding: "40px 24px", textAlign: "center" }}>
                     <p style={{ color: t.textMuted, fontSize: "0.875rem" }}>No instances with bandwidth data.</p>

@@ -15,21 +15,26 @@ export async function GET() {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const [unread, notifications] = await Promise.all([
-            prisma.ticketNotification.count({
-                where: { userId: session.user.id, read: false },
-            }),
+        const userId = session.user.id;
+        const [ticketUnread, sysUnread, tickets, sys] = await Promise.all([
+            prisma.ticketNotification.count({ where: { userId, read: false } }),
+            prisma.notification.count({ where: { userId, read: false } }),
             prisma.ticketNotification.findMany({
-                where: { userId: session.user.id },
+                where: { userId },
                 orderBy: { createdAt: "desc" },
                 take: 20,
-                include: {
-                    ticket: { select: { id: true, title: true, status: true } },
-                },
+                include: { ticket: { select: { id: true, title: true, status: true } } },
             }),
+            prisma.notification.findMany({ where: { userId }, orderBy: { createdAt: "desc" }, take: 20 }),
         ]);
 
-        return NextResponse.json({ unread, notifications });
+        // Merge ticket + system notifications into one normalized, sorted feed.
+        const notifications = [
+            ...tickets.map(n => ({ id: n.id, source: "ticket" as const, title: `Ticket: ${n.ticket?.title ?? "update"}`, body: n.message, read: n.read, createdAt: n.createdAt, link: "/dashboard/tickets" })),
+            ...sys.map(n => ({ id: n.id, source: "system" as const, title: n.title, body: n.body, read: n.read, createdAt: n.createdAt, link: n.link })),
+        ].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)).slice(0, 20);
+
+        return NextResponse.json({ unread: ticketUnread + sysUnread, notifications });
     } catch (err) {
         console.error("[GET /api/notifications]", err);
         return NextResponse.json({ error: "Failed" }, { status: 500 });
@@ -45,19 +50,18 @@ export async function PATCH(req: Request) {
 
         const body = await req.json();
 
+        const userId = session.user.id;
         if (body.all) {
-            await prisma.ticketNotification.updateMany({
-                where: { userId: session.user.id, read: false },
-                data: { read: true },
-            });
+            await Promise.all([
+                prisma.ticketNotification.updateMany({ where: { userId, read: false }, data: { read: true } }),
+                prisma.notification.updateMany({ where: { userId, read: false }, data: { read: true } }),
+            ]);
         } else if (Array.isArray(body.ids)) {
-            await prisma.ticketNotification.updateMany({
-                where: {
-                    id: { in: body.ids },
-                    userId: session.user.id,
-                },
-                data: { read: true },
-            });
+            // IDs are cuids, unique across both tables — marking in both is safe.
+            await Promise.all([
+                prisma.ticketNotification.updateMany({ where: { id: { in: body.ids }, userId }, data: { read: true } }),
+                prisma.notification.updateMany({ where: { id: { in: body.ids }, userId }, data: { read: true } }),
+            ]);
         }
 
         return NextResponse.json({ ok: true });

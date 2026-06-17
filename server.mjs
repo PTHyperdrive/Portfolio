@@ -163,6 +163,24 @@ app.prepare().then(() => {
     } else {
         console.warn("> Hourly billing cron: DISABLED (set BILLING_CRON_SECRET)");
     }
+
+    // ── Monitoring sweep ────────────────────────────────────────
+    // Evaluates VM alert rules every 5 minutes and fires notifications.
+    const monitoringSecret = process.env.MONITORING_CRON_SECRET;
+    if (monitoringSecret) {
+        const runSweep = () =>
+            fetch(`http://127.0.0.1:${port}/api/monitoring/sweep`, {
+                method: "POST",
+                headers: { "x-monitoring-cron-secret": monitoringSecret },
+            })
+                .then(async (r) => console.log("[monitoring-cron]", r.status, await r.text()))
+                .catch((e) => console.error("[monitoring-cron] failed:", e.message));
+        setInterval(runSweep, 5 * 60 * 1000);
+        setTimeout(runSweep, 45 * 1000); // shortly after boot
+        console.log("> Monitoring sweep cron: enabled");
+    } else {
+        console.warn("> Monitoring sweep cron: DISABLED (set MONITORING_CRON_SECRET)");
+    }
 });
 
 /** Capitalize header names: sec-websocket-key → Sec-Websocket-Key */

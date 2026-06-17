@@ -1,24 +1,26 @@
 "use client";
 
-import { useState, useEffect, useCallback, use } from "react";
+import { useState, useEffect, useCallback, useRef, use } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { WINDOWS_ISOS, getIsosByCategory } from "@/lib/windows-isos";
 import { useThemeTokens } from "@/lib/useThemeTokens";
-import { AlertTriangle, Play, X, Globe, Network, KeyRound, Eye, EyeOff, Copy, Check } from "lucide-react";
+import { PLAN_CONFIGS } from "@/lib/plan-config";
+import { AlertTriangle, Play, X, Globe, Network, KeyRound, Eye, EyeOff, Copy, Check, SlidersHorizontal } from "lucide-react";
 import TwoFactorModal from "@/components/TwoFactorModal";
 
 /**
  * Tiny dependency-free sparkline. Plots a 0–100 series as a filled area + line,
  * stretched to fill its container (percent values, newest sample on the right).
  */
-function Sparkline({ data, color, height = 44 }: { data: number[]; color: string; height?: number }) {
+function Sparkline({ data, color, height = 44, max = 100 }: { data: number[]; color: string; height?: number; max?: number }) {
     if (data.length < 2) {
         return <div style={{ height, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.7rem", opacity: 0.5 }}>collecting…</div>;
     }
     const w = 100;
+    const scale = max > 0 ? max : 1;
     const step = w / (data.length - 1);
-    const y = (v: number) => height - (Math.min(100, Math.max(0, v)) / 100) * height;
+    const y = (v: number) => height - (Math.min(scale, Math.max(0, v)) / scale) * height;
     const pts = data.map((v, i) => `${(i * step).toFixed(2)},${y(v).toFixed(2)}`);
     const line = `M${pts.join(" L")}`;
     const area = `${line} L${w},${height} L0,${height} Z`;
@@ -66,8 +68,8 @@ interface VpcAssignmentInfo {
 export default function VmDetailPage({ params }: { params: Promise<{ vmId: string }> }) {
     const { vmId } = use(params);
     const searchParams = useSearchParams();
-    const node = searchParams.get("node") || "";
-    const initialTab = searchParams.get("tab") || "overview";
+    const node = searchParams?.get("node") || "";
+    const initialTab = searchParams?.get("tab") || "overview";
     const t = useThemeTokens();
 
     const [vm, setVm] = useState<VmDetail | null>(null);
@@ -90,6 +92,8 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
     // Live usage history for the Overview sparklines (rolling, ~40 samples).
     const [cpuHist, setCpuHist] = useState<number[]>([]);
     const [memHist, setMemHist] = useState<number[]>([]);
+    const [netHist, setNetHist] = useState<number[]>([]);
+    const netPrevRef = useRef<{ total: number; ts: number } | null>(null);
 
     // VM login credentials (revealed on demand from the encrypted store).
     const [creds, setCreds] = useState<VmCredentials | null>(null);
@@ -101,6 +105,79 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
     const [show2fa, setShow2fa] = useState(false);
     const [twoFaError, setTwoFaError] = useState("");
     const [twoFaLoading, setTwoFaLoading] = useState(false);
+
+    // Resize / change plan
+    const [resizePlan, setResizePlan] = useState<string>("");
+    const [resizing, setResizing] = useState(false);
+    const [resizeMsg, setResizeMsg] = useState<{ ok: boolean; text: string } | null>(null);
+    const [resize2faShow, setResize2faShow] = useState(false);
+    const [resize2faError, setResize2faError] = useState("");
+    const [resize2faLoading, setResize2faLoading] = useState(false);
+
+    const doResize = async (token?: string) => {
+        if (!resizePlan) return;
+        setResizing(true); setResizeMsg(null); setResize2faError("");
+        try {
+            const res = await fetch(`/api/vps/${vmId}/resize`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ plan: resizePlan, totpToken: token }),
+            });
+            const d = await res.json();
+            if (!res.ok) {
+                if (d.error === "2FA_REQUIRED") { setResize2faShow(true); return; }
+                if (d.error === "INVALID_2FA" || d.error === "2FA_RATE_LIMITED") { setResize2faError(d.message || "Verification failed."); return; }
+                setResizeMsg({ ok: false, text: d.error || "Resize failed" }); return;
+            }
+            setResize2faShow(false);
+            setResizeMsg({ ok: true, text: `Resized to ${resizePlan}. ${d.note ?? ""}` });
+            loadVm();
+        } catch {
+            setResizeMsg({ ok: false, text: "Network error. Please try again." });
+        } finally {
+            setResizing(false); setResize2faLoading(false);
+        }
+    };
+
+    // Alert rules
+    interface AlertRule { id: string; metric: string; comparison: string; threshold: number; enabled: boolean; }
+    const [alertRules, setAlertRules] = useState<AlertRule[]>([]);
+    const [alertMetric, setAlertMetric] = useState("cpu");
+    const [alertComparison, setAlertComparison] = useState("gt");
+    const [alertThreshold, setAlertThreshold] = useState("");
+    const [alertBusy, setAlertBusy] = useState(false);
+    const [alertMsg, setAlertMsg] = useState("");
+
+    const loadAlerts = useCallback(async () => {
+        try {
+            const r = await fetch(`/api/monitoring/rules?vmId=${vmId}`);
+            if (r.ok) { const d = await r.json(); setAlertRules(d.rules ?? []); }
+        } catch { /* silent */ }
+    }, [vmId]);
+    useEffect(() => { if (tab === "settings") loadAlerts(); }, [tab, loadAlerts]);
+
+    const saveAlert = async () => {
+        const thr = Number(alertThreshold);
+        if (!Number.isFinite(thr) || thr <= 0) { setAlertMsg("Enter a positive threshold."); return; }
+        setAlertBusy(true); setAlertMsg("");
+        try {
+            const r = await fetch("/api/monitoring/rules", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ vmId, metric: alertMetric, comparison: alertComparison, threshold: thr }),
+            });
+            if (!r.ok) { const d = await r.json(); setAlertMsg(d.error || "Failed to save rule"); return; }
+            setAlertThreshold(""); loadAlerts();
+        } catch { setAlertMsg("Network error"); }
+        finally { setAlertBusy(false); }
+    };
+    const deleteAlert = async (id: string) => {
+        try { await fetch(`/api/monitoring/rules?id=${id}`, { method: "DELETE" }); } catch { /* silent */ }
+        loadAlerts();
+    };
+    const toggleAlert = async (id: string, enabled: boolean) => {
+        try { await fetch("/api/monitoring/rules", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, enabled }) }); } catch { /* silent */ }
+        loadAlerts();
+    };
 
     const loadCreds = useCallback(async (totpToken?: string) => {
         setCredsLoading(true);
@@ -186,6 +263,15 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
                     const memPct = liveData.maxmem ? (liveData.memory / liveData.maxmem) * 100 : 0;
                     setCpuHist(h => [...h, cpuPct].slice(-40));
                     setMemHist(h => [...h, memPct].slice(-40));
+                    // Bandwidth rate (Mbps) derived from the netin+netout byte counters.
+                    const total = (liveData.netin ?? 0) + (liveData.netout ?? 0);
+                    const nowTs = Date.now();
+                    const prev = netPrevRef.current;
+                    if (prev && nowTs > prev.ts) {
+                        const mbps = ((total - prev.total) * 8) / ((nowTs - prev.ts) / 1000) / 1e6;
+                        setNetHist(h => [...h, Math.max(0, mbps)].slice(-40));
+                    }
+                    netPrevRef.current = { total, ts: nowTs };
                 }
             } catch { /* ignore */ }
         };
@@ -251,7 +337,8 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
     const isRunning = (live?.status || vm.status) === "running";
     const cpuPercent = live?.cpu ? live.cpu * 100 : 0;
     const memUsed = live?.memory || 0, memTotal = live?.maxmem || 0, memPercent = memTotal > 0 ? (memUsed / memTotal) * 100 : 0;
-    const diskUsed = live?.disk || 0, diskTotal = live?.maxdisk || 0, diskPercent = diskTotal > 0 ? (diskUsed / diskTotal) * 100 : 0;
+    const netIn = live?.netin || 0, netOut = live?.netout || 0;
+    const bwRate = netHist.length ? netHist[netHist.length - 1] : 0;
     const isoCategories = getIsosByCategory();
 
     const tabs = [
@@ -316,21 +403,21 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
             {tab === "overview" && (
                 <div>
                     {/* Resource bars */}
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 24 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16, marginBottom: 24 }}>
                         {[
-                            { label: "CPU Usage", value: `${cpuPercent.toFixed(1)}%`, pct: cpuPercent, sub: `${vm.specs?.vcpu || "—"} vCPU Cores`, hist: cpuHist },
-                            { label: "Memory", value: formatBytes(memUsed), pct: memPercent, sub: `${formatBytes(memUsed)} / ${formatBytes(memTotal)}`, hist: memHist },
-                            { label: "Disk", value: formatBytes(diskUsed), pct: diskPercent, sub: `${formatBytes(diskUsed)} / ${formatBytes(diskTotal)}`, hist: null },
+                            { label: "CPU Usage", value: `${cpuPercent.toFixed(1)}%`, pct: cpuPercent, sub: `${vm.specs?.vcpu || "—"} vCPU Cores`, hist: cpuHist, max: 100 },
+                            { label: "Memory", value: formatBytes(memUsed), pct: memPercent, sub: `${formatBytes(memUsed)} / ${formatBytes(memTotal)}`, hist: memHist, max: 100 },
+                            { label: "Bandwidth", value: `${bwRate.toFixed(1)} Mbps`, pct: 0, sub: `↓ ${formatBytes(netIn)} · ↑ ${formatBytes(netOut)}`, hist: netHist, max: Math.max(...netHist, 1) },
                         ].map(r => (
                             <div key={r.label} style={card}>
                                 <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12 }}>
                                     <span style={{ color: t.textMuted, fontSize: "0.85rem", fontWeight: 600 }}>{r.label}</span>
                                     <span style={{ fontSize: "1.15rem", fontWeight: 700, color: t.accentPrimary, fontFamily: t.fontMono }}>{r.value}</span>
                                 </div>
-                                {/* Live trend chart (CPU/Memory). Disk keeps the bar only — it barely moves. */}
+                                {/* Live trend chart — CPU / Memory / Bandwidth */}
                                 {r.hist ? (
                                     <div style={{ marginBottom: 8 }}>
-                                        {isRunning ? <Sparkline data={r.hist} color={t.accentPrimary} /> : <div style={{ height: 44, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.72rem", color: t.textMuted }}>VM stopped</div>}
+                                        {isRunning ? <Sparkline data={r.hist} color={t.accentPrimary} max={r.max} /> : <div style={{ height: 44, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.72rem", color: t.textMuted }}>VM stopped</div>}
                                     </div>
                                 ) : (
                                     <div style={{ height: 6, borderRadius: 3, background: t.borderPrimary }}>
@@ -343,7 +430,7 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
                     </div>
 
                     {/* Info grid */}
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 }}>
                         <div style={card}>
                             <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: 14, color: t.textSecondary }}>Instance Details</h3>
                             {[["Status", live?.status || vm.status], ["Uptime", isRunning ? formatUptime(live?.uptime || 0) : "—"], ["OS", vm.os], ["IP Address", vm.ipAddress || "Not assigned"], ["Node", vm.node], ["VM ID", vm.vmId]].map(([l, v]) => (
@@ -444,7 +531,7 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
                                         <span style={{ fontWeight: 700, color: t.textPrimary, fontSize: "1rem" }}>{a.vpc.name}</span>
                                         <span style={{ fontSize: "0.68rem", fontWeight: 700, padding: "2px 8px", borderRadius: 4, background: a.vpc.status === "ACTIVE" ? t.statusSuccessBg : t.statusErrorBg, color: a.vpc.status === "ACTIVE" ? t.statusSuccess : t.statusError }}>{a.vpc.status}</span>
                                     </div>
-                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: "0.85rem" }}>
+                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 8, fontSize: "0.85rem" }}>
                                         {[
                                             ["VLAN ID", String(a.vpc.vlanId)],
                                             ["Subnet", a.vpc.subnet],
@@ -497,6 +584,105 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
             {/* ─── Settings Tab ─── */}
             {tab === "settings" && (
                 <div>
+                    {/* Resize / Change Plan */}
+                    {(() => {
+                        const vmHasGpu = !!(vm.specs?.gpu);
+                        const currentPlan = (vm.specs as Record<string, unknown> | null)?.plan as string | undefined;
+                        const options = Object.entries(PLAN_CONFIGS).filter(([, cfg]) => cfg.priceInCredits > 0 && cfg.requiresGpu === vmHasGpu);
+                        return (
+                            <div style={{ ...card, marginBottom: 20 }}>
+                                <h3 style={{ fontSize: "1.05rem", fontWeight: 700, marginBottom: 4, color: t.textPrimary, display: "flex", alignItems: "center", gap: 8 }}>
+                                    <SlidersHorizontal style={{ width: 17, height: 17, color: t.accentPrimary }} /> Resize / Change Plan
+                                </h3>
+                                <p style={{ color: t.textMuted, fontSize: "0.85rem", marginBottom: 16 }}>
+                                    Pick a plan. CPU/RAM apply after a reboot; disk can only grow. Billing switches to the new hourly rate from the next cycle.
+                                </p>
+                                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12, marginBottom: 16 }}>
+                                    {options.map(([name, cfg]) => {
+                                        const isCurrent = currentPlan === name;
+                                        const selected = resizePlan === name;
+                                        return (
+                                            <button key={name} onClick={() => setResizePlan(name)} disabled={isCurrent}
+                                                style={{
+                                                    textAlign: "left", padding: "14px 16px", borderRadius: t.cardRadius, cursor: isCurrent ? "default" : "pointer",
+                                                    border: `2px solid ${selected ? t.accentPrimary : t.borderPrimary}`,
+                                                    background: selected ? t.accentPrimaryMuted : t.bgSecondary,
+                                                    opacity: isCurrent ? 0.55 : 1, transition: "all 0.15s",
+                                                }}>
+                                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                                                    <span style={{ fontWeight: 700, color: t.textPrimary, fontSize: "0.9rem" }}>{name}</span>
+                                                    {isCurrent && <span style={{ fontSize: "0.62rem", fontWeight: 800, padding: "2px 7px", borderRadius: 10, background: t.bgTertiary, color: t.textMuted }}>CURRENT</span>}
+                                                </div>
+                                                <p style={{ fontSize: "0.75rem", color: t.textSecondary, fontFamily: t.fontMono }}>{cfg.vcpu} vCPU · {cfg.ramMb / 1024} GB · {cfg.diskGb} GB</p>
+                                                <p style={{ fontSize: "0.78rem", color: t.accentPrimary, fontWeight: 700, marginTop: 4 }}>{cfg.priceInCredits.toLocaleString()} cr/mo</p>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                {resizeMsg && (
+                                    <p style={{ fontSize: "0.82rem", marginBottom: 12, fontWeight: 600, color: resizeMsg.ok ? t.statusSuccess : t.statusError }}>{resizeMsg.text}</p>
+                                )}
+                                <button onClick={() => doResize()} disabled={!resizePlan || resizing}
+                                    style={{ padding: "10px 24px", borderRadius: t.buttonRadius, border: "none", background: t.accentPrimary, color: t.textInverse, fontWeight: 700, fontSize: "0.875rem", cursor: !resizePlan || resizing ? "not-allowed" : "pointer", opacity: !resizePlan || resizing ? 0.5 : 1 }}>
+                                    {resizing ? "Applying…" : "Apply resize"}
+                                </button>
+                            </div>
+                        );
+                    })()}
+
+                    {/* Monitoring Alerts */}
+                    <div style={{ ...card, marginBottom: 20 }}>
+                        <h3 style={{ fontSize: "1.05rem", fontWeight: 700, marginBottom: 4, color: t.textPrimary, display: "flex", alignItems: "center", gap: 8 }}>
+                            <AlertTriangle style={{ width: 16, height: 16, color: t.accentPrimary }} /> Monitoring Alerts
+                        </h3>
+                        <p style={{ color: t.textMuted, fontSize: "0.85rem", marginBottom: 16 }}>
+                            Get an in-app notification (and email) when a metric crosses a threshold. Checked every few minutes.
+                        </p>
+
+                        {alertRules.length > 0 && (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+                                {alertRules.map(r => {
+                                    const unit = r.metric === "bandwidth" ? " Mbps" : "%";
+                                    const label = ({ cpu: "CPU", mem: "Memory", disk: "Disk", bandwidth: "Bandwidth" } as Record<string, string>)[r.metric] ?? r.metric;
+                                    return (
+                                        <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderRadius: t.cardRadius, background: t.bgInput, border: `1px solid ${t.borderSecondary}` }}>
+                                            <span style={{ fontSize: "0.85rem", color: t.textPrimary, fontWeight: 600, flex: 1 }}>
+                                                {label} {r.comparison === "lt" ? "<" : ">"} {r.threshold}{unit}
+                                            </span>
+                                            <button onClick={() => toggleAlert(r.id, !r.enabled)} title={r.enabled ? "Enabled" : "Disabled"}
+                                                style={{ fontSize: "0.7rem", fontWeight: 700, padding: "3px 10px", borderRadius: 20, cursor: "pointer", border: "none", background: r.enabled ? t.statusSuccessBg : t.bgTertiary, color: r.enabled ? t.statusSuccess : t.textMuted }}>
+                                                {r.enabled ? "ON" : "OFF"}
+                                            </button>
+                                            <button onClick={() => deleteAlert(r.id)} title="Delete" style={{ width: 28, height: 28, borderRadius: t.buttonRadius, border: `1px solid ${t.statusError}33`, background: t.statusErrorBg, color: t.statusError, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                                <X style={{ width: 13, height: 13 }} />
+                                            </button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                            <select value={alertMetric} onChange={e => setAlertMetric(e.target.value)} style={{ padding: "9px 12px", borderRadius: t.buttonRadius, background: t.bgInput, border: `1px solid ${t.borderPrimary}`, color: t.textPrimary, fontSize: "0.85rem", cursor: "pointer", outline: "none" }}>
+                                <option value="cpu">CPU %</option>
+                                <option value="mem">Memory %</option>
+                                <option value="disk">Disk %</option>
+                                <option value="bandwidth">Bandwidth Mbps</option>
+                            </select>
+                            <select value={alertComparison} onChange={e => setAlertComparison(e.target.value)} style={{ padding: "9px 12px", borderRadius: t.buttonRadius, background: t.bgInput, border: `1px solid ${t.borderPrimary}`, color: t.textPrimary, fontSize: "0.85rem", cursor: "pointer", outline: "none" }}>
+                                <option value="gt">above</option>
+                                <option value="lt">below</option>
+                            </select>
+                            <input value={alertThreshold} onChange={e => setAlertThreshold(e.target.value.replace(/[^0-9.]/g, ""))} placeholder="80" inputMode="decimal"
+                                style={{ width: 90, padding: "9px 12px", borderRadius: t.buttonRadius, background: t.bgInput, border: `1px solid ${t.borderPrimary}`, color: t.textPrimary, fontSize: "0.85rem", fontFamily: t.fontMono, outline: "none" }} />
+                            <button onClick={saveAlert} disabled={alertBusy}
+                                style={{ padding: "9px 20px", borderRadius: t.buttonRadius, border: "none", background: t.accentPrimary, color: t.textInverse, fontWeight: 700, fontSize: "0.85rem", cursor: alertBusy ? "not-allowed" : "pointer", opacity: alertBusy ? 0.6 : 1 }}>
+                                {alertBusy ? "Saving…" : "Add rule"}
+                            </button>
+                        </div>
+                        {alertMsg && <p style={{ fontSize: "0.8rem", color: t.statusError, marginTop: 10 }}>{alertMsg}</p>}
+                    </div>
+
                     {/* Display Type */}
                     <div style={{ ...card, marginBottom: 20 }}>
                         <h3 style={{ fontSize: "1.05rem", fontWeight: 700, marginBottom: 4, color: t.textPrimary }}>Console Display Type</h3>
@@ -578,6 +764,15 @@ export default function VmDetailPage({ params }: { params: Promise<{ vmId: strin
                 onSubmit={(token) => { setTwoFaLoading(true); loadCreds(token); }}
                 loading={twoFaLoading}
                 error={twoFaError}
+            />
+
+            {/* TOTP step-up for resize (billing-affecting) */}
+            <TwoFactorModal
+                open={resize2faShow}
+                onClose={() => { setResize2faShow(false); setResize2faError(""); setResize2faLoading(false); }}
+                onSubmit={(token) => { setResize2faLoading(true); doResize(token); }}
+                loading={resize2faLoading}
+                error={resize2faError}
             />
 
             {/* Destroy Modal */}

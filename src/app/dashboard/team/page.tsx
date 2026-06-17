@@ -71,7 +71,7 @@ export default function TeamPage() {
             )}
 
             {/* Role Breakdown */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 14, marginBottom: 24 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 14, marginBottom: 24 }}>
                 {ROLES.map(r => (
                     <div key={r.id} style={{ ...card, padding: "18px 22px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>

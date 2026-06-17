@@ -1063,6 +1063,12 @@ export async function setCloudInitConfig(
         nameserver?: string;
         /** DNS search domain */
         searchdomain?: string;
+        /**
+         * Cloud-Init datasource format. Linux uses "nocloud" (default); Windows
+         * with Cloudbase-Init must use "configdrive2" — it reads the ConfigDrive
+         * metadata, not the NoCloud one.
+         */
+        citype?: "nocloud" | "configdrive2";
     }
 ): Promise<void> {
     // Build only the defined fields — Proxmox ignores undefined/null
@@ -1073,6 +1079,7 @@ export async function setCloudInitConfig(
     if (config.ipconfig0) payload.ipconfig0 = config.ipconfig0;
     if (config.nameserver) payload.nameserver = config.nameserver;
     if (config.searchdomain) payload.searchdomain = config.searchdomain;
+    if (config.citype) payload.citype = config.citype;
 
     if (Object.keys(payload).length === 0) return;
 

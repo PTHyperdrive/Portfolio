@@ -94,7 +94,7 @@ export default function AdminTicketsPage() {
             </div>
 
             {/* Stats Bar */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12, marginBottom: 20 }}>
                 {[{ key: "all", label: "Total", count: counts.all, color: t.accentPrimary }, { key: "PENDING", label: "Pending", count: counts.PENDING, color: "#fdd663" }, { key: "UNSOLVED", label: "Unsolved", count: counts.UNSOLVED, color: "#f28b82" }, { key: "SOLVED", label: "Solved", count: counts.SOLVED, color: "#81c995" }].map(s => (
                     <button key={s.key} onClick={() => setFilter(s.key)} style={{
                         ...card, padding: "14px 18px", cursor: "pointer", border: filter === s.key ? `2px solid ${s.color}55` : `1px solid ${t.borderPrimary}`,

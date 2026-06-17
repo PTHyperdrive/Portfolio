@@ -119,7 +119,7 @@ export default function InfrastructurePage() {
                     <h1 style={{ fontSize: "1.6rem", fontWeight: 800, color: t.textPrimary }}>Infrastructure</h1>
                 </div>
                 {/* Skeleton cards */}
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
                     {[1, 2, 3].map(i => (
                         <div key={i} style={{ ...card, padding: 24, height: 120 }}>
                             <div style={{
@@ -240,7 +240,7 @@ export default function InfrastructurePage() {
             </div>
 
             {/* ─── Resource Gauges ─── */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 24 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 24 }}>
                 {/* CPU */}
                 <div style={{ ...card, padding: 22 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>

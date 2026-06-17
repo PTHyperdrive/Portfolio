@@ -218,7 +218,7 @@ export default function VpsDashboard() {
         <div style={{ padding: "32px 36px", minHeight: "100vh", backgroundColor: t.bgPrimary }}>
 
             {/* ── Page Header ── */}
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 28 }}>
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: 16, marginBottom: 28 }}>
                 <div>
                     <p style={{ fontSize: "0.78rem", color: t.textMuted, marginBottom: 6 }}>Dashboard &nbsp;•&nbsp; Virtual Machine</p>
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -337,7 +337,8 @@ export default function VpsDashboard() {
                     </div>
                 ) : (
                     <>
-                        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                        <div style={{ overflowX: "auto" }}>
+                        <table style={{ width: "100%", minWidth: 720, borderCollapse: "collapse" }}>
                             <thead>
                                 <tr style={{ background: t.isMono ? t.bgSecondary : "rgba(255,255,255,0.015)" }}>
                                     {["Status", "Name", "IP Address", "Configuration", "Actions"].map(h => (
@@ -468,6 +469,7 @@ export default function VpsDashboard() {
                                 })}
                             </tbody>
                         </table>
+                        </div>
                         {renderPagination()}
                     </>
                 )}

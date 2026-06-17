@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useThemeTokens } from "@/lib/useThemeTokens";
+import { useIsMobile } from "@/lib/useIsMobile";
 import AccountDropdown from "@/components/layout/AccountDropdown";
 import { ChevronRight, ChevronDown } from "lucide-react";
 
@@ -34,7 +35,8 @@ export const useDocs = () => useContext(DocsContext);
 
 export default function DocsLayout({ children }: { children: React.ReactNode }) {
     const t = useThemeTokens();
-    const pathname = usePathname();
+    const isMobile = useIsMobile();
+    const pathname = usePathname() ?? "";
     const [chapters, setChapters] = useState<Chapter[]>([]);
     const [loading, setLoading] = useState(true);
     const [expandedChapters, setExpandedChapters] = useState<Set<string>>(new Set());
@@ -173,8 +175,9 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
 
                 {/* ─── Main Layout ─── */}
                 <div style={{ display: "flex", flex: 1 }}>
-                    {/* Left — TOC Sidebar */}
+                    {/* Left — TOC Sidebar (hidden on mobile; use top nav / links) */}
                     <aside style={{
+                        display: isMobile ? "none" : undefined,
                         width: 280, minWidth: 280,
                         borderRight: `1px solid ${t.borderPrimary}`,
                         background: t.isMono ? (t.isLight ? "#fafafa" : "#000") : t.bgSecondary,
@@ -226,7 +229,7 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
                     {/* Right — Reading Area */}
                     <main style={{
                         flex: 1,
-                        padding: "40px 48px",
+                        padding: isMobile ? "24px 16px" : "40px 48px",
                         maxWidth: 900,
                         overflowY: "auto",
                     }}>
