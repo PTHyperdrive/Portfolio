@@ -121,7 +121,8 @@ export default function AuditLogPage() {
                 {loading ? (
                     <div style={{ padding: 60, textAlign: "center", color: t.textMuted }}>Loading audit log...</div>
                 ) : (
-                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", minWidth: 720, borderCollapse: "collapse" }}>
                         <thead>
                             <tr style={{ background: t.bgSecondary }}>
                                 {["Action", "Resource", "User", "Created At", "Outcome", ""].map(h => (
@@ -173,7 +174,7 @@ export default function AuditLogPage() {
                                                 <td colSpan={6} style={{ padding: "0 20px 16px", background: t.accentPrimaryMuted }}>
                                                     <div style={{ padding: 20, background: t.bgSecondary, borderRadius: t.cardRadius, border: `1px solid ${t.borderSecondary}` }}>
                                                         <p style={{ fontSize: "0.8rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 16 }}>Activity Details</p>
-                                                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 16 }}>
+                                                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 16, marginBottom: 16 }}>
                                                             <div>
                                                                 <span style={{ display: "block", fontSize: "0.7rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 6 }}>IP Address</span>
                                                                 {log.ipAddress ? <BlurredIP ip={log.ipAddress} color={t.textPrimary} /> : <span style={{ fontFamily: t.fontMono, fontSize: "0.85rem", color: t.textMuted }}>N/A</span>}
@@ -200,6 +201,7 @@ export default function AuditLogPage() {
                             })}
                         </tbody>
                     </table>
+                    </div>
                 )}
 
                 {/* Pagination */}

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { Server, Trash2, RotateCcw, RefreshCw } from "lucide-react";
 import { useThemeTokens } from "@/lib/useThemeTokens";
+import { useIsMobile } from "@/lib/useIsMobile";
 
 interface VpsInstance { id: string; vmId: string; name: string; node: string; status: string; }
 interface Snapshot { name: string; description: string; snaptime: number; vmstate: number; parent?: string; }
@@ -35,6 +36,7 @@ function SubNav({ active }: { active: "snapshots" | "backups" | "isos" }) {
 
 export default function SnapshotsPage() {
     const t = useThemeTokens();
+    const isMobile = useIsMobile();
     const [vms, setVms] = useState<VpsInstance[]>([]);
     const [selectedVm, setSelectedVm] = useState("");
     const [selectedNode, setSelectedNode] = useState("");
@@ -148,7 +150,7 @@ export default function SnapshotsPage() {
                             Create Snapshot
                         </h2>
                         <form onSubmit={handleCreate} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 14 }}>
+                            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 2fr", gap: 14 }}>
                                 <div>
                                     <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 600, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Snapshot Name *</label>
                                     <input id="snap-name-input" value={snapname} onChange={e => setSnapname(e.target.value.replace(/[^a-zA-Z0-9_-]/g, ""))} placeholder="e.g. before_update" required style={input} />
@@ -160,7 +162,7 @@ export default function SnapshotsPage() {
                                 </div>
                             </div>
 
-                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 12 }}>
                                 <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
                                     <div onClick={() => setIncludeRam(v => !v)} style={{ width: 40, height: 22, borderRadius: 11, background: includeRam ? t.accentPrimary : `${t.textMuted}33`, position: "relative", cursor: "pointer", transition: "background 0.2s", flexShrink: 0 }}>
                                         <div style={{ position: "absolute", top: 3, left: includeRam ? 21 : 3, width: 16, height: 16, borderRadius: "50%", background: "#fff", transition: "left 0.2s" }} />
@@ -193,8 +195,9 @@ export default function SnapshotsPage() {
                         ) : snapshots.length === 0 ? (
                             <div style={{ padding: "40px", textAlign: "center", color: t.textMuted, fontSize: "0.875rem" }}>No snapshots yet.</div>
                         ) : (
-                            snapshots.map((snap, idx) => (
-                                <div key={snap.name} style={{ display: "grid", gridTemplateColumns: "200px 1fr 160px 80px auto", alignItems: "center", gap: 12, padding: "14px 24px", borderBottom: idx < snapshots.length - 1 ? `1px solid ${t.borderSecondary}` : "none" }}
+                            <div style={{ overflowX: "auto" }}>
+                            {snapshots.map((snap, idx) => (
+                                <div key={snap.name} style={{ display: "grid", gridTemplateColumns: "200px 1fr 160px 80px auto", alignItems: "center", gap: 12, padding: "14px 24px", borderBottom: idx < snapshots.length - 1 ? `1px solid ${t.borderSecondary}` : "none", minWidth: 640 }}
                                     onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = t.bgCardHover}
                                     onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = "transparent"}>
                                     <div>
@@ -215,7 +218,8 @@ export default function SnapshotsPage() {
                                         </button>
                                     </div>
                                 </div>
-                            ))
+                            ))}
+                            </div>
                         )}
                     </div>
                 </div>

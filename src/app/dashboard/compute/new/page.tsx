@@ -400,7 +400,7 @@ export default function ComputeNewPage() {
                             sub="Choose the hardware configuration for your instance"
                             t={t}
                         />
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 12 }}>
                             {PLANS.map(p => {
                                 const active     = selectedPlan === p.id;
                                 const isTrial    = p.id === "free-trial";
@@ -476,7 +476,7 @@ export default function ComputeNewPage() {
                                 </div>
 
                                 {swTab === "Operating System" ? (
-                                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                                    <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10 }}>
                                         {OS_OPTIONS.map(o => {
                                             const active = selectedOs === o.id;
                                             return (
@@ -513,7 +513,7 @@ export default function ComputeNewPage() {
                                 />
 
                                 {/* Template grid */}
-                                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 20 }}>
+                                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 10, marginBottom: 20 }}>
                                     {availableTemplates.map(tpl => {
                                         const active = selectedOs === tpl.id;
                                         return (
@@ -707,8 +707,8 @@ export default function ComputeNewPage() {
                             sub="Select a pre-configured resource package"
                             t={t}
                         />
-                        <div style={{ border: `1px solid ${t.borderPrimary}`, borderRadius: 10, overflow: "hidden" }}>
-                            <div style={{ display: "grid", gridTemplateColumns: "1.4fr .8fr .8fr .8fr 1fr 1.1fr 28px", padding: "8px 16px", background: t.bgSecondary, borderBottom: `1px solid ${t.borderSecondary}` }}>
+                        <div style={{ border: `1px solid ${t.borderPrimary}`, borderRadius: 10, overflow: "hidden", overflowX: "auto" }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "1.4fr .8fr .8fr .8fr 1fr 1.1fr 28px", padding: "8px 16px", background: t.bgSecondary, borderBottom: `1px solid ${t.borderSecondary}`, minWidth: 620 }}>
                                 {["Package", "vCPU", "RAM", "Disk", "Bandwidth", "Price", ""].map(h => (
                                     <span key={h} style={{ fontSize: "0.68rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.07em" }}>{h}</span>
                                 ))}
@@ -721,7 +721,7 @@ export default function ComputeNewPage() {
                                     <div key={p.id} onClick={() => setSelectedPlan(p.id)}
                                         style={{
                                             display: "grid", gridTemplateColumns: "1.4fr .8fr .8fr .8fr 1fr 1.1fr 28px",
-                                            alignItems: "center", padding: "12px 16px", cursor: "pointer",
+                                            alignItems: "center", padding: "12px 16px", cursor: "pointer", minWidth: 620,
                                             borderBottom: i < PLANS.length - 1 ? `1px solid ${t.borderSecondary}` : "none",
                                             background:   active ? (isTrial ? trialAccentMuted : t.accentPrimaryMuted) : "transparent",
                                             borderLeft:   active ? `2px solid ${isTrial ? trialAccent : t.accentPrimary}` : "2px solid transparent",

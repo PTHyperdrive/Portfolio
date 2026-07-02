@@ -449,7 +449,7 @@ export default function ConsoleHubPage() {
                             TimoSMS — Rent a Number
                         </p>
                         <p style={{ fontSize: "0.78rem", color: t.textMuted, marginTop: 2 }}>
-                            Temporary numbers for one-time SMS codes
+                            Coming soon — temporary numbers for one-time SMS codes
                         </p>
                     </div>
                 </div>

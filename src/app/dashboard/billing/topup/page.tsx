@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useThemeTokens } from "@/lib/useThemeTokens";
+import { useIsMobile } from "@/lib/useIsMobile";
 import { useCredits } from "@/components/CreditProvider";
 import {
     Clock, DollarSign, ClipboardList, Shield, Gift,
@@ -25,6 +26,7 @@ type PromoState = "idle" | "checking" | "applied" | "error";
 
 export default function TopUpPage() {
     const t = useThemeTokens();
+    const isMobile = useIsMobile();
     const { credits: globalCredits, refresh: refreshCredits, adjust: adjustCredits } = useCredits();
     const [balance, setBalance] = useState(0);
     const [selected, setSelected] = useState<number | null>(120_000);
@@ -132,7 +134,7 @@ export default function TopUpPage() {
             </div>
 
             {/* Two-column grid */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: 24, alignItems: "start" }}>
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 340px", gap: 24, alignItems: "start" }}>
 
                 {/* ── LEFT: Top Up Details ── */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>

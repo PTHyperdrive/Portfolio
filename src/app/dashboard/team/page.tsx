@@ -91,8 +91,9 @@ export default function TeamPage() {
                     <span style={{ fontWeight: 700, color: t.textPrimary, fontSize: "0.95rem" }}>Team Members</span>
                     <span style={{ padding: "2px 10px", borderRadius: 10, background: t.accentPrimaryMuted, color: t.accentPrimary, fontSize: "0.72rem", fontWeight: 700 }}>1 member</span>
                 </div>
-                {/* Current user row */}
-                <div style={{ padding: "14px 24px", display: "grid", gridTemplateColumns: "1fr 160px 100px 80px", alignItems: "center", gap: 12, borderBottom: `1px solid ${t.borderSecondary}` }}>
+                {/* Current user row (scrolls horizontally on narrow screens) */}
+                <div style={{ overflowX: "auto" }}>
+                <div style={{ padding: "14px 24px", display: "grid", gridTemplateColumns: "1fr 160px 100px 80px", alignItems: "center", gap: 12, borderBottom: `1px solid ${t.borderSecondary}`, minWidth: 560 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                         <div style={{ width: 36, height: 36, borderRadius: "50%", background: t.accentPrimaryMuted, display: "flex", alignItems: "center", justifyContent: "center" }}>
                             <Crown style={{ width: 16, height: 16, color: "#f59e0b" }} />
@@ -105,6 +106,7 @@ export default function TeamPage() {
                     <span style={{ padding: "3px 10px", borderRadius: 6, background: `#f59e0b18`, color: "#f59e0b", fontSize: "0.75rem", fontWeight: 700, textAlign: "center" }}>Owner</span>
                     <span style={{ fontSize: "0.78rem", color: t.statusSuccess, fontWeight: 600 }}>Active</span>
                     <span style={{ fontSize: "0.78rem", color: t.textMuted }}>—</span>
+                </div>
                 </div>
                 {/* Empty hint */}
                 <div style={{ padding: "32px 24px", textAlign: "center" }}>

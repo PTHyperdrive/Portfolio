@@ -124,7 +124,8 @@ export default function AdminServersPage() {
                     <div style={{ padding: "48px 24px", textAlign: "center", color: t.textMuted }}>No servers match the filter.</div>
                 ) : (
                     <>
-                        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                        <div style={{ overflowX: "auto" }}>
+                        <table style={{ width: "100%", minWidth: 720, borderCollapse: "collapse" }}>
                             <thead>
                                 <tr style={{ background: t.bgSecondary }}>
                                     {["Status", "VM / OS", "Owner", "IP Address", "Specs", "Node", "Created"].map(h => (
@@ -164,6 +165,7 @@ export default function AdminServersPage() {
                                 })}
                             </tbody>
                         </table>
+                        </div>
 
                         {/* Pagination */}
                         {meta && meta.totalPages > 1 && (
