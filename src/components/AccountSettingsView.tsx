@@ -36,6 +36,11 @@ export default function AccountSettingsView() {
     const [pwdMsg, setPwdMsg] = useState<FeedbackMsg>(null);
     const [saving, setSaving] = useState(false);
 
+    // Avatar state
+    const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+    const [avatarMsg, setAvatarMsg] = useState<FeedbackMsg>(null);
+    const [avatarBusy, setAvatarBusy] = useState(false);
+
     // Preferences state
     const [language, setLanguage] = useState("en");
     const [network, setNetwork] = useState("auto");
@@ -131,12 +136,15 @@ export default function AccountSettingsView() {
     useEffect(() => {
         fetch("/api/overview")
             .then(r => r.json())
-            .then((d: { user?: { twoFactorEnabled?: boolean; emailTwoFactorEnabled?: boolean } }) => {
+            .then((d: { user?: { twoFactorEnabled?: boolean; emailTwoFactorEnabled?: boolean; image?: string | null } }) => {
                 if (d?.user?.twoFactorEnabled) {
                     setIs2FAEnabled(true);
                 }
                 if (d?.user?.emailTwoFactorEnabled) {
                     setIsEmail2FAEnabled(true);
+                }
+                if (d?.user?.image) {
+                    setAvatarUrl(d.user.image);
                 }
             })
             .catch(() => { /* non-critical — toggle stays off */ });
@@ -290,6 +298,59 @@ export default function AccountSettingsView() {
         }
     };
 
+    const handleAvatarSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        e.target.value = ""; // allow re-selecting the same file later
+        if (!file) return;
+        setAvatarBusy(true);
+        setAvatarMsg(null);
+        try {
+            const fd = new FormData();
+            fd.append("files", file);
+            fd.append("context", "AVATAR");
+            const upRes = await fetch("/api/uploads", { method: "POST", body: fd });
+            const upData = await upRes.json();
+            const uploaded = upData.files?.[0] as { id: string } | undefined;
+            if (!upRes.ok || !uploaded) {
+                throw new Error(upData.errors?.[0]?.error || upData.error || "Upload failed.");
+            }
+            const imagePath = `/api/uploads/${uploaded.id}`;
+            const res = await fetch("/api/user/profile", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ image: imagePath }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Could not save avatar.");
+            setAvatarUrl(imagePath);
+            setAvatarMsg({ type: "success", text: "Avatar updated." });
+        } catch (err) {
+            setAvatarMsg({ type: "error", text: err instanceof Error ? err.message : "Upload failed." });
+        } finally {
+            setAvatarBusy(false);
+        }
+    };
+
+    const handleAvatarRemove = async () => {
+        setAvatarBusy(true);
+        setAvatarMsg(null);
+        try {
+            const res = await fetch("/api/user/profile", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ image: null }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Could not remove avatar.");
+            setAvatarUrl(null);
+            setAvatarMsg({ type: "success", text: "Avatar removed." });
+        } catch (err) {
+            setAvatarMsg({ type: "error", text: err instanceof Error ? err.message : "Could not remove avatar." });
+        } finally {
+            setAvatarBusy(false);
+        }
+    };
+
     const handlePasswordSave = async (e: React.FormEvent) => {
         e.preventDefault();
         setSaving(true);
@@ -415,7 +476,7 @@ export default function AccountSettingsView() {
                         {/* Read-only info card */}
                         <div style={{ ...card, padding: "24px" }}>
                             <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "16px", color: t.textPrimary }}>Account Information</h3>
-                            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "16px" }}>
                                 <div>
                                     <span style={labelStyle}>Member Since</span>
                                     <span style={{ fontSize: "0.95rem", color: t.textPrimary }}>{registerDate}</span>
@@ -427,25 +488,44 @@ export default function AccountSettingsView() {
                             </div>
                         </div>
 
-                        {/* Avatar placeholder */}
+                        {/* Avatar */}
                         <div style={{ ...card, padding: "24px" }}>
                             <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "16px", color: t.textPrimary }}>Avatar</h3>
-                            <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
-                                <div style={{ width: 72, height: 72, borderRadius: t.cardRadius, background: t.isMono ? t.bgTertiary : "linear-gradient(135deg, #3b82f6, #6366f1)", border: t.isMono ? `1px solid ${t.borderPrimary}` : "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.8rem", fontWeight: 800, color: t.isLight ? t.textPrimary : "#fff" }}>
-                                    {(session?.user?.name || session?.user?.email || "U")[0].toUpperCase()}
-                                </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: "20px", flexWrap: "wrap" }}>
+                                {avatarUrl ? (
+                                    // eslint-disable-next-line @next/next/no-img-element -- authenticated API URL, not optimizable by next/image
+                                    <img src={avatarUrl} alt="Your avatar" style={{ width: 72, height: 72, borderRadius: t.cardRadius, objectFit: "cover", border: `1px solid ${t.borderPrimary}` }} />
+                                ) : (
+                                    <div style={{ width: 72, height: 72, borderRadius: t.cardRadius, background: t.isMono ? t.bgTertiary : "linear-gradient(135deg, #3b82f6, #6366f1)", border: t.isMono ? `1px solid ${t.borderPrimary}` : "none", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.8rem", fontWeight: 800, color: t.isLight ? t.textPrimary : "#fff" }}>
+                                        {(session?.user?.name || session?.user?.email || "U")[0].toUpperCase()}
+                                    </div>
+                                )}
                                 <div>
-                                    <button disabled style={{
-                                        display: "inline-flex", alignItems: "center", gap: 8,
-                                        padding: "8px 18px", borderRadius: t.buttonRadius,
-                                        border: `1px solid ${t.borderPrimary}`, background: "transparent",
-                                        color: t.textMuted, fontSize: "0.85rem", fontWeight: 600,
-                                        opacity: 0.5, cursor: "not-allowed",
-                                    }}>
-                                        <Camera style={{ width: 14, height: 14 }} />
-                                        Upload Photo
-                                    </button>
-                                    <p style={{ marginTop: "8px", fontSize: "0.78rem", color: t.textMuted }}>Custom avatar upload coming soon.</p>
+                                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                                        <label style={{
+                                            display: "inline-flex", alignItems: "center", gap: 8,
+                                            padding: "8px 18px", borderRadius: t.buttonRadius,
+                                            border: `1px solid ${t.borderPrimary}`, background: "transparent",
+                                            color: avatarBusy ? t.textMuted : t.textPrimary, fontSize: "0.85rem", fontWeight: 600,
+                                            cursor: avatarBusy ? "wait" : "pointer",
+                                        }}>
+                                            <Camera style={{ width: 14, height: 14 }} />
+                                            {avatarBusy ? "Working…" : "Upload Photo"}
+                                            <input type="file" accept="image/*" onChange={handleAvatarSelect} disabled={avatarBusy} style={{ display: "none" }} />
+                                        </label>
+                                        {avatarUrl && (
+                                            <button onClick={handleAvatarRemove} disabled={avatarBusy} style={{
+                                                padding: "8px 18px", borderRadius: t.buttonRadius,
+                                                border: `1px solid ${t.statusError}44`, background: "transparent",
+                                                color: t.statusError, fontSize: "0.85rem", fontWeight: 600,
+                                                cursor: avatarBusy ? "wait" : "pointer",
+                                            }}>
+                                                Remove
+                                            </button>
+                                        )}
+                                    </div>
+                                    <p style={{ marginTop: "8px", fontSize: "0.78rem", color: t.textMuted }}>PNG, JPG or WebP — max 5 MB.</p>
+                                    {feedbackLine(avatarMsg)}
                                 </div>
                             </div>
                         </div>

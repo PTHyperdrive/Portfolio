@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useThemeTokens } from "@/lib/useThemeTokens";
+import { useIsMobile } from "@/lib/useIsMobile";
 import {
     MessageSquare, Plus, Clock, CheckCircle2, AlertCircle, X,
     ChevronRight, Send, Upload, Image as ImageIcon, FileText, Loader2
@@ -34,6 +35,7 @@ const PRIORITY_META: Record<string, { label: string; color: string }> = {
 
 export default function TicketsPage() {
     const t = useThemeTokens();
+    const isMobile = useIsMobile();
     const [tickets, setTickets] = useState<Ticket[]>([]);
     const [loading, setLoading] = useState(true);
     const [showCreate, setShowCreate] = useState(false);
@@ -154,7 +156,7 @@ export default function TicketsPage() {
                         <Send style={{ width: 16, height: 16, color: t.accentPrimary }} /> Create New Ticket
                     </h3>
                     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 180px", gap: 14 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 180px", gap: 14 }}>
                             <div>
                                 <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 600, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Title</label>
                                 <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Brief description of your issue" style={inputStyle} maxLength={200} />
@@ -204,7 +206,7 @@ export default function TicketsPage() {
             )}
 
             {/* Filter Tabs */}
-            <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 16 }}>
                 {[{ key: "all", label: "All" }, { key: "PENDING", label: "Pending" }, { key: "UNSOLVED", label: "Unsolved" }, { key: "SOLVED", label: "Solved" }].map(tab => (
                     <button key={tab.key} onClick={() => setFilter(tab.key)} style={{
                         padding: "6px 16px", borderRadius: t.buttonRadius, border: `1px solid ${filter === tab.key ? t.accentPrimary + "55" : t.borderPrimary}`,
@@ -229,8 +231,8 @@ export default function TicketsPage() {
                         <p style={{ color: t.textMuted, fontSize: "0.875rem" }}>Submit a support request to get started.</p>
                     </div>
                 ) : (
-                    <div>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 100px 100px 120px 30px", gap: 12, padding: "10px 24px", borderBottom: `1px solid ${t.borderSecondary}` }}>
+                    <div style={{ overflowX: "auto" }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 100px 100px 120px 30px", gap: 12, padding: "10px 24px", borderBottom: `1px solid ${t.borderSecondary}`, minWidth: 560 }}>
                             {["Title", "Priority", "Status", "Updated", ""].map(h => (
                                 <span key={h} style={{ fontSize: "0.72rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.06em" }}>{h}</span>
                             ))}
@@ -239,7 +241,7 @@ export default function TicketsPage() {
                             const sm = STATUS_META[ticket.status] ?? STATUS_META.PENDING;
                             const pm = PRIORITY_META[ticket.priority] ?? PRIORITY_META.medium;
                             return (
-                                <div key={ticket.id} onClick={() => setSelectedTicket(ticket)} style={{ display: "grid", gridTemplateColumns: "1fr 100px 100px 120px 30px", gap: 12, padding: "14px 24px", borderBottom: `1px solid ${t.borderSecondary}`, alignItems: "center", cursor: "pointer", transition: "background 0.1s" }}
+                                <div key={ticket.id} onClick={() => setSelectedTicket(ticket)} style={{ display: "grid", gridTemplateColumns: "1fr 100px 100px 120px 30px", gap: 12, padding: "14px 24px", borderBottom: `1px solid ${t.borderSecondary}`, alignItems: "center", cursor: "pointer", transition: "background 0.1s", minWidth: 560 }}
                                     onMouseEnter={e => (e.currentTarget.style.background = t.bgCardHover)}
                                     onMouseLeave={e => (e.currentTarget.style.background = "transparent")}>
                                     <div>

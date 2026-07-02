@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useThemeTokens } from "@/lib/useThemeTokens";
+import { useIsMobile } from "@/lib/useIsMobile";
 import TwoFactorModal from "@/components/TwoFactorModal";
 import {
     KeyRound, Plus, X, CheckCircle, AlertCircle,
@@ -52,6 +53,7 @@ function formatDate(iso: string) {
 
 export default function SshKeysPage() {
     const t = useThemeTokens();
+    const isMobile = useIsMobile();
     const [keys, setKeys] = useState<SshKey[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
@@ -255,7 +257,7 @@ export default function SshKeysPage() {
                         Add New SSH Public Key
                     </h2>
                     <form onSubmit={handleAdd} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 16 }}>
                             <div>
                                 <label style={{ display: "block", fontSize: "0.78rem", fontWeight: 600, color: t.textMuted, marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                                     Key Name *
@@ -352,9 +354,9 @@ export default function SshKeysPage() {
                         </button>
                     </div>
                 ) : (
-                    <>
+                    <div style={{ overflowX: "auto" }}>
                         {/* Table header */}
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 160px 120px 120px auto", gap: 0, padding: "10px 24px", borderBottom: `1px solid ${t.borderSecondary}`, background: t.bgSecondary }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 160px 120px 120px auto", gap: 0, padding: "10px 24px", borderBottom: `1px solid ${t.borderSecondary}`, background: t.bgSecondary, minWidth: 680 }}>
                             {["Name / Fingerprint", "Type", "Added", "Status", "Actions"].map(h => (
                                 <span key={h} style={{ fontSize: "0.7rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.07em" }}>{h}</span>
                             ))}
@@ -366,6 +368,7 @@ export default function SshKeysPage() {
                                     display: "grid",
                                     gridTemplateColumns: "1fr 160px 120px 120px auto",
                                     alignItems: "center",
+                                    minWidth: 680,
                                     padding: "16px 24px",
                                     borderBottom: idx < keys.length - 1 ? `1px solid ${t.borderSecondary}` : "none",
                                     transition: "background 0.12s",
@@ -418,14 +421,14 @@ export default function SshKeysPage() {
                                 </div>
                             </div>
                         ))}
-                    </>
+                    </div>
                 )}
             </div>
 
             {/* Delete Confirmation Modal */}
             {deleteTarget && (
-                <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
-                    <div style={{ ...card, padding: "28px 32px", width: 420, borderColor: `${t.statusError}33` }}>
+                <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}>
+                    <div style={{ ...card, padding: "28px 32px", width: "100%", maxWidth: 420, borderColor: `${t.statusError}33` }}>
                         <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: t.textPrimary, marginBottom: 10 }}>Remove SSH Key</h3>
                         <p style={{ fontSize: "0.875rem", color: t.textSecondary, lineHeight: 1.6 }}>
                             Remove <strong style={{ color: t.textPrimary }}>&quot;{deleteTarget.name}&quot;</strong>?

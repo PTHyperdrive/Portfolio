@@ -227,7 +227,8 @@ export default function AdminAccountsPage() {
                 {loading ? (
                     <div style={{ padding: "40px", textAlign: "center", color: t.textMuted }}>Loading accounts...</div>
                 ) : (
-                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", minWidth: 720, borderCollapse: "collapse" }}>
                         <thead>
                             <tr style={{ background: t.bgSecondary }}>
                                 <th style={{ padding: "10px 12px", borderBottom: `1px solid ${t.borderSecondary}`, width: 40 }}>
@@ -356,6 +357,7 @@ export default function AdminAccountsPage() {
                             ))}
                         </tbody>
                     </table>
+                    </div>
                 )}
                 {!loading && filtered.length === 0 && (
                     <p style={{ padding: "40px", textAlign: "center", color: t.textMuted }}>No users found.</p>

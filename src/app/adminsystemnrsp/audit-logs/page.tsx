@@ -269,7 +269,8 @@ export default function AdminAuditLogsPage() {
                 {loading ? (
                     <div style={{ padding: 60, textAlign: "center", color: t.textMuted }}>Loading audit log...</div>
                 ) : (
-                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", minWidth: 720, borderCollapse: "collapse" }}>
                         <thead>
                             <tr style={{ background: t.bgSecondary }}>
                                 {["Action", "Resource", "User", "Timestamp", "Outcome", ""].map(h => (
@@ -331,6 +332,7 @@ export default function AdminAuditLogsPage() {
                             })}
                         </tbody>
                     </table>
+                    </div>
                 )}
 
                 {/* ── Pagination ────────────────────────────────────────── */}

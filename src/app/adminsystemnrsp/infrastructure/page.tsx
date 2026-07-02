@@ -348,7 +348,8 @@ export default function InfrastructurePage() {
                         No interface data available
                     </div>
                 ) : (
-                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", minWidth: 680, borderCollapse: "collapse" }}>
                         <thead>
                             <tr style={{ background: t.bgSecondary }}>
                                 {["Status", "Name", "Type", "RX", "TX"].map(h => (
@@ -412,6 +413,7 @@ export default function InfrastructurePage() {
                             })}
                         </tbody>
                     </table>
+                    </div>
                 )}
             </div>
 

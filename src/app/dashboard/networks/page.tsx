@@ -282,7 +282,8 @@ export default function NetworksPage() {
                                     <span style={{ fontWeight: 700, color: t.textPrimary, fontSize: "0.92rem" }}>Admin-Managed Assignments</span>
                                 </div>
                             </div>
-                            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                            <div style={{ overflowX: "auto" }}>
+                            <table style={{ width: "100%", minWidth: 560, borderCollapse: "collapse" }}>
                                 <thead>
                                     <tr style={{ background: t.bgSecondary }}>
                                         {["VPC", "VLAN", "Subnet", "Assigned IP", "VM"].map(h => (
@@ -302,6 +303,7 @@ export default function NetworksPage() {
                                     ))}
                                 </tbody>
                             </table>
+                            </div>
                         </div>
                     )}
                 </div>

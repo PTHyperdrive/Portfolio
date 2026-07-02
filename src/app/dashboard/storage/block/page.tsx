@@ -106,8 +106,9 @@ export default function BlockStoragePage() {
                                     <div style={{ padding: "14px 20px", borderBottom: `1px solid ${t.borderSecondary}` }}>
                                         <h2 style={{ fontSize: "0.9rem", fontWeight: 700, color: t.textSecondary }}>Attached Extra Disks</h2>
                                     </div>
+                                    <div style={{ overflowX: "auto" }}>
                                     {info.addons.map((addon, idx) => (
-                                        <div key={addon.id} style={{ display: "grid", gridTemplateColumns: "80px 1fr 120px 100px 120px", alignItems: "center", gap: 12, padding: "14px 20px", borderBottom: idx < info.addons.length - 1 ? `1px solid ${t.borderSecondary}` : "none" }}>
+                                        <div key={addon.id} style={{ display: "grid", gridTemplateColumns: "80px 1fr 120px 100px 120px", alignItems: "center", gap: 12, padding: "14px 20px", borderBottom: idx < info.addons.length - 1 ? `1px solid ${t.borderSecondary}` : "none", minWidth: 560 }}>
                                             <span style={{ padding: "3px 8px", borderRadius: 5, background: t.accentPrimaryMuted, color: t.accentPrimary, fontSize: "0.7rem", fontWeight: 700, textAlign: "center" }}>{TIER_LABELS[addon.storageType as StorageType] ?? addon.storageType.toUpperCase()}</span>
                                             <span style={{ fontFamily: t.fontMono, fontSize: "0.8rem", color: t.textMuted }}>{addon.storagePool}</span>
                                             <span style={{ fontWeight: 700, color: t.textPrimary, fontSize: "0.9rem" }}>{addon.sizeGb} GB</span>
@@ -115,6 +116,7 @@ export default function BlockStoragePage() {
                                             <span style={{ fontSize: "0.75rem", color: t.textMuted }}>{formatDate(addon.purchasedAt)}</span>
                                         </div>
                                     ))}
+                                    </div>
                                 </div>
                             )}
 

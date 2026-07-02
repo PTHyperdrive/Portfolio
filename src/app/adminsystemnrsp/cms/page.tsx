@@ -157,7 +157,8 @@ export default function CmsDashboard() {
                         </Link>
                     </div>
                 ) : (
-                    <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <div style={{ overflowX: "auto" }}>
+                    <table style={{ width: "100%", minWidth: 680, borderCollapse: "collapse" }}>
                         <thead>
                             <tr style={{ background: t.bgSecondary }}>
                                 {["Type", "Title", "Author", "Status", "Date", "Actions"].map(h => (
@@ -241,6 +242,7 @@ export default function CmsDashboard() {
                             ))}
                         </tbody>
                     </table>
+                    </div>
                 )}
             </div>
         </div>

@@ -127,7 +127,8 @@ export default function AdminBillingPage() {
                     ) : usage.length === 0 ? (
                         <div style={{ padding: "48px", textAlign: "center", color: t.textMuted }}>No users found.</div>
                     ) : (
-                        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                        <div style={{ overflowX: "auto" }}>
+                        <table style={{ width: "100%", minWidth: 780, borderCollapse: "collapse" }}>
                             <thead><tr style={{ background: t.bgSecondary }}>
                                 {["User", "Credits", "Plan", "VMs (running)", "Burn /hr", "Runway", "VM-hours", "Spent (hourly)"].map(h => (
                                     <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontSize: "0.68rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.07em", borderBottom: `1px solid ${t.borderSecondary}`, whiteSpace: "nowrap" }}>{h}</th>
@@ -158,6 +159,7 @@ export default function AdminBillingPage() {
                                 ))}
                             </tbody>
                         </table>
+                        </div>
                     )}
                 </div>
             )}
@@ -189,7 +191,8 @@ export default function AdminBillingPage() {
                     <div style={{ padding: "48px", textAlign: "center", color: t.textMuted }}>No transactions found.</div>
                 ) : (
                     <>
-                        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                        <div style={{ overflowX: "auto" }}>
+                        <table style={{ width: "100%", minWidth: 720, borderCollapse: "collapse" }}>
                             <thead><tr style={{ background: t.bgSecondary }}>
                                 {["User", "Plan", "Amount (VND)", "Method", "Status", "Date"].map(h => (
                                     <th key={h} style={{ padding: "10px 16px", textAlign: "left", fontSize: "0.68rem", fontWeight: 700, color: t.textMuted, textTransform: "uppercase", letterSpacing: "0.07em", borderBottom: `1px solid ${t.borderSecondary}`, whiteSpace: "nowrap" }}>{h}</th>
@@ -218,6 +221,7 @@ export default function AdminBillingPage() {
                                 })}
                             </tbody>
                         </table>
+                        </div>
 
                         {/* Pagination */}
                         {meta && meta.totalPages > 1 && (

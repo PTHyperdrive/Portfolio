@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useThemeTokens } from "@/lib/useThemeTokens";
+import { useIsMobile } from "@/lib/useIsMobile";
 import { Server, Cpu, HardDrive, MemoryStick, Globe, Shield, Clock, Plus } from "lucide-react";
 
 const METAL_TIERS = [
@@ -13,6 +14,7 @@ const METAL_TIERS = [
 
 export default function BareMetalPage() {
     const t = useThemeTokens();
+    const isMobile = useIsMobile();
     const [selectedTier, setSelectedTier] = useState<string | null>(null);
 
     const card: React.CSSProperties = { background: t.bgCard, border: `1px solid ${t.borderPrimary}`, borderRadius: t.cardRadius, boxShadow: t.shadow };
@@ -45,7 +47,7 @@ export default function BareMetalPage() {
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                 {METAL_TIERS.map(tier => (
                     <div key={tier.name} style={{ ...card, padding: 0, overflow: "hidden", cursor: "pointer", borderColor: selectedTier === tier.name ? `${t.accentPrimary}55` : t.borderPrimary, transition: "border-color 0.15s" }} onClick={() => setSelectedTier(selectedTier === tier.name ? null : tier.name)}>
-                        <div style={{ padding: "22px 28px", display: "grid", gridTemplateColumns: "200px 1fr 1fr 1fr 140px", alignItems: "center", gap: 16 }}>
+                        <div style={{ padding: "22px 28px", display: "grid", gridTemplateColumns: isMobile ? "1fr 1fr" : "200px 1fr 1fr 1fr 140px", alignItems: "center", gap: 16 }}>
                             <div>
                                 <p style={{ fontWeight: 800, color: selectedTier === tier.name ? t.accentPrimary : t.textPrimary, fontSize: "1rem", fontFamily: t.fontMono }}>{tier.name}</p>
                             </div>

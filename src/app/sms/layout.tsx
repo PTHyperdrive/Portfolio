@@ -10,11 +10,58 @@ import ThemeToggle from "@/components/ThemeToggle";
 import DrawerShell from "@/components/layout/DrawerShell";
 import { Smartphone, Inbox, ArrowLeft, Wallet, LogOut } from "lucide-react";
 
+/**
+ * TimoSMS is waiting on a provider API (see src/lib/sms-provider.ts).
+ * Flip to false once SMS_API_BASE / SMS_API_KEY are configured — the full
+ * catalog + rentals UI below is intact and ready.
+ */
+const SMS_COMING_SOON = true;
+
+function SmsComingSoon() {
+    const t = useThemeTokens();
+    return (
+        <div style={{
+            minHeight: "100dvh", display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 24, backgroundColor: t.bgPrimary, color: t.textPrimary, fontFamily: t.fontFamily,
+        }}>
+            <div style={{
+                width: "100%", maxWidth: 480, textAlign: "center", padding: "48px 28px",
+                background: t.bgCard, border: `1px solid ${t.borderPrimary}`,
+                borderRadius: t.cardRadius, boxShadow: t.shadow,
+            }}>
+                <div style={{
+                    width: 64, height: 64, margin: "0 auto 20px", borderRadius: t.cardRadius,
+                    background: t.accentPrimaryMuted, display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                    <Smartphone style={{ width: 30, height: 30, color: t.accentPrimary }} />
+                </div>
+                <h1 style={{ fontSize: "1.5rem", fontWeight: 800, letterSpacing: "-0.02em", marginBottom: 10 }}>
+                    Timo<span style={{ color: t.accentPrimary }}>SMS</span> is coming soon
+                </h1>
+                <p style={{ fontSize: "0.9rem", color: t.textSecondary, lineHeight: 1.6, marginBottom: 28 }}>
+                    Temporary numbers for one-time SMS codes are almost ready.
+                    We&apos;re finalizing our carrier integration — check back shortly.
+                </p>
+                <Link href="/dashboard" style={{
+                    display: "inline-flex", alignItems: "center", gap: 8,
+                    padding: "10px 20px", borderRadius: t.buttonRadius,
+                    background: t.accentPrimary, color: t.textInverse,
+                    fontWeight: 700, fontSize: "0.85rem", textDecoration: "none",
+                }}>
+                    <ArrowLeft style={{ width: 15, height: 15 }} /> Back to Console
+                </Link>
+            </div>
+        </div>
+    );
+}
+
 export default function SmsLayout({ children }: { children: React.ReactNode }) {
     const t = useThemeTokens();
     const pathname = usePathname() ?? "";
     const { data: session } = useSession();
     const { credits } = useCredits();
+
+    if (SMS_COMING_SOON) return <SmsComingSoon />;
 
     const sidebarWidth = 280;
 

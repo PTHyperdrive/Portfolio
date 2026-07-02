@@ -179,8 +179,9 @@ export default function BackupsPage() {
                         ) : backups.length === 0 ? (
                             <div style={{ padding: "40px", textAlign: "center", color: t.textMuted, fontSize: "0.875rem" }}>No backups found.</div>
                         ) : (
-                            backups.map((bk, idx) => (
-                                <div key={bk.volid} style={{ display: "grid", gridTemplateColumns: "1fr 120px 160px auto", alignItems: "center", gap: 12, padding: "14px 24px", borderBottom: idx < backups.length - 1 ? `1px solid ${t.borderSecondary}` : "none" }}
+                            <div style={{ overflowX: "auto" }}>
+                            {backups.map((bk, idx) => (
+                                <div key={bk.volid} style={{ display: "grid", gridTemplateColumns: "1fr 120px 160px auto", alignItems: "center", gap: 12, padding: "14px 24px", borderBottom: idx < backups.length - 1 ? `1px solid ${t.borderSecondary}` : "none", minWidth: 560 }}
                                     onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.background = t.bgCardHover}
                                     onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.background = "transparent"}>
                                     <div>
@@ -194,15 +195,16 @@ export default function BackupsPage() {
                                         <Trash2 style={{ width: 13, height: 13 }} />
                                     </button>
                                 </div>
-                            ))
+                            ))}
+                            </div>
                         )}
                     </div>
                 </div>
             )}
 
             {deleteTarget && (
-                <div style={{ position: "fixed", inset: 0, background: t.isLight ? "rgba(0,0,0,0.4)" : "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100 }}>
-                    <div style={{ ...card, padding: "28px 32px", width: 440, border: `1px solid ${t.statusError}44` }}>
+                <div style={{ position: "fixed", inset: 0, background: t.isLight ? "rgba(0,0,0,0.4)" : "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}>
+                    <div style={{ ...card, padding: "28px 32px", width: "100%", maxWidth: 440, border: `1px solid ${t.statusError}44` }}>
                         <h3 style={{ fontSize: "1.1rem", fontWeight: 800, color: t.textPrimary, marginBottom: 10 }}>Delete Backup?</h3>
                         <p style={{ fontSize: "0.875rem", color: t.textSecondary, lineHeight: 1.6, fontFamily: t.fontMono, wordBreak: "break-all" }}>{archiveName(deleteTarget.volid)}</p>
                         <div style={{ display: "flex", gap: 10, marginTop: 24, justifyContent: "flex-end" }}>
