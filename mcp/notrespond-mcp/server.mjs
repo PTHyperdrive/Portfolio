@@ -28,7 +28,10 @@ import { config } from "dotenv";
 const require = createRequire(import.meta.url);
 const mariadb = require("mariadb");
 
-config();
+// quiet: dotenv's startup banner goes to stdout, which is the JSON-RPC
+// channel. Anything non-protocol written there corrupts framing and an MCP
+// client fails to parse the first message.
+config({ quiet: true });
 
 const SERVER_NAME = "notrespond";
 const SERVER_VERSION = "1.0.0";
