@@ -35,6 +35,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
             showReasoning: true,
             reasoningEffort: true,
             messages: {
+                // A turn that failed before emitting any text has nothing to
+                // show — returning it renders an empty assistant bubble on
+                // reload, which reads as a broken transcript. The row is kept
+                // in the database for the audit trail, just not replayed.
+                where: { NOT: { failed: true, content: "" } },
                 orderBy: { createdAt: "asc" },
                 select: {
                     id: true, role: true, content: true, modelId: true,

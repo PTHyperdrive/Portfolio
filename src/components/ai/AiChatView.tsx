@@ -69,6 +69,8 @@ export default function AiChatView({
      * set before any await and is the authority for whether to queue.
      */
     const busyRef = useRef(false);
+    /** Thread whose server transcript is already reflected in `messages`. */
+    const hydratedRef = useRef<string | null>(null);
 
     const busy = phase !== "idle";
 
@@ -91,11 +93,38 @@ export default function AiChatView({
         return () => { cancelled = true; };
     }, []);
 
+    /**
+     * Replace the panel with the server's transcript for a thread.
+     *
+     * Only ever called when no turn is in flight — a running turn holds
+     * optimistic messages the server has not persisted yet, and overwriting
+     * them is what made the first message vanish mid-stream.
+     */
+    const hydrate = useCallback(async (id: string) => {
+        setLoadingThread(true);
+        try {
+            const res = await fetch(`/api/ai/conversations/${id}`);
+            if (!res.ok) throw new Error();
+            const data = await res.json();
+            // A slow response for a thread we have since left must not land.
+            if (threadRef.current !== id) return;
+            setMessages(data.conversation.messages);
+            if (data.conversation.nodeId) setNodeId(data.conversation.nodeId);
+            setShowReasoning(data.conversation.showReasoning ?? true);
+            if (data.conversation.reasoningEffort) setEffort(data.conversation.reasoningEffort);
+            hydratedRef.current = id;
+        } catch {
+            if (threadRef.current === id) setError("Could not load that conversation.");
+        } finally {
+            if (threadRef.current === id) setLoadingThread(false);
+        }
+    }, []);
+
     /* ── Load transcript when the active thread changes ─────────── */
     useEffect(() => {
-        // Moving to a different thread must not let queued turns land in it.
-        // runTurn sets threadRef before calling onActiveChange, so the id it
-        // just created reads as equal here and its own stream is left alone.
+        // A genuine switch. runTurn sets threadRef before calling
+        // onActiveChange, so a thread it just created reads as equal here and
+        // its own in-flight stream is left alone.
         if (activeId !== threadRef.current) {
             abortRef.current?.abort();
             abortRef.current = null;
@@ -105,29 +134,25 @@ export default function AiChatView({
             setPhase("idle");
             setError(null);
             threadRef.current = activeId;
+            hydratedRef.current = null;
+            // Clear immediately so the previous thread's messages are not
+            // left on screen under the new thread's header while it loads.
+            setMessages([]);
         }
 
-        if (!activeId) { setMessages([]); return; }
-        let cancelled = false;
-        setLoadingThread(true);
-        (async () => {
-            try {
-                const res = await fetch(`/api/ai/conversations/${activeId}`);
-                if (!res.ok) throw new Error();
-                const data = await res.json();
-                if (cancelled) return;
-                setMessages(data.conversation.messages);
-                if (data.conversation.nodeId) setNodeId(data.conversation.nodeId);
-                setShowReasoning(data.conversation.showReasoning ?? true);
-                if (data.conversation.reasoningEffort) setEffort(data.conversation.reasoningEffort);
-            } catch {
-                if (!cancelled) setError("Could not load that conversation.");
-            } finally {
-                if (!cancelled) setLoadingThread(false);
-            }
-        })();
-        return () => { cancelled = true; };
-    }, [activeId]);
+        if (!activeId) { hydratedRef.current = null; return; }
+
+        // The first turn of a new chat creates the thread and calls
+        // onActiveChange mid-stream. Hydrating here would replace the
+        // optimistic user message and the streaming placeholder with the
+        // server's not-yet-written transcript — the message would appear,
+        // vanish on Enter, and the reply would stream into a row that is no
+        // longer rendered. Leave the panel alone until the turn finishes.
+        if (busyRef.current) return;
+
+        if (hydratedRef.current === activeId) return;
+        void hydrate(activeId);
+    }, [activeId, hydrate]);
 
     /* ── Keep the view pinned to the newest token ───────────────── */
     useEffect(() => {
@@ -172,11 +197,21 @@ export default function AiChatView({
                 const res = await fetch("/api/ai/conversations", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ nodeId }),
+                    // Title it up front so the sidebar row reads correctly from
+                    // the moment it appears, rather than saying "New chat"
+                    // until the stream finishes and the server renames it.
+                    body: JSON.stringify({
+                        nodeId,
+                        title: content.replace(/\s+/g, " ").slice(0, 80),
+                    }),
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error ?? "Failed to start chat");
                 threadRef.current = data.conversation.id;
+                // Claim it as hydrated: the panel already holds the correct
+                // state for this brand-new thread, and re-reading it from the
+                // server would only discard the optimistic turn.
+                hydratedRef.current = data.conversation.id;
                 onActiveChange(data.conversation.id);
                 onConversationsChanged();
             } catch (err) {
@@ -194,7 +229,9 @@ export default function AiChatView({
             ...prev,
             {
                 id: localId, role: "user",
-                content: content + (images.length ? `\n\n[${images.length} image(s) attached]` : ""),
+                // Same wording the server persists, so the text does not shift
+                // when this thread is later reloaded.
+                content: content + (images.length ? `\n\n[attached ${images.length} image(s)]` : ""),
             },
             { id: replyId, role: "assistant", content: "", streaming: true },
         ]);

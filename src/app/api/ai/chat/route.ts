@@ -115,7 +115,9 @@ export async function POST(req: Request) {
 
     // Images are not persisted — only the fact that some were attached, so a
     // later turn reads coherently without storing megabytes of base64.
-    const imageNote = images?.length ? `\n\n[user attached ${images.length} image(s)]` : "";
+    // Must match the client's optimistic suffix exactly, or the message text
+    // changes under the user when the thread is reloaded from the server.
+    const imageNote = images?.length ? `\n\n[attached ${images.length} image(s)]` : "";
 
     await prisma.aiMessage.create({
         data: { conversationId, role: "user", content: content + imageNote },
