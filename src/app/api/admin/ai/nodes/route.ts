@@ -15,6 +15,7 @@ const createSchema = z.object({
     modelId: z.string().trim().min(1).max(160),
     contextLen: z.number().int().min(512).max(1_000_000).default(8192),
     maxTokens: z.number().int().min(64).max(32_000).default(2048),
+    reasoningControl: z.boolean().default(false),
     active: z.boolean().default(true),
 });
 

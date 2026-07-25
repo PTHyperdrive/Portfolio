@@ -364,6 +364,10 @@ model AiNode {
   modelId     String            // model identifier as loaded in LM Studio
   contextLen  Int       @default(8192)
   maxTokens   Int       @default(2048)
+  /// True when the runtime actually honours reasoning_effort. Verified per
+  /// node — LM Studio silently ignores it for some models (gemma-4 QAT), and
+  /// shipping a control that does nothing is worse than not offering it.
+  reasoningControl Boolean @default(false)
   active      Boolean   @default(true)
   online      Boolean   @default(false)
   lastError   String?   @db.Text
@@ -381,6 +385,12 @@ model AiConversation {
   userId    String
   nodeId    String?
   title     String   @default("New chat") @db.VarChar(200)
+  /// Display preference for a reasoning model's scratchpad. Always effective,
+  /// because it is applied on our side rather than asked of the runtime.
+  showReasoning   Boolean @default(true)
+  /// "off" | "low" | "medium" | "high". Only sent upstream when the node's
+  /// reasoningControl is true; otherwise recorded but not acted on.
+  reasoningEffort String? @db.VarChar(8)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

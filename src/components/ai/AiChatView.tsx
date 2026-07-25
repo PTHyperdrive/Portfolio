@@ -3,13 +3,15 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
     Send, Square, Copy, Check, Bot, User as UserIcon,
-    AlertTriangle, Sparkles, Zap, History, Brain,
+    AlertTriangle, Sparkles, History, Brain, X, RotateCcw, Clock,
 } from "lucide-react";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { useThemeTokens } from "@/lib/useThemeTokens";
 import { useIsMobile } from "@/lib/useIsMobile";
 import ModelPicker from "./ModelPicker";
-import type { AiNodeSummary, ChatMessage } from "./types";
+import type {
+    AiNodeSummary, ChatMessage, ChatPhase, QueuedMessage, ReasoningEffort,
+} from "./types";
 
 const SUGGESTIONS = [
     "Explain PCIe passthrough in one paragraph",
@@ -17,6 +19,8 @@ const SUGGESTIONS = [
     "Summarise the tradeoffs of ZFS vs LVM-thin",
     "Draft a status page incident update",
 ];
+
+const EFFORTS: ReasoningEffort[] = ["off", "low", "medium", "high"];
 
 export default function AiChatView({
     activeId,
@@ -37,16 +41,33 @@ export default function AiChatView({
     const [nodeId, setNodeId] = useState<string | null>(null);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState("");
-    const [streaming, setStreaming] = useState(false);
+    const [phase, setPhase] = useState<ChatPhase>("idle");
+    const [queue, setQueue] = useState<QueuedMessage[]>([]);
     const [error, setError] = useState<string | null>(null);
     const [copiedId, setCopiedId] = useState<string | null>(null);
     const [openReasoning, setOpenReasoning] = useState<Set<string>>(new Set());
     const [loadingThread, setLoadingThread] = useState(false);
+    const [showReasoning, setShowReasoning] = useState(true);
+    const [effort, setEffort] = useState<ReasoningEffort>("medium");
 
     const abortRef = useRef<AbortController | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const pinnedToBottom = useRef(true);
+    /** Queue mirror — the streaming loop reads it without stale closures. */
+    const queueRef = useRef<QueuedMessage[]>([]);
+    /** Thread id that survives creation mid-queue. */
+    const threadRef = useRef<string | null>(activeId);
+    const lastPromptRef = useRef<string | null>(null);
+    const runTurnRef = useRef<((text: string) => Promise<void>) | null>(null);
+    /**
+     * Synchronous busy latch. `phase` is state, so two Enter presses in the
+     * same tick would both read "idle" and start duplicate turns — this is
+     * set before any await and is the authority for whether to queue.
+     */
+    const busyRef = useRef(false);
+
+    const busy = phase !== "idle";
 
     /* ── Load available nodes once ─────────────────────────────── */
     useEffect(() => {
@@ -58,7 +79,8 @@ export default function AiChatView({
                 const data = await res.json();
                 if (cancelled) return;
                 setNodes(data.nodes);
-                setNodeId(prev => prev ?? data.nodes.find((n: AiNodeSummary) => n.online)?.id ?? data.nodes[0]?.id ?? null);
+                setNodeId(prev =>
+                    prev ?? data.nodes.find((n: AiNodeSummary) => n.online)?.id ?? data.nodes[0]?.id ?? null);
             } catch {
                 if (!cancelled) setError("Could not reach the inference cluster.");
             }
@@ -68,6 +90,20 @@ export default function AiChatView({
 
     /* ── Load transcript when the active thread changes ─────────── */
     useEffect(() => {
+        // Moving to a different thread must not let queued turns land in it.
+        // runTurn sets threadRef before calling onActiveChange, so the id it
+        // just created reads as equal here and its own stream is left alone.
+        if (activeId !== threadRef.current) {
+            abortRef.current?.abort();
+            abortRef.current = null;
+            queueRef.current = [];
+            setQueue([]);
+            busyRef.current = false;
+            setPhase("idle");
+            setError(null);
+            threadRef.current = activeId;
+        }
+
         if (!activeId) { setMessages([]); return; }
         let cancelled = false;
         setLoadingThread(true);
@@ -79,6 +115,8 @@ export default function AiChatView({
                 if (cancelled) return;
                 setMessages(data.conversation.messages);
                 if (data.conversation.nodeId) setNodeId(data.conversation.nodeId);
+                setShowReasoning(data.conversation.showReasoning ?? true);
+                if (data.conversation.reasoningEffort) setEffort(data.conversation.reasoningEffort);
             } catch {
                 if (!cancelled) setError("Could not load that conversation.");
             } finally {
@@ -92,7 +130,7 @@ export default function AiChatView({
     useEffect(() => {
         if (!pinnedToBottom.current) return;
         scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-    }, [messages]);
+    }, [messages, queue]);
 
     const onScroll = () => {
         const el = scrollRef.current;
@@ -108,49 +146,53 @@ export default function AiChatView({
         el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
     }, [input]);
 
+    /** Stop the current turn and drop anything waiting behind it. */
     const stop = useCallback(() => {
         abortRef.current?.abort();
         abortRef.current = null;
-        setStreaming(false);
+        queueRef.current = [];
+        setQueue([]);
+        busyRef.current = false;
+        setPhase("idle");
         setMessages(prev => prev.map(m => ({ ...m, streaming: false })));
     }, []);
 
-    /* ── Send ──────────────────────────────────────────────────── */
-    const send = useCallback(async (text: string) => {
-        const content = text.trim();
-        if (!content || streaming) return;
-
+    /* ── One turn: send, stream, persist, then pull from queue ──── */
+    const runTurn = useCallback(async (content: string) => {
         setError(null);
-        setInput("");
         pinnedToBottom.current = true;
+        lastPromptRef.current = content;
 
-        // Make sure a thread exists before streaming into it.
-        let threadId = activeId;
-        if (!threadId) {
+        // A thread must exist before we can stream into it.
+        if (!threadRef.current) {
             try {
                 const res = await fetch("/api/ai/conversations", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ nodeId }),
                 });
-                if (!res.ok) throw new Error((await res.json()).error ?? "Failed to start chat");
                 const data = await res.json();
-                threadId = data.conversation.id;
+                if (!res.ok) throw new Error(data.error ?? "Failed to start chat");
+                threadRef.current = data.conversation.id;
                 onActiveChange(data.conversation.id);
                 onConversationsChanged();
             } catch (err) {
                 setError(err instanceof Error ? err.message : "Failed to start chat");
+                busyRef.current = false;
+                setPhase("idle");
                 return;
             }
         }
 
-        const localId = `local-${Date.now()}`;
+        const localId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        const replyId = `${localId}-a`;
+
         setMessages(prev => [
             ...prev,
             { id: localId, role: "user", content },
-            { id: `${localId}-a`, role: "assistant", content: "", streaming: true },
+            { id: replyId, role: "assistant", content: "", streaming: true },
         ]);
-        setStreaming(true);
+        setPhase("connecting");
 
         const controller = new AbortController();
         abortRef.current = controller;
@@ -159,7 +201,13 @@ export default function AiChatView({
             const res = await fetch("/api/ai/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ conversationId: threadId, content, nodeId }),
+                body: JSON.stringify({
+                    conversationId: threadRef.current,
+                    content,
+                    nodeId,
+                    showReasoning,
+                    reasoningEffort: effort,
+                }),
                 signal: controller.signal,
             });
 
@@ -181,8 +229,9 @@ export default function AiChatView({
                 buffer = blocks.pop() ?? "";
 
                 for (const block of blocks) {
-                    const evLine = block.split("\n").find(l => l.startsWith("event:"));
-                    const dataLine = block.split("\n").find(l => l.startsWith("data:"));
+                    const lines = block.split("\n");
+                    const evLine = lines.find(l => l.startsWith("event:"));
+                    const dataLine = lines.find(l => l.startsWith("data:"));
                     if (!evLine || !dataLine) continue;
 
                     const event = evLine.slice(6).trim();
@@ -191,30 +240,34 @@ export default function AiChatView({
                     catch { continue; }
 
                     if (event === "meta") {
-                        setMessages(prev => prev.map(m =>
-                            m.id === `${localId}-a`
-                                ? { ...m, gpuLabel: payload.gpuLabel as string, modelId: payload.model as string }
-                                : m));
+                        setMessages(prev => prev.map(m => m.id === replyId
+                            ? { ...m, gpuLabel: payload.gpuLabel as string, modelId: payload.model as string }
+                            : m));
                     } else if (event === "reasoning") {
-                        const chunk = payload.text as string;
-                        setMessages(prev => prev.map(m =>
-                            m.id === `${localId}-a`
-                                ? { ...m, reasoning: (m.reasoning ?? "") + chunk }
-                                : m));
+                        setPhase(p => (p === "streaming" ? p : "thinking"));
+                        const chunk = (payload.text as string) ?? "";
+                        const chars = payload.chars as number;
+                        setMessages(prev => prev.map(m => m.id === replyId
+                            ? {
+                                ...m,
+                                reasoning: chunk ? (m.reasoning ?? "") + chunk : m.reasoning,
+                                reasoningChars: chars,
+                            }
+                            : m));
                     } else if (event === "delta") {
+                        setPhase("streaming");
                         const chunk = payload.text as string;
-                        setMessages(prev => prev.map(m =>
-                            m.id === `${localId}-a` ? { ...m, content: m.content + chunk } : m));
+                        setMessages(prev => prev.map(m => m.id === replyId
+                            ? { ...m, content: m.content + chunk } : m));
                     } else if (event === "done") {
-                        setMessages(prev => prev.map(m =>
-                            m.id === `${localId}-a`
-                                ? {
-                                    ...m,
-                                    streaming: false,
-                                    latencyMs: payload.latencyMs as number,
-                                    outputTokens: payload.outputTokens as number,
-                                }
-                                : m));
+                        setMessages(prev => prev.map(m => m.id === replyId
+                            ? {
+                                ...m,
+                                streaming: false,
+                                latencyMs: payload.latencyMs as number,
+                                outputTokens: payload.outputTokens as number,
+                            }
+                            : m));
                     } else if (event === "error") {
                         throw new Error((payload.message as string) || "Generation failed");
                     }
@@ -223,17 +276,59 @@ export default function AiChatView({
             onConversationsChanged();
         } catch (err) {
             if (err instanceof Error && err.name === "AbortError") {
-                // User pressed stop — partial text stays on screen.
+                // Stopped by the user — keep whatever text already arrived.
             } else {
                 setError(err instanceof Error ? err.message : "Generation failed");
-                setMessages(prev => prev.filter(m => m.id !== `${localId}-a` || m.content.length > 0));
+                // Drop an assistant bubble that never produced anything.
+                setMessages(prev => prev.filter(m => m.id !== replyId || m.content.length > 0));
+                // A failed turn should not silently drag the queue down with it.
+                queueRef.current = [];
+                setQueue([]);
             }
         } finally {
             abortRef.current = null;
-            setStreaming(false);
             setMessages(prev => prev.map(m => ({ ...m, streaming: false })));
+
+            const next = queueRef.current.shift();
+            setQueue([...queueRef.current]);
+            if (next) {
+                void runTurnRef.current?.(next.content);
+            } else {
+                busyRef.current = false;
+                setPhase("idle");
+            }
         }
-    }, [activeId, nodeId, streaming, onActiveChange, onConversationsChanged]);
+    }, [nodeId, showReasoning, effort, onActiveChange, onConversationsChanged]);
+
+    useEffect(() => { runTurnRef.current = runTurn; }, [runTurn]);
+
+    /** Enqueue while busy, otherwise start immediately. */
+    const send = useCallback((text: string) => {
+        const content = text.trim();
+        if (!content) return;
+        setInput("");
+
+        if (busyRef.current) {
+            const item = { id: `q-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, content };
+            queueRef.current = [...queueRef.current, item];
+            setQueue([...queueRef.current]);
+            pinnedToBottom.current = true;
+            return;
+        }
+        busyRef.current = true;
+        void runTurn(content);
+    }, [runTurn]);
+
+    const unqueue = (id: string) => {
+        queueRef.current = queueRef.current.filter(q => q.id !== id);
+        setQueue([...queueRef.current]);
+    };
+
+    const retry = () => {
+        if (!lastPromptRef.current || busyRef.current) return;
+        busyRef.current = true;
+        void runTurn(lastPromptRef.current);
+    };
 
     const copy = async (msg: ChatMessage) => {
         await navigator.clipboard.writeText(msg.content);
@@ -242,7 +337,20 @@ export default function AiChatView({
     };
 
     const selectedNode = nodes.find(n => n.id === nodeId) ?? null;
-    const showWelcome = messages.length === 0 && !loadingThread;
+    const showWelcome = messages.length === 0 && queue.length === 0 && !loadingThread;
+
+    const PHASE_LABEL: Record<ChatPhase, string> = {
+        idle: "Ready",
+        connecting: "Connecting…",
+        thinking: "Thinking…",
+        streaming: "Writing…",
+    };
+
+    const chip: React.CSSProperties = {
+        display: "inline-flex", alignItems: "center", gap: 5,
+        fontSize: "0.7rem", fontWeight: 700, letterSpacing: "0.03em",
+        padding: "3px 9px", borderRadius: 20,
+    };
 
     return (
         <div style={{
@@ -273,17 +381,31 @@ export default function AiChatView({
                             <History style={{ width: 17, height: 17 }} />
                         </button>
                     )}
-                    <ModelPicker nodes={nodes} selectedId={nodeId} onSelect={setNodeId} disabled={streaming} />
+                    <ModelPicker nodes={nodes} selectedId={nodeId} onSelect={setNodeId} disabled={busy} />
                 </div>
-                {selectedNode && !isMobile && (
-                    <span style={{
-                        display: "flex", alignItems: "center", gap: 6,
-                        fontSize: "0.75rem", color: t.textMuted,
+
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                    {queue.length > 0 && (
+                        <span id="ai-queue-count" style={{
+                            ...chip, background: t.bgTertiary, color: t.textSecondary,
+                        }}>
+                            <Clock style={{ width: 11, height: 11 }} />
+                            {queue.length} queued
+                        </span>
+                    )}
+                    <span id="ai-phase" style={{
+                        ...chip,
+                        background: busy ? t.accentPrimaryMuted : t.bgTertiary,
+                        color: busy ? t.accentPrimary : t.textMuted,
                     }}>
-                        <Zap style={{ width: 12, height: 12 }} />
-                        {selectedNode.online ? "Ready" : "Node offline"}
+                        <span style={{
+                            width: 6, height: 6, borderRadius: "50%", flexShrink: 0,
+                            background: busy ? t.accentPrimary : t.textMuted,
+                            animation: busy ? "aiPulse 1.2s ease-in-out infinite" : "none",
+                        }} />
+                        {!isMobile && PHASE_LABEL[phase]}
                     </span>
-                )}
+                </div>
             </header>
 
             {/* ── Transcript ── */}
@@ -394,9 +516,11 @@ export default function AiChatView({
                                         </p>
                                     ) : (
                                         <div style={{ fontSize: "0.9rem", lineHeight: 1.7, color: t.textSecondary }}>
-                                            {msg.reasoning && (() => {
+                                            {(msg.reasoning || msg.reasoningChars) && (() => {
                                                 const thinking = msg.streaming && !msg.content;
-                                                const open = thinking || openReasoning.has(msg.id);
+                                                const open = msg.reasoning
+                                                    ? (thinking || openReasoning.has(msg.id))
+                                                    : false;
                                                 return (
                                                     <div style={{ marginBottom: msg.content ? 12 : 0 }}>
                                                         <button
@@ -406,19 +530,23 @@ export default function AiChatView({
                                                                 else next.add(msg.id);
                                                                 return next;
                                                             })}
-                                                            disabled={thinking}
+                                                            disabled={thinking || !msg.reasoning}
                                                             style={{
                                                                 display: "inline-flex", alignItems: "center", gap: 6,
                                                                 padding: 0, border: "none", background: "transparent",
                                                                 color: t.textMuted, fontSize: "0.75rem", fontWeight: 600,
-                                                                cursor: thinking ? "default" : "pointer",
+                                                                cursor: (thinking || !msg.reasoning) ? "default" : "pointer",
                                                                 fontFamily: t.fontFamily, marginBottom: 6,
                                                             }}
                                                         >
                                                             <Brain style={{ width: 12, height: 12 }} />
-                                                            {thinking ? "Thinking…" : open ? "Hide reasoning" : "Show reasoning"}
+                                                            {thinking
+                                                                ? "Thinking…"
+                                                                : !msg.reasoning
+                                                                    ? "Reasoned quietly"
+                                                                    : open ? "Hide reasoning" : "Show reasoning"}
                                                         </button>
-                                                        {open && (
+                                                        {open && msg.reasoning && (
                                                             <div style={{
                                                                 borderLeft: `2px solid ${t.borderPrimary}`,
                                                                 paddingLeft: 12,
@@ -470,6 +598,46 @@ export default function AiChatView({
                         );
                     })}
 
+                    {/* Queued turns — not yet sent anywhere. */}
+                    {queue.map(q => (
+                        <div key={q.id} style={{ display: "flex", gap: 14, marginBottom: 26, opacity: 0.55 }}>
+                            <div style={{
+                                width: 30, height: 30, flexShrink: 0,
+                                borderRadius: t.isMono ? 0 : "50%",
+                                background: t.bgTertiary,
+                                border: `1px dashed ${t.borderPrimary}`,
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                            }}>
+                                <Clock style={{ width: 14, height: 14, color: t.textMuted }} />
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
+                                    <span style={{ fontSize: "0.82rem", fontWeight: 700, color: t.textPrimary }}>You</span>
+                                    <span style={{ ...chip, background: t.bgTertiary, color: t.textMuted, padding: "1px 7px" }}>
+                                        QUEUED
+                                    </span>
+                                    <button
+                                        onClick={() => unqueue(q.id)}
+                                        aria-label="Remove from queue"
+                                        style={{
+                                            display: "flex", alignItems: "center", justifyContent: "center",
+                                            width: 20, height: 20, border: "none", background: "transparent",
+                                            color: t.textMuted, cursor: "pointer",
+                                        }}
+                                    >
+                                        <X style={{ width: 12, height: 12 }} />
+                                    </button>
+                                </div>
+                                <p style={{
+                                    fontSize: "0.9rem", lineHeight: 1.7, color: t.textSecondary,
+                                    whiteSpace: "pre-wrap", wordBreak: "break-word",
+                                }}>
+                                    {q.content}
+                                </p>
+                            </div>
+                        </div>
+                    ))}
+
                     {error && (
                         <div style={{
                             display: "flex", alignItems: "flex-start", gap: 10,
@@ -480,7 +648,23 @@ export default function AiChatView({
                             fontSize: "0.82rem", lineHeight: 1.5,
                         }}>
                             <AlertTriangle style={{ width: 15, height: 15, flexShrink: 0, marginTop: 1 }} />
-                            <span>{error}</span>
+                            <span style={{ flex: 1 }}>{error}</span>
+                            {lastPromptRef.current && phase === "idle" && (
+                                <button
+                                    onClick={retry}
+                                    style={{
+                                        display: "inline-flex", alignItems: "center", gap: 5, flexShrink: 0,
+                                        padding: "3px 9px", borderRadius: t.buttonRadius,
+                                        border: `1px solid ${t.statusError}55`,
+                                        background: "transparent", color: t.statusError,
+                                        fontSize: "0.72rem", fontWeight: 700, cursor: "pointer",
+                                        fontFamily: t.fontFamily,
+                                    }}
+                                >
+                                    <RotateCcw style={{ width: 11, height: 11 }} />
+                                    Retry
+                                </button>
+                            )}
                         </div>
                     )}
                 </div>
@@ -491,6 +675,55 @@ export default function AiChatView({
                 flexShrink: 0, padding: isMobile ? "10px 14px 14px" : "14px 24px 20px",
                 borderTop: `1px solid ${t.borderPrimary}`, background: t.bgSecondary,
             }}>
+                {/* Reasoning controls */}
+                <div style={{
+                    maxWidth: 820, margin: "0 auto 8px",
+                    display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap",
+                }}>
+                    <button
+                        id="ai-toggle-reasoning"
+                        onClick={() => setShowReasoning(v => !v)}
+                        title="Show or hide the model's scratchpad. Applied on our side, so it always works."
+                        style={{
+                            display: "inline-flex", alignItems: "center", gap: 6,
+                            padding: "4px 10px", borderRadius: t.buttonRadius,
+                            border: `1px solid ${showReasoning ? t.accentPrimary : t.borderPrimary}`,
+                            background: showReasoning ? t.accentPrimaryMuted : "transparent",
+                            color: showReasoning ? t.accentPrimary : t.textMuted,
+                            fontSize: "0.73rem", fontWeight: 600, cursor: "pointer",
+                            fontFamily: t.fontFamily,
+                        }}
+                    >
+                        <Brain style={{ width: 12, height: 12 }} />
+                        Reasoning {showReasoning ? "shown" : "hidden"}
+                    </button>
+
+                    {selectedNode?.reasoningControl ? (
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                            {EFFORTS.map(e => (
+                                <button
+                                    key={e}
+                                    onClick={() => setEffort(e)}
+                                    style={{
+                                        padding: "4px 9px", borderRadius: t.buttonRadius,
+                                        border: `1px solid ${effort === e ? t.accentPrimary : t.borderPrimary}`,
+                                        background: effort === e ? t.accentPrimaryMuted : "transparent",
+                                        color: effort === e ? t.accentPrimary : t.textMuted,
+                                        fontSize: "0.72rem", fontWeight: 600, cursor: "pointer",
+                                        fontFamily: t.fontFamily, textTransform: "capitalize",
+                                    }}
+                                >
+                                    {e}
+                                </button>
+                            ))}
+                        </span>
+                    ) : selectedNode && (
+                        <span style={{ fontSize: "0.7rem", color: t.textMuted }}>
+                            Effort control not supported by this model
+                        </span>
+                    )}
+                </div>
+
                 <div style={{
                     maxWidth: 820, margin: "0 auto",
                     display: "flex", alignItems: "flex-end", gap: 10,
@@ -507,7 +740,11 @@ export default function AiChatView({
                         onKeyDown={e => {
                             if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input); }
                         }}
-                        placeholder={selectedNode ? "Send a message…" : "No model available"}
+                        placeholder={
+                            !selectedNode ? "No model available"
+                                : busy ? "Type to queue the next message…"
+                                    : "Send a message…"
+                        }
                         disabled={!selectedNode}
                         rows={1}
                         style={{
@@ -517,25 +754,45 @@ export default function AiChatView({
                             maxHeight: 200, padding: "6px 0",
                         }}
                     />
+
+                    {/* Queue-ahead send stays available while streaming. */}
+                    {busy && input.trim() && (
+                        <button
+                            id="ai-queue"
+                            onClick={() => send(input)}
+                            aria-label="Queue message"
+                            title="Queue this message"
+                            style={{
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                width: 34, height: 34, flexShrink: 0,
+                                borderRadius: t.buttonRadius,
+                                border: `1px solid ${t.borderPrimary}`,
+                                background: "transparent", color: t.textSecondary, cursor: "pointer",
+                            }}
+                        >
+                            <Clock style={{ width: 15, height: 15 }} />
+                        </button>
+                    )}
+
                     <button
                         id="ai-send"
-                        onClick={() => (streaming ? stop() : send(input))}
-                        disabled={!selectedNode || (!streaming && !input.trim())}
-                        aria-label={streaming ? "Stop generating" : "Send message"}
+                        onClick={() => (busy ? stop() : send(input))}
+                        disabled={!selectedNode || (!busy && !input.trim())}
+                        aria-label={busy ? "Stop generating" : "Send message"}
                         style={{
                             display: "flex", alignItems: "center", justifyContent: "center",
                             width: 34, height: 34, flexShrink: 0,
                             borderRadius: t.buttonRadius, border: "none",
-                            background: streaming ? t.statusErrorBg : t.accentPrimary,
-                            color: streaming ? t.statusError : t.textInverse,
-                            cursor: (!selectedNode || (!streaming && !input.trim())) ? "not-allowed" : "pointer",
-                            opacity: (!selectedNode || (!streaming && !input.trim())) ? 0.45 : 1,
+                            background: busy ? t.statusErrorBg : t.accentPrimary,
+                            color: busy ? t.statusError : t.textInverse,
+                            cursor: (!selectedNode || (!busy && !input.trim())) ? "not-allowed" : "pointer",
+                            opacity: (!selectedNode || (!busy && !input.trim())) ? 0.45 : 1,
                             transition: "transform 0.15s, opacity 0.15s",
                         }}
                         onMouseDown={e => { e.currentTarget.style.transform = "scale(0.94)"; }}
                         onMouseUp={e => { e.currentTarget.style.transform = "scale(1)"; }}
                     >
-                        {streaming
+                        {busy
                             ? <Square style={{ width: 13, height: 13, fill: "currentColor" }} />
                             : <Send style={{ width: 15, height: 15 }} />}
                     </button>
@@ -546,7 +803,9 @@ export default function AiChatView({
                     fontSize: "0.7rem", color: t.textMuted, textAlign: "center",
                 }}>
                     {selectedNode
-                        ? `${selectedNode.displayName} · ${selectedNode.gpuLabel} · Enter to send, Shift+Enter for a new line`
+                        ? busy
+                            ? "Stop also clears the queue · Enter queues the next message"
+                            : `${selectedNode.displayName} · ${selectedNode.gpuLabel} · Enter to send, Shift+Enter for a new line`
                         : "Ask an administrator to bring an inference node online."}
                 </p>
             </div>
@@ -554,6 +813,7 @@ export default function AiChatView({
             <style>{`
                 @keyframes aiBlink { 0%,100% { opacity: 1 } 50% { opacity: 0 } }
                 @keyframes aiFadeIn { from { opacity: 0; transform: translateY(-4px) } to { opacity: 1; transform: translateY(0) } }
+                @keyframes aiPulse { 0%,100% { opacity: 1 } 50% { opacity: 0.35 } }
             `}</style>
         </div>
     );

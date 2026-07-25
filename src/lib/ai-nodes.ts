@@ -91,6 +91,9 @@ export interface PublicAiNode {
     tier: AiTier;
     modelId: string;
     contextLen: number;
+    maxTokens: number;
+    /** Whether reasoning_effort actually does anything on this node. */
+    reasoningControl: boolean;
     online: boolean;
     lastCheckAt: Date | null;
 }
@@ -103,6 +106,8 @@ export function toPublicNode(node: AiNode): PublicAiNode {
         tier: node.tier,
         modelId: node.modelId,
         contextLen: node.contextLen,
+        maxTokens: node.maxTokens,
+        reasoningControl: node.reasoningControl,
         online: node.online,
         lastCheckAt: node.lastCheckAt,
     };

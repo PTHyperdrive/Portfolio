@@ -29,6 +29,10 @@ const bodySchema = z.object({
     conversationId: z.string().min(1).max(64),
     content: z.string().trim().min(1).max(32_000),
     nodeId: z.string().min(1).max(64).nullable().optional(),
+    /** Forward the model's scratchpad to the client. Applied on our side. */
+    showReasoning: z.boolean().optional(),
+    /** Only reaches the runtime on nodes flagged reasoningControl. */
+    reasoningEffort: z.enum(["off", "low", "medium", "high"]).optional(),
 });
 
 /** Rough char budget from a token context window, leaving room for the reply. */
@@ -48,12 +52,15 @@ export async function POST(req: Request) {
     if (!parsed.success) {
         return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
-    const { conversationId, content, nodeId } = parsed.data;
+    const { conversationId, content, nodeId, showReasoning, reasoningEffort } = parsed.data;
 
     // ── Ownership ────────────────────────────────────────────────
     const conversation = await prisma.aiConversation.findFirst({
         where: { id: conversationId, userId },
-        select: { id: true, nodeId: true, title: true },
+        select: {
+            id: true, nodeId: true, title: true,
+            showReasoning: true, reasoningEffort: true,
+        },
     });
     if (!conversation) {
         return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
@@ -97,11 +104,17 @@ export async function POST(req: Request) {
             ? content.replace(/\s+/g, " ").slice(0, 80)
             : null;
 
+    // Per-request options become the thread's preference so a reload keeps them.
+    const wantReasoning = showReasoning ?? conversation.showReasoning;
+    const effort = reasoningEffort ?? conversation.reasoningEffort ?? undefined;
+
     await prisma.aiConversation.update({
         where: { id: conversationId },
         data: {
             nodeId: node.id,
             ...(autoTitle ? { title: autoTitle } : {}),
+            ...(showReasoning !== undefined ? { showReasoning } : {}),
+            ...(reasoningEffort !== undefined ? { reasoningEffort } : {}),
         },
     });
 
@@ -142,6 +155,16 @@ export async function POST(req: Request) {
                 max_tokens: node.maxTokens,
                 stream: true,
                 stream_options: { include_usage: true },
+                // Sent only where it is known to work. Measured against
+                // gemma-4-26b-a4b-qat, LM Studio ignores both this and
+                // chat_template_kwargs.enable_thinking, so nodes default to
+                // reasoningControl=false and we do not pretend otherwise.
+                ...(node.reasoningControl && effort && effort !== "off"
+                    ? { reasoning_effort: effort }
+                    : {}),
+                ...(node.reasoningControl && effort === "off"
+                    ? { chat_template_kwargs: { enable_thinking: false } }
+                    : {}),
             }),
             signal: req.signal,
         });
@@ -227,8 +250,16 @@ export async function POST(req: Request) {
                             const think: string =
                                 delta?.reasoning_content ?? delta?.reasoning ?? "";
                             if (think) {
+                                // Always accumulated — the exhausted-budget check
+                                // below needs it even when the user hides it.
                                 reasoning += think;
-                                controller.enqueue(sseEvent("reasoning", { text: think }));
+                                // Emit either way so the UI can show "Thinking…"
+                                // instead of an idle bubble; the text itself is
+                                // withheld when the user has it collapsed.
+                                controller.enqueue(sseEvent("reasoning", {
+                                    ...(wantReasoning ? { text: think } : {}),
+                                    chars: reasoning.length,
+                                }));
                             }
 
                             const text: string = delta?.content ?? "";

@@ -32,6 +32,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
             title: true,
             nodeId: true,
             updatedAt: true,
+            showReasoning: true,
+            reasoningEffort: true,
             messages: {
                 orderBy: { createdAt: "asc" },
                 select: {

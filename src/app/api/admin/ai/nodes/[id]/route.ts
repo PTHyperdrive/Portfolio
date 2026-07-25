@@ -15,6 +15,7 @@ const patchSchema = z.object({
     modelId: z.string().trim().min(1).max(160).optional(),
     contextLen: z.number().int().min(512).max(1_000_000).optional(),
     maxTokens: z.number().int().min(64).max(32_000).optional(),
+    reasoningControl: z.boolean().optional(),
     active: z.boolean().optional(),
 });
 

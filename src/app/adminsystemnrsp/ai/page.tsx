@@ -17,6 +17,7 @@ interface AdminNode {
     modelId: string;
     contextLen: number;
     maxTokens: number;
+    reasoningControl: boolean;
     active: boolean;
     online: boolean;
     lastError: string | null;
@@ -42,6 +43,7 @@ const BLANK = {
     modelId: "",
     contextLen: 8192,
     maxTokens: 2048,
+    reasoningControl: false,
 };
 
 export default function AdminAiNodesPage() {
@@ -252,6 +254,29 @@ export default function AdminAiNodesPage() {
                                 onChange={e => setForm(f => ({ ...f, apiKey: e.target.value }))} />
                         </div>
                     </div>
+
+                    <label style={{
+                        display: "flex", alignItems: "flex-start", gap: 10, marginTop: 18,
+                        cursor: "pointer", maxWidth: 620,
+                    }}>
+                        <input
+                            type="checkbox"
+                            checked={form.reasoningControl}
+                            onChange={e => setForm(f => ({ ...f, reasoningControl: e.target.checked }))}
+                            style={{ marginTop: 3, accentColor: t.accentPrimary, cursor: "pointer" }}
+                        />
+                        <span>
+                            <span style={{ display: "block", fontSize: "0.83rem", fontWeight: 600, color: t.textPrimary }}>
+                                Runtime honours reasoning_effort
+                            </span>
+                            <span style={{ display: "block", fontSize: "0.76rem", color: t.textMuted, marginTop: 3, lineHeight: 1.5 }}>
+                                Leave off unless you have confirmed it. LM Studio silently ignores this
+                                for some models — gemma-4-26b-a4b-qat produced identical reasoning at
+                                every effort level — and an control that does nothing is worse than none.
+                                Users always get the show/hide toggle regardless.
+                            </span>
+                        </span>
+                    </label>
 
                     <button
                         onClick={save}
