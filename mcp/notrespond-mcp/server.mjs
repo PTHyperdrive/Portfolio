@@ -381,18 +381,21 @@ async function selftest() {
     });
 
     log(failures === 0
-        ? "\nAll checks passed. Register with:\n  claude mcp add notrespond -- node <repo>/mcp/notrespond-mcp/server.mjs\n"
+        ? "\nAll checks passed. Register with the ABSOLUTE path to this file:\n" +
+          "  claude mcp add notrespond -- node <repo>/mcp/notrespond-mcp/server.mjs\n"
         : `\n${failures} check(s) failed.\n`);
 
-    if (pool) await pool.end().catch(() => {});
-    process.exit(failures === 0 ? 0 : 1);
-}
+    if (pool) {
+        await pool.end().catch(() => {});
+        pool = null;
+    }
 
-if (process.argv.includes("--selftest")) {
-    selftest();
+    // Set the code and let the loop drain. Calling process.exit() here trips
+    // a libuv assertion on Windows when the pool's handles are still closing
+    // (UV_HANDLE_CLOSING in win/async.c), which surfaces as exit 127 after a
+    // clean run — a passing test reported as a failure.
+    process.exitCode = failures === 0 ? 0 : 1;
 }
-
-const rl = createInterface({ input: process.stdin });
 
 /**
  * In-flight handlers. stdin reaching EOF does not mean pending work is done —
@@ -401,29 +404,46 @@ const rl = createInterface({ input: process.stdin });
  */
 const inflight = new Set();
 
-rl.on("line", line => {
-    const text = line.trim();
-    if (!text) return;
-    let msg;
-    try { msg = JSON.parse(text); }
-    catch { return; }
+function startTransport() {
+    const rl = createInterface({ input: process.stdin });
 
-    const task = (async () => {
-        try {
-            await handle(msg);
-        } catch (err) {
-            // stderr only — stdout is the protocol channel and must stay clean.
-            process.stderr.write(`[notrespond-mcp] ${err.stack ?? err.message}\n`);
-            if (msg.id !== undefined) fail(msg.id, -32603, "Internal error");
+    rl.on("line", line => {
+        const text = line.trim();
+        if (!text) return;
+        let msg;
+        try { msg = JSON.parse(text); }
+        catch { return; }
+
+        const task = (async () => {
+            try {
+                await handle(msg);
+            } catch (err) {
+                // stderr only — stdout is the protocol channel, keep it clean.
+                process.stderr.write(`[notrespond-mcp] ${err.stack ?? err.message}\n`);
+                if (msg.id !== undefined) fail(msg.id, -32603, "Internal error");
+            }
+        })();
+
+        inflight.add(task);
+        task.finally(() => inflight.delete(task));
+    });
+
+    rl.on("close", async () => {
+        await Promise.allSettled([...inflight]);
+        if (pool) {
+            await pool.end().catch(() => {});
+            pool = null;
         }
-    })();
+        // Let the loop drain rather than process.exit() — see selftest().
+        process.exitCode = 0;
+    });
+}
 
-    inflight.add(task);
-    task.finally(() => inflight.delete(task));
-});
-
-rl.on("close", async () => {
-    await Promise.allSettled([...inflight]);
-    if (pool) await pool.end().catch(() => {});
-    process.exit(0);
-});
+// Self-test and transport are mutually exclusive: constructing the readline
+// interface during a test let stdin EOF fire close() and exit part-way
+// through the checks, passing or failing on whichever won the race.
+if (process.argv.includes("--selftest")) {
+    await selftest();
+} else {
+    startTransport();
+}
