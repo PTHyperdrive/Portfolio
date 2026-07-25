@@ -23,8 +23,24 @@ const CHUNK_OVERLAP = 150;
 /** Chunks returned per search, before the model sees them. */
 export const TOP_K = 5;
 
-/** Below this cosine score a chunk is treated as irrelevant noise. */
-export const MIN_SCORE = 0.35;
+/**
+ * Cosine floor for a chunk to count as relevant.
+ *
+ * Calibrated against the real corpus rather than guessed. nomic-embed has a
+ * high similarity floor — unrelated text still scores ~0.37–0.46 — so the
+ * original 0.35 matched 16–18 of 18 chunks for *every* query, including
+ * "write a haiku about autumn". That injected the whole knowledge base into
+ * every conversation and drowned general questions in irrelevant context.
+ *
+ * Measured tops: infrastructure questions 0.59–0.63, a code request 0.42,
+ * a haiku request 0.50. At 0.55 the clear cases separate — code and haiku
+ * retrieve nothing, infrastructure retrieves 2–5 chunks.
+ *
+ * The overlap is real and cannot be fully removed by a threshold, so the
+ * system prompt treats retrieved context as advisory and tells the model to
+ * ignore passages that do not apply. That handles the marginal band.
+ */
+export const MIN_SCORE = 0.55;
 
 /* ─── Chunking ───────────────────────────────────────────────────── */
 
@@ -236,11 +252,19 @@ export async function searchKnowledge(
         .map(c => ({ ...c, content: redactSecrets(c.content).text }));
 }
 
-/** Render retrieved passages as grounding context with provenance. */
+/**
+ * Render retrieved passages as grounding context with provenance.
+ *
+ * Framed as "possibly relevant" on purpose. Retrieval runs on every message,
+ * so a chunk reaching this function is not evidence the user asked about
+ * infrastructure — the header has to say that, or the model treats an
+ * unrelated passage as the subject of the question.
+ */
 export function formatContext(chunks: RetrievedChunk[]): string {
     if (chunks.length === 0) return "";
     return [
-        "Retrieved documentation:",
+        "Possibly relevant documentation. Ignore it entirely if it does not " +
+        "answer the user's question — it is attached automatically, not chosen by them.",
         ...chunks.map((c, i) =>
             `[${i + 1}] ${c.docTitle} (${c.category}, relevance ${c.score.toFixed(2)})\n${c.content}`),
     ].join("\n\n");
