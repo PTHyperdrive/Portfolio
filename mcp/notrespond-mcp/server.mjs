@@ -21,6 +21,8 @@
 
 import { createInterface } from "node:readline";
 import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import process from "node:process";
 import { config } from "dotenv";
 
@@ -28,10 +30,16 @@ import { config } from "dotenv";
 const require = createRequire(import.meta.url);
 const mariadb = require("mariadb");
 
+// Resolve .env from the repository root rather than process.cwd(). An MCP
+// client spawns this from wherever it happens to be, and a cwd-relative
+// lookup silently yields no DATABASE_URL and fails every tool call.
+//
 // quiet: dotenv's startup banner goes to stdout, which is the JSON-RPC
 // channel. Anything non-protocol written there corrupts framing and an MCP
 // client fails to parse the first message.
-config({ quiet: true });
+const REPO_ROOT = fileURLToPath(new URL("../../", import.meta.url));
+config({ path: join(REPO_ROOT, ".env"), quiet: true });
+config({ path: join(REPO_ROOT, ".env.local"), quiet: true, override: false });
 
 const SERVER_NAME = "notrespond";
 const SERVER_VERSION = "1.0.0";
@@ -302,6 +310,86 @@ async function handle(msg) {
         default:
             if (id !== undefined) fail(id, -32601, `Method not found: ${method}`);
     }
+}
+
+/* ─── Self-test ──────────────────────────────────────────────────── */
+
+/**
+ * `node server.mjs --selftest` exercises the paths an MCP client depends on
+ * and reports pass/fail. Writes to stderr so it can never be confused with
+ * protocol output.
+ */
+async function selftest() {
+    const log = m => process.stderr.write(`${m}\n`);
+    let failures = 0;
+
+    const check = async (label, fn) => {
+        try {
+            const detail = await fn();
+            log(`  PASS  ${label}${detail ? ` — ${detail}` : ""}`);
+        } catch (err) {
+            failures++;
+            log(`  FAIL  ${label} — ${err.message}`);
+        }
+    };
+
+    log("notrespond-mcp self-test\n");
+
+    await check("DATABASE_URL resolved", async () => {
+        if (!process.env.DATABASE_URL) throw new Error(`not found; looked in ${REPO_ROOT}`);
+        return new URL(process.env.DATABASE_URL.replace(/^mysql:/, "mariadb:")).host;
+    });
+
+    await check("database reachable", async () => {
+        const [row] = await query("SELECT 1 AS ok");
+        if (!row?.ok) throw new Error("unexpected result");
+        return "ok";
+    });
+
+    await check("knowledge base populated", async () => {
+        const [d] = await query("SELECT COUNT(*) c FROM AiKnowledgeDoc WHERE published=1");
+        const [c] = await query("SELECT COUNT(*) c FROM AiKnowledgeChunk");
+        if (Number(d.c) === 0) throw new Error("no published documents — run scripts/seed-ai-knowledge.cjs");
+        return `${d.c} doc(s), ${c.c} chunk(s)`;
+    });
+
+    await check("embedding host configured", async () => {
+        const rows = await query("SELECT baseUrl, embedModelId FROM AiNode WHERE active=1 AND embedModelId IS NOT NULL LIMIT 1");
+        if (!rows.length) throw new Error("no node has embedModelId set — semantic search will fall back to keywords");
+        return rows[0].embedModelId;
+    });
+
+    await check("embeddings answering", async () => {
+        const v = await embed(["connectivity probe"]);
+        if (!v?.length) throw new Error("embedding host unreachable — retrieval degrades to keyword search");
+        return `${v[0].length} dimensions`;
+    });
+
+    await check("semantic retrieval returns a match", async () => {
+        const tool = TOOLS.find(t => t.name === "search_infrastructure_docs");
+        const out = await tool.run({ query: "GPU passthrough Code 43" });
+        if (/^No documentation matched/.test(out)) throw new Error("query matched nothing");
+        const first = out.split("\n")[0];
+        return first.slice(0, 60);
+    });
+
+    await check("secret redaction active", async () => {
+        const dirty = "host=db password=hunter2 token=abc123";
+        const clean = redact(dirty);
+        if (clean.includes("hunter2") || clean.includes("abc123")) throw new Error("secrets survived redaction");
+        return "credentials stripped";
+    });
+
+    log(failures === 0
+        ? "\nAll checks passed. Register with:\n  claude mcp add notrespond -- node <repo>/mcp/notrespond-mcp/server.mjs\n"
+        : `\n${failures} check(s) failed.\n`);
+
+    if (pool) await pool.end().catch(() => {});
+    process.exit(failures === 0 ? 0 : 1);
+}
+
+if (process.argv.includes("--selftest")) {
+    selftest();
 }
 
 const rl = createInterface({ input: process.stdin });
