@@ -67,6 +67,7 @@ model User {
   smsRentals           SmsRental[]
   notifications        Notification[]
   vmAlertRules         VmAlertRule[]
+  aiConversations      AiConversation[]
 }
 
 model Account {
@@ -333,6 +334,80 @@ model GpuNode {
   vms VpsInstance[]
 
   @@index([active])
+}
+
+// ─── AI Inference Nodes (LM Studio) ───────────────────────────────
+
+/// Access tier for an inference node.
+/// STANDARD — RX 580 machines, available to every signed-in user.
+/// PREMIUM  — RTX 2060 machines, admin-only.
+/// The tier is enforced server-side in lib/ai-nodes.ts; the client
+/// never decides which node it is allowed to reach.
+enum AiTier {
+  STANDARD
+  PREMIUM
+}
+
+/// One LM Studio server, each fronting a single GPU + loaded model.
+/// baseUrl points at the OpenAI-compatible endpoint LM Studio exposes,
+/// e.g. "http://10.0.1.50:1234/v1". These hosts sit on the private LAN
+/// and are never reachable from the browser — all traffic is proxied
+/// through /api/ai/chat so the tier gate cannot be bypassed.
+model AiNode {
+  id          String    @id @default(cuid())
+  name        String    @unique // "lm-rx580-01"
+  displayName String            // "Qwen2.5 14B — RX 580 #1"
+  gpuLabel    String            // "RX 580 8GB"
+  tier        AiTier    @default(STANDARD)
+  baseUrl     String            // "http://10.0.1.50:1234/v1"
+  apiKey      String?   @db.Text // AES-256-GCM encrypted; LM Studio usually needs none
+  modelId     String            // model identifier as loaded in LM Studio
+  contextLen  Int       @default(8192)
+  maxTokens   Int       @default(2048)
+  active      Boolean   @default(true)
+  online      Boolean   @default(false)
+  lastError   String?   @db.Text
+  lastCheckAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  conversations AiConversation[]
+
+  @@index([tier, active])
+}
+
+model AiConversation {
+  id        String   @id @default(cuid())
+  userId    String
+  nodeId    String?
+  title     String   @default("New chat") @db.VarChar(200)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  node     AiNode?     @relation(fields: [nodeId], references: [id], onDelete: SetNull)
+  messages AiMessage[]
+
+  @@index([userId, updatedAt])
+  @@index([nodeId])
+}
+
+model AiMessage {
+  id             String   @id @default(cuid())
+  conversationId String
+  role           String   // "user" | "assistant" | "system"
+  content        String   @db.LongText
+  modelId        String?  // snapshot — the node may be re-pointed later
+  gpuLabel       String?
+  promptTokens   Int?
+  outputTokens   Int?
+  latencyMs      Int?
+  failed         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+
+  conversation AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
 }
 
 // ─── Phase 1: Proxmox VM Block Storage Addons ──────────────────────
@@ -664,6 +739,11 @@ enum AuditAction {
   // Misc
   REDIRECT_TO_PLANS
   TRIGGER_UPSELL_FLOW
+  // AI Inference (LM Studio)
+  AI_CHAT_COMPLETION
+  AI_TIER_DENIED
+  AI_CONVERSATION_DELETE
+  ADMIN_AI_NODE_MODIFY
 }
 
 model AuditLog {

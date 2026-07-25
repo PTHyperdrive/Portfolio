@@ -13,7 +13,7 @@ import {
     LayoutGrid, Server, Users, Tag, Receipt,
     ScrollText, MessageSquare, MessagesSquare, SlidersHorizontal,
     LogOut, ArrowLeft, Wallet, Shield, Store, FileText,
-    Activity, Network, Smartphone,
+    Activity, Network, Smartphone, Bot,
 } from "lucide-react";
 
 type NavItem = { label: string; href: string; Icon: React.ElementType; badge?: number };
@@ -27,6 +27,7 @@ const INFRA_ITEMS: NavItem[] = [
     { label: "Infrastructure",   href: "/adminsystemnrsp/infrastructure", Icon: Activity        },
     { label: "VPC Networks",     href: "/adminsystemnrsp/vpcs",           Icon: Network         },
     { label: "WireGuard Peers",  href: "/adminsystemnrsp/wireguard",      Icon: Shield          },
+    { label: "AI Nodes",         href: "/adminsystemnrsp/ai",             Icon: Bot             },
 ];
 
 const ADMIN_ITEMS: NavItem[] = [
