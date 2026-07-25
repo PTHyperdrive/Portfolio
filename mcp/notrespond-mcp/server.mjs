@@ -20,9 +20,13 @@
  */
 
 import { createInterface } from "node:readline";
+import { createRequire } from "node:module";
 import process from "node:process";
 import { config } from "dotenv";
-import mariadb from "mariadb";
+
+// mariadb is CommonJS and exposes no ESM default export, so require it.
+const require = createRequire(import.meta.url);
+const mariadb = require("mariadb");
 
 config();
 
