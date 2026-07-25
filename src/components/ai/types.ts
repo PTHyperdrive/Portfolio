@@ -31,4 +31,6 @@ export interface ChatMessage {
     createdAt?: string;
     /** True while tokens are still arriving for this message. */
     streaming?: boolean;
+    /** Scratchpad from a reasoning model. Live-only — not persisted. */
+    reasoning?: string;
 }

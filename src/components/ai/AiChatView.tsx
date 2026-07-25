@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
     Send, Square, Copy, Check, Bot, User as UserIcon,
-    AlertTriangle, Sparkles, Zap, History,
+    AlertTriangle, Sparkles, Zap, History, Brain,
 } from "lucide-react";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { useThemeTokens } from "@/lib/useThemeTokens";
@@ -40,6 +40,7 @@ export default function AiChatView({
     const [streaming, setStreaming] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [copiedId, setCopiedId] = useState<string | null>(null);
+    const [openReasoning, setOpenReasoning] = useState<Set<string>>(new Set());
     const [loadingThread, setLoadingThread] = useState(false);
 
     const abortRef = useRef<AbortController | null>(null);
@@ -193,6 +194,12 @@ export default function AiChatView({
                         setMessages(prev => prev.map(m =>
                             m.id === `${localId}-a`
                                 ? { ...m, gpuLabel: payload.gpuLabel as string, modelId: payload.model as string }
+                                : m));
+                    } else if (event === "reasoning") {
+                        const chunk = payload.text as string;
+                        setMessages(prev => prev.map(m =>
+                            m.id === `${localId}-a`
+                                ? { ...m, reasoning: (m.reasoning ?? "") + chunk }
                                 : m));
                     } else if (event === "delta") {
                         const chunk = payload.text as string;
@@ -387,6 +394,44 @@ export default function AiChatView({
                                         </p>
                                     ) : (
                                         <div style={{ fontSize: "0.9rem", lineHeight: 1.7, color: t.textSecondary }}>
+                                            {msg.reasoning && (() => {
+                                                const thinking = msg.streaming && !msg.content;
+                                                const open = thinking || openReasoning.has(msg.id);
+                                                return (
+                                                    <div style={{ marginBottom: msg.content ? 12 : 0 }}>
+                                                        <button
+                                                            onClick={() => setOpenReasoning(prev => {
+                                                                const next = new Set(prev);
+                                                                if (next.has(msg.id)) next.delete(msg.id);
+                                                                else next.add(msg.id);
+                                                                return next;
+                                                            })}
+                                                            disabled={thinking}
+                                                            style={{
+                                                                display: "inline-flex", alignItems: "center", gap: 6,
+                                                                padding: 0, border: "none", background: "transparent",
+                                                                color: t.textMuted, fontSize: "0.75rem", fontWeight: 600,
+                                                                cursor: thinking ? "default" : "pointer",
+                                                                fontFamily: t.fontFamily, marginBottom: 6,
+                                                            }}
+                                                        >
+                                                            <Brain style={{ width: 12, height: 12 }} />
+                                                            {thinking ? "Thinking…" : open ? "Hide reasoning" : "Show reasoning"}
+                                                        </button>
+                                                        {open && (
+                                                            <div style={{
+                                                                borderLeft: `2px solid ${t.borderPrimary}`,
+                                                                paddingLeft: 12,
+                                                                fontSize: "0.8rem", lineHeight: 1.6,
+                                                                color: t.textMuted, whiteSpace: "pre-wrap",
+                                                                maxHeight: thinking ? 160 : 320, overflowY: "auto",
+                                                            }}>
+                                                                {msg.reasoning}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                );
+                                            })()}
                                             <MarkdownRenderer content={msg.content} />
                                             {msg.streaming && (
                                                 <span style={{

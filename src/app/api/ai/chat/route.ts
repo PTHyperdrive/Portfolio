@@ -177,8 +177,10 @@ export async function POST(req: Request) {
             const decoder = new TextDecoder();
             let buffer = "";
             let answer = "";
+            let reasoning = "";
             let outputTokens: number | null = null;
             let promptTokens: number | null = null;
+            let reasoningTokens: number | null = null;
 
             const assistant = await prisma.aiMessage.create({
                 data: {
@@ -216,14 +218,30 @@ export async function POST(req: Request) {
 
                         try {
                             const chunk = JSON.parse(payload);
-                            const text: string = chunk.choices?.[0]?.delta?.content ?? "";
+                            const delta = chunk.choices?.[0]?.delta;
+
+                            // Reasoning models (Gemma 4 QAT, DeepSeek-R1, gpt-oss)
+                            // stream their scratchpad on a separate field first.
+                            // Forward it so the UI can show progress instead of an
+                            // empty bubble, but keep it out of the stored answer.
+                            const think: string =
+                                delta?.reasoning_content ?? delta?.reasoning ?? "";
+                            if (think) {
+                                reasoning += think;
+                                controller.enqueue(sseEvent("reasoning", { text: think }));
+                            }
+
+                            const text: string = delta?.content ?? "";
                             if (text) {
                                 answer += text;
                                 controller.enqueue(sseEvent("delta", { text }));
                             }
+
                             if (chunk.usage) {
                                 outputTokens = chunk.usage.completion_tokens ?? null;
                                 promptTokens = chunk.usage.prompt_tokens ?? null;
+                                reasoningTokens =
+                                    chunk.usage.completion_tokens_details?.reasoning_tokens ?? null;
                             }
                         } catch {
                             // Partial JSON across chunk boundaries — skip this line.
@@ -232,6 +250,11 @@ export async function POST(req: Request) {
                 }
 
                 const latencyMs = Date.now() - startedAt;
+
+                // A reasoning model can spend its entire max_tokens budget on the
+                // scratchpad and emit no answer at all. That is not a silent empty
+                // reply — tell the user what happened and what to change.
+                const exhaustedByReasoning = answer.length === 0 && reasoning.length > 0;
 
                 await prisma.aiMessage.update({
                     where: { id: assistant.id },
@@ -259,11 +282,21 @@ export async function POST(req: Request) {
                         gpu: node.gpuLabel,
                         tier: node.tier,
                         outputTokens,
+                        reasoningTokens,
                         latencyMs,
                     },
                 });
 
-                controller.enqueue(sseEvent("done", { latencyMs, outputTokens }));
+                if (exhaustedByReasoning) {
+                    controller.enqueue(sseEvent("error", {
+                        message:
+                            `${node.displayName} used its entire ${node.maxTokens}-token budget ` +
+                            `reasoning and produced no answer. Raise "Max output tokens" for this ` +
+                            `node, or ask a narrower question.`,
+                    }));
+                } else {
+                    controller.enqueue(sseEvent("done", { latencyMs, outputTokens, reasoningTokens }));
+                }
             } catch (err) {
                 // Client disconnects land here; keep whatever was generated.
                 const message = err instanceof Error ? err.message : "Stream interrupted";
