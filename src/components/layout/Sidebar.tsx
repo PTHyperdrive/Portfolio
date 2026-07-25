@@ -36,7 +36,7 @@ const SIDEBAR_STRUCTURE: NavGroup[] = [
                 ]
             },
             { label: "Game Hosting", icon: Gamepad2, href: "/dashboard/game" },
-            { label: "AI Studio", icon: Bot, href: "/dashboard/ai" },
+            { label: "AI Studio", icon: Bot, href: "/dashboard/studio" },
             {
                 label: "Storage", icon: Cloud, href: "/dashboard/storage",
                 subItems: [

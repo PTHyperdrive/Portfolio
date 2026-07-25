@@ -58,4 +58,6 @@ export type ChatPhase = "idle" | "connecting" | "thinking" | "streaming";
 export interface QueuedMessage {
     id: string;
     content: string;
+    /** Attachments travel with the queued turn, not the composer. */
+    images?: string[];
 }

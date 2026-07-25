@@ -368,6 +368,9 @@ model AiNode {
   /// node — LM Studio silently ignores it for some models (gemma-4 QAT), and
   /// shipping a control that does nothing is worse than not offering it.
   reasoningControl Boolean @default(false)
+  /// Embedding model loaded on this host, if any. Retrieval uses the node the
+  /// user is already entitled to, so embedding never crosses a tier boundary.
+  embedModelId String?
   active      Boolean   @default(true)
   online      Boolean   @default(false)
   lastError   String?   @db.Text
@@ -400,6 +403,57 @@ model AiConversation {
 
   @@index([userId, updatedAt])
   @@index([nodeId])
+}
+
+// ─── AI Knowledge Base (RAG) ──────────────────────────────────────
+
+/// Who may retrieve a document. Enforced at query time, not at render time —
+/// a STANDARD user's retrieval never reads ADMIN rows, so infra detail cannot
+/// leak through a summarised answer.
+enum AiDocVisibility {
+  PUBLIC
+  ADMIN
+}
+
+/// A curated infrastructure document the assistant can ground answers on.
+/// Content is authored by admins only. Never store secrets here: everything
+/// in a PUBLIC doc should be considered readable by any signed-in user, and
+/// everything in any doc should be considered reachable by a prompt injection.
+model AiKnowledgeDoc {
+  id         String          @id @default(cuid())
+  slug       String          @unique
+  title      String
+  /// "topology" | "web-guide" | "machine-guide" | "security" | "runbook"
+  category   String
+  content    String          @db.LongText
+  visibility AiDocVisibility @default(ADMIN)
+  published  Boolean         @default(false)
+  /// Where the text came from, for provenance in citations.
+  source     String?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  chunks AiKnowledgeChunk[]
+
+  @@index([published, visibility])
+  @@index([category])
+}
+
+/// One retrievable slice of a document plus its embedding vector.
+/// The vector is stored as a JSON float array — the corpus is small enough
+/// that in-process cosine scoring beats adding a vector database.
+model AiKnowledgeChunk {
+  id        String   @id @default(cuid())
+  docId     String
+  ordinal   Int
+  content   String   @db.Text
+  embedding String   @db.LongText
+  dims      Int      @default(768)
+  createdAt DateTime @default(now())
+
+  doc AiKnowledgeDoc @relation(fields: [docId], references: [id], onDelete: Cascade)
+
+  @@index([docId, ordinal])
 }
 
 model AiMessage {
@@ -754,6 +808,11 @@ enum AuditAction {
   AI_TIER_DENIED
   AI_CONVERSATION_DELETE
   ADMIN_AI_NODE_MODIFY
+  // AI tool use / retrieval
+  AI_TOOL_CALL
+  AI_TOOL_DENIED
+  AI_KNOWLEDGE_SEARCH
+  ADMIN_AI_DOC_MODIFY
 }
 
 model AuditLog {

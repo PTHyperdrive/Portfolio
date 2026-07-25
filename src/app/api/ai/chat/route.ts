@@ -3,7 +3,15 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/api-auth";
 import { resolveNodeForUser, decryptNodeKey } from "@/lib/ai-nodes";
+import { searchKnowledge, formatContext } from "@/lib/ai-knowledge";
+import { systemPrompt, frameUntrusted } from "@/lib/ai-security";
 import { audit } from "@/lib/audit";
+
+/** A turn as sent upstream. Content is a string, or parts when images ride along. */
+type ChatPart =
+    | { type: "text"; text: string }
+    | { type: "image_url"; image_url: { url: string } };
+type ChatTurn = { role: string; content: string | ChatPart[] };
 
 /**
  * POST /api/ai/chat
@@ -33,6 +41,17 @@ const bodySchema = z.object({
     showReasoning: z.boolean().optional(),
     /** Only reaches the runtime on nodes flagged reasoningControl. */
     reasoningEffort: z.enum(["off", "low", "medium", "high"]).optional(),
+    /**
+     * Inline images as data URLs. Restricted to still raster formats the
+     * vision encoder accepts — no SVG, which is script-bearing markup rather
+     * than an image, and no arbitrary URLs, which would make this an SSRF
+     * primitive pointed at the LAN.
+     */
+    images: z.array(
+        z.string()
+            .regex(/^data:image\/(png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=]+$/, "Unsupported image format")
+            .max(12_000_000),
+    ).max(4).optional(),
 });
 
 /** Rough char budget from a token context window, leaving room for the reply. */
@@ -52,7 +71,7 @@ export async function POST(req: Request) {
     if (!parsed.success) {
         return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
-    const { conversationId, content, nodeId, showReasoning, reasoningEffort } = parsed.data;
+    const { conversationId, content, nodeId, showReasoning, reasoningEffort, images } = parsed.data;
 
     // ── Ownership ────────────────────────────────────────────────
     const conversation = await prisma.aiConversation.findFirst({
@@ -94,8 +113,12 @@ export async function POST(req: Request) {
     // ── Persist the user turn, then build the prompt ─────────────
     const priorCount = await prisma.aiMessage.count({ where: { conversationId } });
 
+    // Images are not persisted — only the fact that some were attached, so a
+    // later turn reads coherently without storing megabytes of base64.
+    const imageNote = images?.length ? `\n\n[user attached ${images.length} image(s)]` : "";
+
     await prisma.aiMessage.create({
-        data: { conversationId, role: "user", content },
+        data: { conversationId, role: "user", content: content + imageNote },
     });
 
     // First turn names the thread.
@@ -127,14 +150,68 @@ export async function POST(req: Request) {
     });
 
     const budget = historyCharBudget(node.contextLen);
-    const history: { role: string; content: string }[] = [];
+    const history: ChatTurn[] = [];
     let used = 0;
     for (const msg of recent) {
         used += msg.content.length;
         if (used > budget && history.length > 0) break;
-        history.push(msg);
+        history.push({ role: msg.role, content: msg.content });
     }
     history.reverse();
+
+    // ── Ground the answer in the operator's own documentation ────
+    // Retrieval is visibility-scoped by role inside searchKnowledge, so a
+    // tenant's question never pulls operator-only passages.
+    const role = (await prisma.user.findUnique({
+        where: { id: userId },
+        select: { role: true },
+    }))?.role ?? "USER";
+
+    let retrieved: Awaited<ReturnType<typeof searchKnowledge>> = [];
+    try {
+        retrieved = await searchKnowledge(content, role);
+    } catch (err) {
+        // Retrieval is an enhancement — never fail the chat over it.
+        console.error("[api/ai/chat] retrieval failed:", err);
+    }
+
+    if (retrieved.length > 0) {
+        void audit({
+            userId,
+            action: "AI_KNOWLEDGE_SEARCH",
+            resourceType: "AiConversation",
+            resourceId: conversationId,
+            metadata: { hits: retrieved.length, docs: retrieved.map(r => r.docSlug) },
+        });
+    }
+
+    const prompt: ChatTurn[] = [
+        {
+            role: "system",
+            content: systemPrompt({ role, tier: node.tier, hasKnowledge: retrieved.length > 0 }),
+        },
+        ...(retrieved.length > 0
+            ? [{ role: "system" as const, content: frameUntrusted("knowledge_base", formatContext(retrieved)) }]
+            : []),
+        ...history,
+    ];
+
+    // Attach images to the final user turn. Only the current turn carries
+    // them; prior images are not replayed, which keeps context bounded.
+    if (images?.length) {
+        for (let i = prompt.length - 1; i >= 0; i--) {
+            if (prompt[i].role === "user") {
+                prompt[i] = {
+                    role: "user",
+                    content: [
+                        { type: "text", text: content },
+                        ...images.map(url => ({ type: "image_url" as const, image_url: { url } })),
+                    ],
+                };
+                break;
+            }
+        }
+    }
 
     // ── Call the LM Studio host ──────────────────────────────────
     const apiKey = decryptNodeKey(node.apiKey);
@@ -151,7 +228,7 @@ export async function POST(req: Request) {
             },
             body: JSON.stringify({
                 model: node.modelId,
-                messages: history,
+                messages: prompt,
                 max_tokens: node.maxTokens,
                 stream: true,
                 stream_options: { include_usage: true },

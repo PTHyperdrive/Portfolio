@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
     Send, Square, Copy, Check, Bot, User as UserIcon,
-    AlertTriangle, Sparkles, History, Brain, X, RotateCcw, Clock,
+    AlertTriangle, Sparkles, History, Brain, X, RotateCcw, Clock, ImagePlus,
 } from "lucide-react";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { useThemeTokens } from "@/lib/useThemeTokens";
@@ -49,17 +49,20 @@ export default function AiChatView({
     const [loadingThread, setLoadingThread] = useState(false);
     const [showReasoning, setShowReasoning] = useState(true);
     const [effort, setEffort] = useState<ReasoningEffort>("medium");
+    /** Pending attachments as data URLs, cleared once the turn is sent. */
+    const [attachments, setAttachments] = useState<string[]>([]);
 
     const abortRef = useRef<AbortController | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const fileRef = useRef<HTMLInputElement>(null);
     const pinnedToBottom = useRef(true);
     /** Queue mirror — the streaming loop reads it without stale closures. */
     const queueRef = useRef<QueuedMessage[]>([]);
     /** Thread id that survives creation mid-queue. */
     const threadRef = useRef<string | null>(activeId);
     const lastPromptRef = useRef<string | null>(null);
-    const runTurnRef = useRef<((text: string) => Promise<void>) | null>(null);
+    const runTurnRef = useRef<((text: string, images?: string[]) => Promise<void>) | null>(null);
     /**
      * Synchronous busy latch. `phase` is state, so two Enter presses in the
      * same tick would both read "idle" and start duplicate turns — this is
@@ -158,7 +161,7 @@ export default function AiChatView({
     }, []);
 
     /* ── One turn: send, stream, persist, then pull from queue ──── */
-    const runTurn = useCallback(async (content: string) => {
+    const runTurn = useCallback(async (content: string, images: string[] = []) => {
         setError(null);
         pinnedToBottom.current = true;
         lastPromptRef.current = content;
@@ -189,7 +192,10 @@ export default function AiChatView({
 
         setMessages(prev => [
             ...prev,
-            { id: localId, role: "user", content },
+            {
+                id: localId, role: "user",
+                content: content + (images.length ? `\n\n[${images.length} image(s) attached]` : ""),
+            },
             { id: replyId, role: "assistant", content: "", streaming: true },
         ]);
         setPhase("connecting");
@@ -207,6 +213,7 @@ export default function AiChatView({
                     nodeId,
                     showReasoning,
                     reasoningEffort: effort,
+                    ...(images.length ? { images } : {}),
                 }),
                 signal: controller.signal,
             });
@@ -292,7 +299,7 @@ export default function AiChatView({
             const next = queueRef.current.shift();
             setQueue([...queueRef.current]);
             if (next) {
-                void runTurnRef.current?.(next.content);
+                void runTurnRef.current?.(next.content, next.images ?? []);
             } else {
                 busyRef.current = false;
                 setPhase("idle");
@@ -306,18 +313,55 @@ export default function AiChatView({
     const send = useCallback((text: string) => {
         const content = text.trim();
         if (!content) return;
+
+        // Attachments belong to this turn, so detach them from the composer
+        // now — otherwise a queued turn and the next one share the same set.
+        const images = attachments;
         setInput("");
+        setAttachments([]);
 
         if (busyRef.current) {
-            const item = { id: `q-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, content };
+            const item = {
+                id: `q-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+                content,
+                images,
+            };
             queueRef.current = [...queueRef.current, item];
             setQueue([...queueRef.current]);
             pinnedToBottom.current = true;
             return;
         }
         busyRef.current = true;
-        void runTurn(content);
-    }, [runTurn]);
+        void runTurn(content, images);
+    }, [runTurn, attachments]);
+
+    /** Read picked files as data URLs, enforcing the same limits as the API. */
+    const attachFiles = useCallback(async (files: FileList | null) => {
+        if (!files?.length) return;
+        const allowed = /^image\/(png|jpeg|jpg|webp|gif)$/;
+        const picked: string[] = [];
+
+        for (const file of Array.from(files).slice(0, 4)) {
+            if (!allowed.test(file.type)) {
+                setError(`${file.name} is not a supported image type.`);
+                continue;
+            }
+            if (file.size > 8 * 1024 * 1024) {
+                setError(`${file.name} is larger than 8 MB.`);
+                continue;
+            }
+            picked.push(await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(String(reader.result));
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            }));
+        }
+
+        if (picked.length) {
+            setAttachments(prev => [...prev, ...picked].slice(0, 4));
+        }
+    }, []);
 
     const unqueue = (id: string) => {
         queueRef.current = queueRef.current.filter(q => q.id !== id);
@@ -724,6 +768,44 @@ export default function AiChatView({
                     )}
                 </div>
 
+                {/* Pending attachments */}
+                {attachments.length > 0 && (
+                    <div style={{
+                        maxWidth: 820, margin: "0 auto 8px",
+                        display: "flex", gap: 8, flexWrap: "wrap",
+                    }}>
+                        {attachments.map((src, i) => (
+                            <span key={i} style={{ position: "relative", display: "inline-block" }}>
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                    src={src}
+                                    alt={`Attachment ${i + 1}`}
+                                    style={{
+                                        width: 56, height: 56, objectFit: "cover",
+                                        borderRadius: t.cardRadius,
+                                        border: `1px solid ${t.borderPrimary}`,
+                                        display: "block",
+                                    }}
+                                />
+                                <button
+                                    onClick={() => setAttachments(prev => prev.filter((_, j) => j !== i))}
+                                    aria-label={`Remove attachment ${i + 1}`}
+                                    style={{
+                                        position: "absolute", top: -6, right: -6,
+                                        width: 20, height: 20, borderRadius: "50%",
+                                        display: "flex", alignItems: "center", justifyContent: "center",
+                                        border: `1px solid ${t.borderPrimary}`,
+                                        background: t.bgCard, color: t.textSecondary,
+                                        cursor: "pointer", padding: 0,
+                                    }}
+                                >
+                                    <X style={{ width: 11, height: 11 }} />
+                                </button>
+                            </span>
+                        ))}
+                    </div>
+                )}
+
                 <div style={{
                     maxWidth: 820, margin: "0 auto",
                     display: "flex", alignItems: "flex-end", gap: 10,
@@ -754,6 +836,33 @@ export default function AiChatView({
                             maxHeight: 200, padding: "6px 0",
                         }}
                     />
+
+                    <input
+                        ref={fileRef}
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp,image/gif"
+                        multiple
+                        onChange={e => { void attachFiles(e.target.files); e.target.value = ""; }}
+                        style={{ display: "none" }}
+                    />
+                    <button
+                        id="ai-attach"
+                        onClick={() => fileRef.current?.click()}
+                        disabled={!selectedNode || attachments.length >= 4}
+                        aria-label="Attach image"
+                        title={attachments.length >= 4 ? "Four images maximum" : "Attach an image"}
+                        style={{
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            width: 34, height: 34, flexShrink: 0,
+                            borderRadius: t.buttonRadius,
+                            border: `1px solid ${t.borderPrimary}`,
+                            background: "transparent", color: t.textSecondary,
+                            cursor: (!selectedNode || attachments.length >= 4) ? "not-allowed" : "pointer",
+                            opacity: (!selectedNode || attachments.length >= 4) ? 0.45 : 1,
+                        }}
+                    >
+                        <ImagePlus style={{ width: 15, height: 15 }} />
+                    </button>
 
                     {/* Queue-ahead send stays available while streaming. */}
                     {busy && input.trim() && (
