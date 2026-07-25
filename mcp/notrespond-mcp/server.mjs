@@ -306,23 +306,36 @@ async function handle(msg) {
 
 const rl = createInterface({ input: process.stdin });
 
-rl.on("line", async line => {
+/**
+ * In-flight handlers. stdin reaching EOF does not mean pending work is done —
+ * piping a single request closes the stream immediately, and tearing the pool
+ * down underneath a running query fails it with "pool is ending".
+ */
+const inflight = new Set();
+
+rl.on("line", line => {
     const text = line.trim();
     if (!text) return;
     let msg;
     try { msg = JSON.parse(text); }
     catch { return; }
 
-    try {
-        await handle(msg);
-    } catch (err) {
-        // stderr only — stdout is the protocol channel and must stay clean.
-        process.stderr.write(`[notrespond-mcp] ${err.stack ?? err.message}\n`);
-        if (msg.id !== undefined) fail(msg.id, -32603, "Internal error");
-    }
+    const task = (async () => {
+        try {
+            await handle(msg);
+        } catch (err) {
+            // stderr only — stdout is the protocol channel and must stay clean.
+            process.stderr.write(`[notrespond-mcp] ${err.stack ?? err.message}\n`);
+            if (msg.id !== undefined) fail(msg.id, -32603, "Internal error");
+        }
+    })();
+
+    inflight.add(task);
+    task.finally(() => inflight.delete(task));
 });
 
 rl.on("close", async () => {
+    await Promise.allSettled([...inflight]);
     if (pool) await pool.end().catch(() => {});
     process.exit(0);
 });
