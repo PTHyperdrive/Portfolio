@@ -196,8 +196,17 @@ export async function searchKnowledge(
     query: string,
     role: string,
     limit = TOP_K,
+    /**
+     * Explicit visibility scope, overriding what the role would grant.
+     * Used by the support surface to pin retrieval to PUBLIC even for admins.
+     * Never widen beyond visibilitiesForRole(role) — only narrow.
+     */
+    visibilityOverride?: ("PUBLIC" | "ADMIN")[],
 ): Promise<RetrievedChunk[]> {
-    const visibility = visibilitiesForRole(role);
+    const allowed = visibilitiesForRole(role);
+    const visibility = visibilityOverride
+        ? visibilityOverride.filter(v => allowed.includes(v))
+        : allowed;
 
     const chunks = await prisma.aiKnowledgeChunk.findMany({
         where: { doc: { published: true, visibility: { in: visibility } } },

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { requireAdmin } from "@/lib/admin-guard";
+import { requireAdmin } from "@/lib/api-auth";
 
 /** GET /api/admin/sms/rentals — recent rentals across all users (admin overview). */
 export async function GET() {

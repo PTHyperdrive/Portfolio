@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { requireAdmin } from "@/lib/admin-guard";
+import { requireAdmin } from "@/lib/api-auth";
 import { audit } from "@/lib/audit";
 
 /**

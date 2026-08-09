@@ -21,7 +21,7 @@ import { prisma } from "@/lib/db";
 import { fetchAllVMs, fetchNodes } from "@/lib/proxmox";
 import { searchKnowledge } from "@/lib/ai-knowledge";
 import {
-    visibilitiesForRole, toolAllowedForRole, frameUntrusted,
+    visibilitiesForMode, toolAllowedForRole, frameUntrusted,
     sanitiseToolResult, type ToolTier,
 } from "@/lib/ai-security";
 import { audit } from "@/lib/audit";
@@ -29,7 +29,17 @@ import { audit } from "@/lib/audit";
 export interface ToolContext {
     userId: string;
     role: string;
+    /**
+     * Conversation kind, when the call originates from a chat thread.
+     * SUPPORT pins document visibility to PUBLIC regardless of role
+     * (see visibilitiesForMode). Absent on the MCP surfaces = STUDIO.
+     */
+    kind?: "STUDIO" | "SUPPORT";
 }
+
+/** Document visibilities this call may read, honouring the support override. */
+const ctxVisibilities = (ctx: ToolContext) =>
+    visibilitiesForMode(ctx.kind ?? "STUDIO", ctx.role);
 
 export interface ToolDefinition {
     name: string;
@@ -64,7 +74,7 @@ const searchDocs: ToolDefinition = {
         const query = str(args.query).trim();
         if (!query) return "No query supplied.";
 
-        const hits = await searchKnowledge(query, ctx.role);
+        const hits = await searchKnowledge(query, ctx.role, undefined, ctxVisibilities(ctx));
         if (hits.length === 0) {
             return "No documentation matched that query. Say so rather than guessing.";
         }
@@ -84,7 +94,7 @@ const listDocs: ToolDefinition = {
     parameters: { type: "object", properties: {} },
     async run(_args, ctx) {
         const docs = await prisma.aiKnowledgeDoc.findMany({
-            where: { published: true, visibility: { in: visibilitiesForRole(ctx.role) } },
+            where: { published: true, visibility: { in: ctxVisibilities(ctx) } },
             select: { slug: true, title: true, category: true, updatedAt: true },
             orderBy: [{ category: "asc" }, { title: "asc" }],
         });
@@ -116,7 +126,7 @@ const getDoc: ToolDefinition = {
             where: {
                 slug,
                 published: true,
-                visibility: { in: visibilitiesForRole(ctx.role) },
+                visibility: { in: ctxVisibilities(ctx) },
             },
             select: { title: true, category: true, content: true, source: true },
         });
@@ -264,6 +274,26 @@ export function toolsForRole(role: string): ToolDefinition[] {
     return ALL_TOOLS.filter(t => toolAllowedForRole(t.minTier, role));
 }
 
+/**
+ * Tool names a SUPPORT conversation may offer, regardless of role.
+ *
+ * Deliberately excludes get_ai_node_status, get_hypervisor_status and
+ * get_platform_summary — those are exactly the channels that would leak
+ * GPU models, node names and fleet counts into a customer-facing surface.
+ */
+const SUPPORT_TOOL_NAMES = new Set([
+    "search_infrastructure_docs",
+    "list_infrastructure_docs",
+    "get_infrastructure_doc",
+    "get_my_services",
+]);
+
+/** Tools available to a conversation kind. SUPPORT narrows; STUDIO = role rules. */
+export function toolsForMode(kind: "STUDIO" | "SUPPORT", role: string): ToolDefinition[] {
+    const base = toolsForRole(role);
+    return kind === "SUPPORT" ? base.filter(t => SUPPORT_TOOL_NAMES.has(t.name)) : base;
+}
+
 export function findTool(name: string): ToolDefinition | undefined {
     return ALL_TOOLS.find(t => t.name === name);
 }
@@ -304,6 +334,25 @@ export async function executeTool(
         return {
             ok: false,
             text: frameUntrusted(name, `No tool named "${name}" exists.`),
+            redacted: [],
+        };
+    }
+
+    if (ctx.kind === "SUPPORT" && !SUPPORT_TOOL_NAMES.has(tool.name)) {
+        // Enforced here, not just at spec time — a model (or an injection)
+        // asking for an off-menu tool from a support thread is denied and logged.
+        void audit({
+            userId: ctx.userId,
+            action: "AI_TOOL_DENIED",
+            resourceType: "AiTool",
+            resourceId: name,
+            outcome: "DENIED",
+            metadata: { reason: "support_mode", role: ctx.role },
+            req,
+        });
+        return {
+            ok: false,
+            text: frameUntrusted(name, "This tool is not available in support chat."),
             redacted: [],
         };
     }

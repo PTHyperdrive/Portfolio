@@ -68,6 +68,21 @@ model User {
   notifications        Notification[]
   vmAlertRules         VmAlertRule[]
   aiConversations      AiConversation[]
+  provisioningJobs     ProvisioningJob[]
+  mailbox              MailMailbox?
+
+  /// When the user accepted the AI support-chat terms. Null = never consented;
+  /// SUPPORT conversations cannot be created until this is set.
+  supportChatConsentAt DateTime?
+
+  /// Per-user vanity subdomain label (e.g. "cmabcd12" → cmabcd12.notrespond.com).
+  /// First 8 chars of the cuid, extended on the (astronomically rare) prefix
+  /// collision. Kept even when Cloudflare fails so a retry is deterministic.
+  subdomain        String?   @unique @db.VarChar(63)
+  /// "PENDING" | "ACTIVE" | "FAILED" — the DNS sweep retries non-ACTIVE rows.
+  subdomainStatus  String?   @db.VarChar(10)
+  /// Cloudflare DNS record id, for cleanup on account deletion.
+  cfDnsRecordId    String?
 }
 
 model Account {
@@ -348,6 +363,154 @@ enum AiTier {
   PREMIUM
 }
 
+// ─── Mail (Postfix/Dovecot on 10.12.0.5) ──────────────────────────
+//
+// These four tables ARE the mail server's configuration. Postfix and Dovecot
+// query them directly over MySQL (user `mailserver`, SELECT-only), so there
+// is no sync job and no second source of truth: creating a row here creates
+// a working mailbox, and deactivating one stops delivery immediately.
+//
+// Column names are read by /etc/postfix/mysql-*.cf and dovecot-sql.conf.ext
+// on the mail VM — renaming a field here means editing those files too.
+
+enum MailboxKind {
+  /// Belongs to a platform user; exactly one per account.
+  USER
+  /// Send-only or functional box (noreply, support) — admin managed.
+  SYSTEM
+  /// Receives mail for addresses that have no mailbox yet, so an admin can
+  /// be prompted to create one instead of the sender getting a bounce.
+  CATCHALL
+}
+
+model MailDomain {
+  id        String   @id @default(cuid())
+  domain    String   @unique
+  active    Boolean  @default(true)
+  /// When true, only admins may create mailboxes here. notrespond.com is
+  /// admin-only; mail.notrespond.com is where users self-serve.
+  adminOnly Boolean  @default(false)
+  /// Accept unknown recipients into the catch-all rather than rejecting at
+  /// RCPT TO. Turning this off makes the domain bounce unknown addresses.
+  catchAll  Boolean  @default(true)
+  /// DKIM selector; the private key lives only on the mail VM.
+  dkimSelector String @default("nrsp")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  mailboxes MailMailbox[]
+  aliases   MailAlias[]
+  unrouted  MailUnrouted[]
+}
+
+model MailMailbox {
+  id        String      @id @default(cuid())
+  /// Null for SYSTEM/CATCHALL boxes. Unique so a user can hold at most one
+  /// mailbox — MySQL permits many NULLs under a unique index, which is
+  /// exactly the "one per user, unlimited system boxes" rule we want.
+  userId    String?     @unique
+  domainId  String
+  localPart String      @db.VarChar(64)
+  /// Denormalised "localPart@domain" — Postfix looks up this single column.
+  address   String      @unique @db.VarChar(255)
+  /// bcrypt hash, read by Dovecot as BLF-CRYPT (same scheme as User.passwordHash).
+  passwordHash String   @db.Text
+  quotaMb   Int         @default(1024)
+  active    Boolean     @default(true)
+  kind      MailboxKind @default(USER)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  lastLoginAt DateTime?
+
+  user   User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  domain MailDomain @relation(fields: [domainId], references: [id], onDelete: Cascade)
+
+  @@unique([domainId, localPart])
+  @@index([active])
+}
+
+model MailAlias {
+  id          String   @id @default(cuid())
+  domainId    String
+  /// "sales@domain" or "@domain" for a catch-all.
+  source      String   @unique @db.VarChar(255)
+  /// Comma-separated target addresses, as Postfix expects.
+  destination String   @db.Text
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  domain MailDomain @relation(fields: [domainId], references: [id], onDelete: Cascade)
+}
+
+/// An address that received mail while having no mailbox. Written by the
+/// catch-all reporter on the mail VM; drives the admin's "create an inbox
+/// for this address?" prompt.
+model MailUnrouted {
+  id         String   @id @default(cuid())
+  domainId   String
+  recipient  String   @db.VarChar(255)
+  lastSender String?  @db.VarChar(255)
+  lastSubject String? @db.VarChar(255)
+  messageCount Int    @default(1)
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+  /// Set once an admin creates the mailbox or dismisses the prompt.
+  resolved   Boolean  @default(false)
+  resolvedAt DateTime?
+
+  domain MailDomain @relation(fields: [domainId], references: [id], onDelete: Cascade)
+
+  @@unique([recipient])
+  @@index([resolved, lastSeenAt])
+}
+
+// ─── n8n-orchestrated VM provisioning ─────────────────────────────
+
+enum ProvisioningJobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  COMPENSATED
+  TIMED_OUT
+}
+
+/// One VM provisioning run, orchestrated step-by-step (normally by n8n,
+/// inline as fallback). Money moves BEFORE the job is dispatched — the job
+/// only ever moves hypervisor state; `compensate` refunds via the recorded
+/// charge fields when a run dies half-way.
+model ProvisioningJob {
+  id             String                @id @default(cuid())
+  userId         String
+  status         ProvisioningJobStatus @default(QUEUED)
+  /// Step currently executing (or last executed) — for the UI checklist.
+  currentStep    String?               @db.VarChar(16)
+  /// [{step, ok, ms, at, detail?}] appended by every step call.
+  stepLog        Json
+  planId         String
+  templateId     String
+  /// vmName, ciuser, ciPasswordEnc (AES-256-GCM), sshKeys, templateName,
+  /// knownVmid, family, chargedCredits, ticketWasPreexisting…
+  params         Json
+  /// Dedup key — a replayed n8n webhook or step call cannot double-clone.
+  idempotencyKey String                @unique
+  orderId        String?
+  ticketId       String?
+  /// Set after the clone step; required for compensation to know what to destroy.
+  vmId           Int?
+  node           String?
+  vpsInstanceId  String?               @unique
+  error          String?               @db.Text
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  completedAt    DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([status, updatedAt]) // timeout sweep
+}
+
 /// One LM Studio server, each fronting a single GPU + loaded model.
 /// baseUrl points at the OpenAI-compatible endpoint LM Studio exposes,
 /// e.g. "http://10.0.1.50:1234/v1". These hosts sit on the private LAN
@@ -383,10 +546,20 @@ model AiNode {
   @@index([tier, active])
 }
 
+/// What a conversation is for. The server derives every privilege from this —
+/// SUPPORT threads get the restricted support prompt, PUBLIC-only retrieval
+/// and the STANDARD node regardless of the caller's role. Never client-flippable
+/// after creation.
+enum ConversationKind {
+  STUDIO
+  SUPPORT
+}
+
 model AiConversation {
   id        String   @id @default(cuid())
   userId    String
   nodeId    String?
+  kind      ConversationKind @default(STUDIO)
   title     String   @default("New chat") @db.VarChar(200)
   /// Display preference for a reasoning model's scratchpad. Always effective,
   /// because it is applied on our side rather than asked of the runtime.
@@ -813,6 +986,17 @@ enum AuditAction {
   AI_TOOL_DENIED
   AI_KNOWLEDGE_SEARCH
   ADMIN_AI_DOC_MODIFY
+  // AI support bubble
+  SUPPORT_CHAT_CONSENT
+  // Per-user subdomains
+  SUBDOMAIN_PROVISIONED
+  // Mail
+  MAILBOX_CREATE
+  MAILBOX_DELETE
+  MAILBOX_PASSWORD_RESET
+  MAILBOX_ADMIN_ACCESS
+  MAIL_MESSAGE_DELETE
+  MAIL_ATTACHMENT_DOWNLOAD
 }
 
 model AuditLog {

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useViewMode } from "@/components/ViewModeProvider";
 import Link from "next/link";
 import Image from "next/image";
-import { Gift, Ticket, Tag, AlertTriangle, Sparkles, Key, Terminal, Cloud, User, RefreshCw, Settings } from "lucide-react";
+import { Gift, Ticket, Tag, AlertTriangle, Sparkles, Key, Terminal, Cloud, User, RefreshCw, Settings, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { CLOUD_TEMPLATES, getTemplatesForPlan } from "@/config/templates";
 import type { CloudTemplate } from "@/config/templates";
 import { useThemeTokens } from "@/lib/useThemeTokens";
@@ -89,6 +89,33 @@ interface Ticket {
     validUntil: string;
 }
 
+/** What actually exists on the hypervisor right now (/api/vps/options). */
+interface LiveOptions {
+    templates: { id: string; gpuStates: ("NoGPU" | "vGPU")[] }[];
+    plans: { name: string; deployable: boolean }[];
+}
+
+interface JobView {
+    id: string;
+    status: string;
+    currentStep: string | null;
+    stepLog: { step: string; ok: boolean }[];
+    vpsInstanceId: string | null;
+    error: string | null;
+}
+
+const JOB_STEPS: { id: string; label: string }[] = [
+    { id: "clone",     label: "Cloning template" },
+    { id: "resize",    label: "Resizing disk" },
+    { id: "hardware",  label: "Applying hardware plan" },
+    { id: "cloudinit", label: "Writing cloud-init config" },
+    { id: "start",     label: "Starting VM" },
+    { id: "fetch_ip",  label: "Waiting for network" },
+    { id: "finalize",  label: "Finalizing" },
+];
+
+const TERMINAL_JOB_STATUSES = ["SUCCEEDED", "FAILED", "COMPENSATED", "TIMED_OUT"];
+
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 function SectionHeader({ icon, title, sub, t }: { icon: React.ReactNode; title: string; sub: string; t: ReturnType<typeof useThemeTokens> }) {
@@ -148,6 +175,13 @@ export default function ComputeNewPage() {
     const [hasUsedTrial,  setHasUsedTrial]  = useState<boolean | null>(null);
 
     // ── Cloud-Init guest-specific state ──────────────────────────────
+    // Live hypervisor inventory — null until loaded (or when the endpoint
+    // fails, in which case the static registry lists are used unfiltered).
+    const [liveOptions,   setLiveOptions]   = useState<LiveOptions | null>(null);
+    // Non-null while an async (n8n) deployment is in flight — drives the
+    // progress overlay, polled every 2s until every job is terminal.
+    const [activeJobs,    setActiveJobs]    = useState<JobView[] | null>(null);
+
     const [hostname,      setHostname]      = useState("");
     const [ciUsername,    setCiUsername]     = useState("");
     const [sshKeys,       setSshKeys]       = useState("");
@@ -160,7 +194,12 @@ export default function ComputeNewPage() {
     const requiresGpu = currentPlanCfg
         ? ["GPU-Media", "GPU-Compute"].includes(currentPlanCfg.id)
         : false;
-    const availableTemplates: CloudTemplate[] = getTemplatesForPlan(requiresGpu);
+    // Registry list narrowed to what physically exists on the hypervisor —
+    // a template only shows once its clone source is actually built.
+    const neededGpuState = requiresGpu ? "vGPU" as const : "NoGPU" as const;
+    const availableTemplates: CloudTemplate[] = getTemplatesForPlan(requiresGpu)
+        .filter(tpl => !liveOptions
+            || liveOptions.templates.some(lt => lt.id === tpl.id && lt.gpuStates.includes(neededGpuState)));
 
     // Load available tickets + trial eligibility + SSH keys on mount
     useEffect(() => {
@@ -179,11 +218,50 @@ export default function ComputeNewPage() {
             .then(r => r.json())
             .then(d => { if (d.keys) setSavedSshKeys(d.keys); })
             .catch(() => null);
+
+        // Live hypervisor inventory — templates that actually exist + which
+        // plans are currently deployable (GPU plans hide until a vGPU
+        // template is built).
+        fetch("/api/vps/options")
+            .then(r => r.ok ? r.json() : null)
+            .then(d => { if (d?.templates) setLiveOptions(d); })
+            .catch(() => null);
     }, []);
+
+    // ── Async deployment progress polling (n8n path) ─────────────────
+    useEffect(() => {
+        if (!activeJobs || activeJobs.every(j => TERMINAL_JOB_STATUSES.includes(j.status))) return;
+
+        const iv = setInterval(async () => {
+            const updated = await Promise.all(activeJobs.map(async j => {
+                if (TERMINAL_JOB_STATUSES.includes(j.status)) return j;
+                try {
+                    const res = await fetch(`/api/vps/jobs/${j.id}`);
+                    if (!res.ok) return j;
+                    const { job } = await res.json();
+                    return { ...j, ...job } as JobView;
+                } catch { return j; }
+            }));
+            setActiveJobs(updated);
+
+            if (updated.every(j => TERMINAL_JOB_STATUSES.includes(j.status))
+                && updated.every(j => j.status === "SUCCEEDED")) {
+                // Give the success state a beat to render, then move on.
+                setTimeout(() => router.push("/dashboard/vps"), 1200);
+            }
+        }, 2000);
+        return () => clearInterval(iv);
+    }, [activeJobs, router]);
 
     // ── Derived ──────────────────────────────────────────────────────
     const isFreeTrial      = selectedPlan === "free-trial";
-    const PLANS            = [...(hasUsedTrial === false ? [FREE_TRIAL_PLAN] : []), ...PAID_PLANS];
+    const PLANS            = [...(hasUsedTrial === false ? [FREE_TRIAL_PLAN] : []), ...PAID_PLANS]
+        // Hide plans the hypervisor can't satisfy right now (e.g. GPU plans
+        // until a -vGPU template exists). Unknown plans stay visible.
+        .filter(p => {
+            const live = liveOptions?.plans.find(lp => lp.name === p.id);
+            return !live || live.deployable;
+        });
     const plan             = isFreeTrial
         ? FREE_TRIAL_PLAN
         : (PAID_PLANS.find(p => p.id === selectedPlan) ?? PAID_PLANS[0]);
@@ -285,7 +363,18 @@ export default function ComputeNewPage() {
                     }),
                 });
                 const d = await res.json();
-                if (!res.ok) { setDeployErr(d.error ?? "Deployment failed"); return; }
+                if (!res.ok && res.status !== 202) { setDeployErr(d.error ?? "Deployment failed"); return; }
+
+                if (d.async && Array.isArray(d.jobIds)) {
+                    // n8n-orchestrated path: 202 + job ids. Switch to the
+                    // progress overlay; the poll effect drives it from here.
+                    setActiveJobs(d.jobIds.map((id: string) => ({
+                        id, status: "QUEUED", currentStep: null,
+                        stepLog: [], vpsInstanceId: null, error: null,
+                    })));
+                    return;
+                }
+
                 const firstVmId = d.vmids?.[0];
                 if (firstVmId) {
                     router.push(`/dashboard/vps/${firstVmId}`);
@@ -1037,6 +1126,93 @@ export default function ComputeNewPage() {
                     </p>
                 </div>
             </div>
+
+            {/* ── Async deployment progress overlay (n8n path) ── */}
+            {activeJobs && (
+                <div style={{
+                    position: "fixed", inset: 0, zIndex: 10000,
+                    background: "rgba(0,0,0,0.6)", backdropFilter: "blur(3px)",
+                    display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+                }}>
+                    <div style={{
+                        ...card, width: "100%", maxWidth: 460, maxHeight: "85dvh",
+                        overflowY: "auto", padding: 24,
+                    }}>
+                        <h3 style={{ fontWeight: 800, fontSize: "1.05rem", color: t.textPrimary, marginBottom: 4 }}>
+                            Deploying {activeJobs.length > 1 ? `${activeJobs.length} servers` : "server"}
+                        </h3>
+                        <p style={{ fontSize: "0.75rem", color: t.textMuted, marginBottom: 16 }}>
+                            Provisioning runs in the background — you can leave this page;
+                            finished servers appear under Virtual Machines.
+                        </p>
+
+                        {activeJobs.map((job, ji) => {
+                            const doneSteps = new Set(job.stepLog.filter(s => s.ok).map(s => s.step));
+                            const failed = ["FAILED", "COMPENSATED", "TIMED_OUT"].includes(job.status);
+                            return (
+                                <div key={job.id} style={{
+                                    marginBottom: 14, padding: "12px 14px",
+                                    borderRadius: t.cardRadius - 4, background: t.bgSecondary,
+                                    border: `1px solid ${failed ? t.statusError : t.borderSecondary}`,
+                                }}>
+                                    {activeJobs.length > 1 && (
+                                        <p style={{ fontSize: "0.72rem", fontWeight: 700, color: t.textSecondary, marginBottom: 8 }}>
+                                            Instance {ji + 1}
+                                        </p>
+                                    )}
+                                    {JOB_STEPS.map(step => {
+                                        const done = doneSteps.has(step.id);
+                                        const current = job.currentStep === step.id
+                                            && !done && !failed && job.status !== "SUCCEEDED";
+                                        return (
+                                            <div key={step.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "3px 0" }}>
+                                                {done || job.status === "SUCCEEDED" ? (
+                                                    <CheckCircle2 style={{ width: 14, height: 14, color: t.statusSuccess, flexShrink: 0 }} />
+                                                ) : current ? (
+                                                    <Loader2 style={{ width: 14, height: 14, color: t.accentPrimary, flexShrink: 0, animation: "spin 1s linear infinite" }} />
+                                                ) : failed ? (
+                                                    <XCircle style={{ width: 14, height: 14, color: t.statusError, flexShrink: 0, opacity: 0.5 }} />
+                                                ) : (
+                                                    <div style={{ width: 14, height: 14, borderRadius: "50%", border: `2px solid ${t.borderPrimary}`, flexShrink: 0 }} />
+                                                )}
+                                                <span style={{
+                                                    fontSize: "0.78rem",
+                                                    color: done || current ? t.textPrimary : t.textMuted,
+                                                    fontWeight: current ? 700 : 500,
+                                                }}>{step.label}</span>
+                                            </div>
+                                        );
+                                    })}
+                                    {failed && (
+                                        <p style={{ fontSize: "0.72rem", color: t.statusError, marginTop: 8, lineHeight: 1.4 }}>
+                                            {job.status === "TIMED_OUT"
+                                                ? "Provisioning timed out — any charges were refunded."
+                                                : job.status === "COMPENSATED"
+                                                    ? "Provisioning failed — the VM was cleaned up and charges refunded."
+                                                    : (job.error || "Provisioning failed.")}
+                                        </p>
+                                    )}
+                                </div>
+                            );
+                        })}
+
+                        {activeJobs.every(j => TERMINAL_JOB_STATUSES.includes(j.status)) && (
+                            <button onClick={() => {
+                                setActiveJobs(null);
+                                refreshCredits();
+                                if (activeJobs.some(j => j.status === "SUCCEEDED")) router.push("/dashboard/vps");
+                            }} style={{
+                                width: "100%", padding: "11px 0", marginTop: 4,
+                                borderRadius: t.buttonRadius, border: "none", cursor: "pointer",
+                                background: t.accentPrimary, color: t.isMono ? t.bgPrimary : "#fff",
+                                fontWeight: 700, fontSize: "0.85rem",
+                            }}>
+                                {activeJobs.every(j => j.status === "SUCCEEDED") ? "View my servers" : "Close"}
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
 
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>

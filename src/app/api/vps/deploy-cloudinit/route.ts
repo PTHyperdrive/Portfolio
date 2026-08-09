@@ -16,6 +16,11 @@ import {
 } from "@/lib/proxmox";
 import { validateAndResolveTemplate, resolveTemplateVmid } from "@/config/templates";
 import { generateSecurePassword } from "@/lib/password-generator";
+import {
+    dispatchJobToN8n,
+    runProvisioningJobInline,
+    type ProvisionJobParams,
+} from "@/lib/provisioning";
 // Cloud-init password is stored AES-256-GCM encrypted at rest (same scheme as
 // the TOTP secret) so it can be revealed to the owner later without keeping
 // plaintext in the DB.
@@ -231,6 +236,138 @@ export async function POST(req: Request) {
 
         const expiresAt30d = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
         const rateMBs      = mbitToMBs(planCfg.bandwidthMbits);
+
+        // ── 6b. n8n-orchestrated path ────────────────────────────────
+        // Money moves HERE, atomically, before any hypervisor work; the
+        // async job only moves VM state and refunds via compensation on
+        // failure. Flag off (or dispatch failure) → the inline driver runs
+        // the exact same steps, so rollback is just flipping the env var.
+        if (process.env.N8N_PROVISIONING_ENABLED === "true") {
+            const order = await prisma.order.create({
+                data: {
+                    userId,
+                    serviceId: service.id,
+                    status:    "ACTIVE",
+                    totalPrice: isAdmin ? 0 : totalCost,
+                    notes: `n8n deploy: ${requestedCount}× ${plan} (${templateName}). ` +
+                           `Tickets: ${ticketsToUse.length}, Charged: ${toCharge}.`,
+                },
+            });
+
+            // Charge + mint tickets + create jobs in one transaction.
+            const jobsData: {
+                ticketId: string | null;
+                ticketWasPreexisting: boolean;
+                chargedCredits: number;
+                vmName: string;
+            }[] = [];
+            for (let i = 0; i < requestedCount; i++) {
+                const preexisting = i < ticketsToUse.length;
+                jobsData.push({
+                    ticketId: preexisting ? ticketsToUse[i].id : null,
+                    ticketWasPreexisting: preexisting,
+                    chargedCredits: preexisting || isFree || isAdmin ? 0 : planCfg.priceInCredits,
+                    vmName: requestedCount === 1 ? hostname : `${hostname}-${i + 1}`,
+                });
+            }
+
+            const jobIds = await prisma.$transaction(async tx => {
+                if (!isAdmin && totalCost > 0) {
+                    await tx.user.update({
+                        where: { id: userId },
+                        data:  { credits: { decrement: totalCost } },
+                    });
+                    await tx.creditTransaction.create({
+                        data: {
+                            userId,
+                            type:    "VM_Deduction",
+                            amount:  -totalCost,
+                            details: `Cloud-Init (n8n): ${requestedCount}× ${plan} (${templateName})`,
+                        },
+                    });
+                }
+                if (isFreeTrial) {
+                    await tx.user.update({
+                        where: { id: userId },
+                        data:  { hasUsedTrial: true },
+                    });
+                }
+                for (const t of ticketsToUse) {
+                    await tx.deploymentTicket.update({
+                        where: { id: t.id },
+                        data:  { status: "IN_USE" },
+                    });
+                }
+
+                const ids: string[] = [];
+                for (const jd of jobsData) {
+                    let ticketId = jd.ticketId;
+                    if (!ticketId && !isFree) {
+                        const t = await tx.deploymentTicket.create({
+                            data: {
+                                userId,
+                                planId:     plan,
+                                status:     "IN_USE",
+                                validUntil: expiresAt30d,
+                            },
+                        });
+                        ticketId = t.id;
+                    }
+
+                    const params: ProvisionJobParams = {
+                        vmName:        jd.vmName,
+                        ciuser,
+                        ciPasswordEnc: encryptSecret(ciPassword),
+                        sshKeys:       sshPublicKeys.trim() || undefined,
+                        templateName,
+                        knownVmid,
+                        family,
+                        chargedCredits: jd.chargedCredits,
+                        ticketWasPreexisting: jd.ticketWasPreexisting,
+                    };
+                    const job = await tx.provisioningJob.create({
+                        data: {
+                            userId,
+                            planId:     plan,
+                            templateId,
+                            params:     params as unknown as object,
+                            stepLog:    [],
+                            idempotencyKey: `${order.id}:${jd.vmName}`,
+                            orderId:    order.id,
+                            ticketId,
+                        },
+                        select: { id: true },
+                    });
+                    ids.push(job.id);
+                }
+                return ids;
+            });
+
+            // Dispatch to n8n; unreachable orchestrator → inline driver.
+            for (const jobId of jobIds) {
+                const dispatched = await dispatchJobToN8n(jobId, jobId);
+                if (!dispatched) {
+                    void runProvisioningJobInline(jobId).catch(err =>
+                        console.error(`[deploy-cloudinit] inline job ${jobId} crashed:`, err));
+                }
+            }
+
+            return NextResponse.json({
+                success:          true,
+                async:            true,
+                jobIds,
+                username:         ciuser,
+                password:         passwordWasGenerated ? ciPassword : undefined,
+                passwordGenerated: passwordWasGenerated,
+                ticketsUsed:      ticketsToUse.length,
+                instancesCharged: isAdmin ? 0 : toCharge,
+                totalCost:        isAdmin ? 0 : totalCost,
+                isFreeTrial,
+                provisionMethod:  "n8n-cloud-init",
+                message: `${requestedCount} deployment job(s) queued. ` +
+                         `Track progress on the deployment screen.`,
+            }, { status: 202 });
+        }
 
         // ── 7. Deploy each instance (sequential for unique VMIDs) ────
         const deployedVms: {

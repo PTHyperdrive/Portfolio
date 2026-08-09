@@ -8,7 +8,7 @@ import { useSession, signOut } from "next-auth/react";
 import {
     LayoutGrid, Server, Gamepad2, Cloud, Key, Globe, Settings as SettingsIcon,
     Users, History, BarChart2, Wallet, User, Sliders, MessageSquare, Ticket,
-    ChevronDown, ChevronRight, LogOut, Shield, Bot
+    ChevronDown, ChevronRight, LogOut, Shield, Bot, Mail
 } from "lucide-react";
 import ThemeToggle from "@/components/ThemeToggle";
 import { useThemeTokens } from "@/lib/useThemeTokens";
@@ -37,6 +37,7 @@ const SIDEBAR_STRUCTURE: NavGroup[] = [
             },
             { label: "Game Hosting", icon: Gamepad2, href: "/dashboard/game" },
             { label: "AI Studio", icon: Bot, href: "/dashboard/studio" },
+            { label: "Email", icon: Mail, href: "/dashboard/mail" },
             {
                 label: "Storage", icon: Cloud, href: "/dashboard/storage",
                 subItems: [

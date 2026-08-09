@@ -15,6 +15,9 @@ const ALLOWED_ORIGINS = new Set([
     'https://lab.notrespond.com',
 ]);
 
+/** The bare domain, with no subdomain in front of it. */
+const APEX_HOST = 'notrespond.com';
+
 /**
  * CSRF Origin validation for state-changing requests.
  * Compares Origin (or Referer) header against the set of allowed origins.
@@ -39,8 +42,7 @@ function validateCsrfOrigin(request: NextRequest): boolean {
     // Fall back to Referer header
     if (referer) {
         try {
-            const refOrigin = new URL(referer).origin;
-            return ALLOWED_ORIGINS.has(refOrigin);
+            return ALLOWED_ORIGINS.has(new URL(referer).origin);
         } catch {
             return false;
         }
@@ -52,6 +54,23 @@ function validateCsrfOrigin(request: NextRequest): boolean {
 
 export function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
+
+    // ── Bare domain → www ──
+    // notrespond.com and www.notrespond.com are separate DNS records and only
+    // www points at the web origin, so the bare domain is a dead end for
+    // anyone who omits the prefix. Send it to www instead.
+    //
+    // /api/ is deliberately excluded: a redirect on a POST can drop the body,
+    // and external callers (payment webhooks) are configured against the bare
+    // domain — silently redirecting those would break them.
+    const host = request.headers.get('host')?.split(':')[0].toLowerCase();
+    if (host === APEX_HOST && !pathname.startsWith('/api/')) {
+        const target = new URL(request.url);
+        target.protocol = 'https:';
+        target.host = `www.${APEX_HOST}`;
+        target.port = '';
+        return NextResponse.redirect(target, 301);
+    }
 
     // ── Block GET /api/auth/csrf ──
     // NextAuth exposes a CSRF token via GET. This is only needed internally
@@ -82,7 +101,11 @@ export function middleware(request: NextRequest) {
     // Internal cron endpoints are server-to-server (no Origin header) and are
     // authenticated by their own secret header (x-*-cron-secret), so they're
     // exempt from the browser-oriented CSRF origin check — otherwise they 403.
-    const csrfExempt = pathname === '/api/billing/cycle' || pathname === '/api/monitoring/sweep';
+    const csrfExempt = pathname === '/api/billing/cycle'
+        || pathname === '/api/monitoring/sweep'
+        || pathname === '/api/internal/provision/step'
+        || pathname === '/api/internal/provision/sweep'
+        || pathname === '/api/internal/mail/unrouted';
     if (pathname.startsWith('/api/') && !csrfExempt && !validateCsrfOrigin(request)) {
         return NextResponse.json(
             { error: 'CSRF validation failed: invalid origin' },

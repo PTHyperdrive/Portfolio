@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/api-auth";
 import { resolveNodeForUser, decryptNodeKey } from "@/lib/ai-nodes";
 import { searchKnowledge, formatContext } from "@/lib/ai-knowledge";
-import { systemPrompt, frameUntrusted } from "@/lib/ai-security";
+import { systemPrompt, supportSystemPrompt, visibilitiesForMode, frameUntrusted } from "@/lib/ai-security";
 import { audit } from "@/lib/audit";
 
 /** A turn as sent upstream. Content is a string, or parts when images ride along. */
@@ -77,7 +77,7 @@ export async function POST(req: Request) {
     const conversation = await prisma.aiConversation.findFirst({
         where: { id: conversationId, userId },
         select: {
-            id: true, nodeId: true, title: true,
+            id: true, nodeId: true, title: true, kind: true,
             showReasoning: true, reasoningEffort: true,
         },
     });
@@ -85,8 +85,15 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
     }
 
+    // The kind is read from the row, never from the request — a client cannot
+    // flip a SUPPORT thread into STUDIO privileges by sending a flag.
+    const isSupport = conversation.kind === "SUPPORT";
+
     // ── Tier gate ────────────────────────────────────────────────
-    const requestedNode = nodeId ?? conversation.nodeId ?? null;
+    // Support threads always run on the default STANDARD node: the widget
+    // offers no model picker, and a premium node request from that surface
+    // would be a smuggled parameter, not a feature.
+    const requestedNode = isSupport ? null : (nodeId ?? conversation.nodeId ?? null);
     const { node, error: nodeErr } = await resolveNodeForUser(userId, requestedNode);
 
     if (nodeErr === "FORBIDDEN") {
@@ -171,7 +178,12 @@ export async function POST(req: Request) {
 
     let retrieved: Awaited<ReturnType<typeof searchKnowledge>> = [];
     try {
-        retrieved = await searchKnowledge(content, role);
+        // Support threads retrieve PUBLIC documents only, whatever the role —
+        // the transcript is a customer-facing surface (C4, support variant).
+        retrieved = await searchKnowledge(
+            content, role, undefined,
+            visibilitiesForMode(conversation.kind, role),
+        );
     } catch (err) {
         // Retrieval is an enhancement — never fail the chat over it.
         console.error("[api/ai/chat] retrieval failed:", err);
@@ -190,7 +202,9 @@ export async function POST(req: Request) {
     const prompt: ChatTurn[] = [
         {
             role: "system",
-            content: systemPrompt({ role, tier: node.tier, hasKnowledge: retrieved.length > 0 }),
+            content: isSupport
+                ? supportSystemPrompt()
+                : systemPrompt({ role, tier: node.tier, hasKnowledge: retrieved.length > 0 }),
         },
         ...(retrieved.length > 0
             ? [{ role: "system" as const, content: frameUntrusted("knowledge_base", formatContext(retrieved)) }]

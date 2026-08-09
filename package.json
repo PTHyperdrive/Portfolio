@@ -25,7 +25,9 @@
     "@types/speakeasy": "^2.0.10",
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.3.1",
+    "imapflow": "^1.6.5",
     "lucide-react": "^1.7.0",
+    "mailparser": "^3.9.14",
     "mariadb": "^3.5.2",
     "next": "^16.2.6",
     "next-auth": "^5.0.0-beta.30",
@@ -45,6 +47,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",
+    "@types/mailparser": "^3.4.6",
     "@types/node": "^20",
     "@types/nodemailer": "^8.0.1",
     "@types/novnc__novnc": "^1.6.0",

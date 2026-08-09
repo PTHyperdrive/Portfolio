@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin-guard";
+import { requireAdmin } from "@/lib/api-auth";
 import { prisma } from "@/lib/db";
 import { hashPassword } from "@/lib/security";
 import { audit } from "@/lib/audit";

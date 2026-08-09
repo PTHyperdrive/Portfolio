@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/lib/admin-guard";
+import { requireAdmin } from "@/lib/api-auth";
 import { audit } from "@/lib/audit";
 import { PLAN_CONFIGS } from "@/lib/plan-config";
 import { resolvePeriodPrices } from "@/lib/billing-periods";

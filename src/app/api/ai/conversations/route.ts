@@ -7,18 +7,24 @@ import { resolveNodeForUser } from "@/lib/ai-nodes";
 const createSchema = z.object({
     nodeId: z.string().min(1).max(64).nullable().optional(),
     title: z.string().trim().min(1).max(200).optional(),
+    kind: z.enum(["STUDIO", "SUPPORT"]).optional(),
 });
 
 /**
  * GET /api/ai/conversations
  * The caller's chat threads, most recently used first.
+ * Defaults to STUDIO threads so support chats don't pollute the Studio
+ * sidebar; the support widget asks for its own with ?kind=SUPPORT.
  */
-export async function GET() {
+export async function GET(req: Request) {
     const { userId, error } = await requireUser();
     if (error) return error;
 
+    const kindParam = new URL(req.url).searchParams.get("kind");
+    const kind = kindParam === "SUPPORT" ? "SUPPORT" as const : "STUDIO" as const;
+
     const conversations = await prisma.aiConversation.findMany({
-        where: { userId },
+        where: { userId, kind },
         orderBy: { updatedAt: "desc" },
         take: 100,
         select: {
@@ -56,7 +62,22 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
 
-    const { nodeId = null, title } = parsed.data;
+    const { nodeId = null, title, kind = "STUDIO" } = parsed.data;
+
+    // Support chat is opt-in: the thread cannot exist before consent, so the
+    // gate lives here rather than only in the widget UI.
+    if (kind === "SUPPORT") {
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { supportChatConsentAt: true },
+        });
+        if (!user?.supportChatConsentAt) {
+            return NextResponse.json(
+                { error: "Support chat requires consent first" },
+                { status: 403 },
+            );
+        }
+    }
 
     if (nodeId) {
         const { error: nodeErr } = await resolveNodeForUser(userId, nodeId);
@@ -72,8 +93,15 @@ export async function POST(req: Request) {
     }
 
     const conversation = await prisma.aiConversation.create({
-        data: { userId, nodeId, title: title ?? "New chat" },
-        select: { id: true, title: true, nodeId: true, updatedAt: true },
+        data: {
+            userId,
+            // A support thread never pins a node — the chat route resolves the
+            // default STANDARD node on every turn.
+            nodeId: kind === "SUPPORT" ? null : nodeId,
+            kind,
+            title: title ?? (kind === "SUPPORT" ? "Support chat" : "New chat"),
+        },
+        select: { id: true, title: true, nodeId: true, kind: true, updatedAt: true },
     });
 
     return NextResponse.json({ conversation }, { status: 201 });

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { requireAdmin } from "@/lib/admin-guard";
+import { requireAdmin } from "@/lib/api-auth";
 import { getServerPlanConfigs } from "@/lib/pricing-config";
 import { resolvePeriodPrices } from "@/lib/billing-periods";
 

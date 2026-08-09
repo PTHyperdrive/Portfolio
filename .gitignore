@@ -46,3 +46,19 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+# Deployment secrets (mail server, etc.) - never commit
+**/secrets.local.md
+
+# Local agent/editor tooling. Contains absolute paths to unrelated projects.
+.claude/
+
+# ─── Operational material — this repository is PUBLIC ──────────────
+# Runbooks and the AI knowledge seed describe the internal estate:
+# hypervisor addressing, per-VM roles, GPU PCI slots, deploy procedure.
+# None of it contains credentials, but together it is a map of the
+# private network and does not belong in a world-readable repository.
+# Keep these locally and back them up somewhere private.
+infra/
+scripts/seed-ai-knowledge.cjs
+
