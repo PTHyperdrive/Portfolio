@@ -1,11 +1,30 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Terminal as TerminalIcon, Plug, PlugZap, AlertTriangle, RotateCcw, Users } from "lucide-react";
+import { Terminal as TerminalIcon, Plug, PlugZap, AlertTriangle, RotateCcw, Users, Monitor } from "lucide-react";
+import RelaySetup from "./RelaySetup";
 import { useThemeTokens } from "@/lib/useThemeTokens";
 import { useIsMobile } from "@/lib/useIsMobile";
 
 type Phase = "idle" | "connecting" | "attached" | "closed" | "error";
+
+/** One machine running an agent, as the hub reports it. */
+interface AgentInfo {
+    id: string;
+    name: string;
+    viewers: number;
+    meta?: {
+        platform?: string;
+        command?: string;
+        commandFound?: boolean;
+        commandVersion?: string | null;
+        resolvedPath?: string | null;
+        cwd?: string;
+        terminal?: string;
+        resizable?: boolean;
+        node?: string;
+    };
+}
 
 /**
  * Remote console onto a Claude Code session running on the operator's own VM.
@@ -25,16 +44,32 @@ export default function AdminRelayPage() {
     const termRef = useRef<{ dispose: () => void; write: (d: string | Uint8Array) => void } | null>(null);
     const fitRef = useRef<{ fit: () => void } | null>(null);
     const wsRef = useRef<WebSocket | null>(null);
+    /** Which agent this console is watching. A ref so the socket handler
+     *  reads it without a stale closure. */
+    const attachedRef = useRef<string | null>(null);
 
     const [phase, setPhase] = useState<Phase>("idle");
-    const [agentUp, setAgentUp] = useState(false);
-    const [viewers, setViewers] = useState(0);
+    const [agents, setAgents] = useState<AgentInfo[]>([]);
+    const [attached, setAttached] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [host, setHost] = useState("");
+
+    useEffect(() => { setHost(window.location.host); }, []);
 
     const disconnect = useCallback(() => {
         wsRef.current?.close(1000, "closed by operator");
         wsRef.current = null;
+        attachedRef.current = null;
+        setAttached(null);
         setPhase("closed");
+    }, []);
+
+    /** Point this console at one machine. Switching is just another attach. */
+    const attach = useCallback((id: string) => {
+        const ws = wsRef.current;
+        if (ws?.readyState !== WebSocket.OPEN) return;
+        termRef.current?.write("\u001b[2J\u001b[H");
+        ws.send(JSON.stringify({ type: "attach", id }));
     }, []);
 
     const connect = useCallback(async () => {
@@ -77,9 +112,16 @@ export default function AdminRelayPage() {
             }
             try {
                 const msg = JSON.parse(ev.data as string);
-                if (msg.type === "status") {
-                    setAgentUp(msg.agent === "connected");
-                    setViewers(msg.viewers ?? 0);
+                if (msg.type === "agents") {
+                    setAgents(msg.agents ?? []);
+                    // Attach to the only machine automatically; with several,
+                    // let the operator choose rather than guessing for them.
+                    if (!attachedRef.current && msg.agents?.length === 1) {
+                        attach(msg.agents[0].id);
+                    }
+                } else if (msg.type === "attached") {
+                    attachedRef.current = msg.id;
+                    setAttached(msg.id);
                 } else if (msg.type === "notice") {
                     termRef.current?.write(msg.text);
                 }
@@ -91,13 +133,15 @@ export default function AdminRelayPage() {
         ws.onerror = () => setError("The relay socket failed. Check that the server is reachable over wss.");
         ws.onclose = ev => {
             wsRef.current = null;
-            setAgentUp(false);
+            setAgents([]);
+            attachedRef.current = null;
+            setAttached(null);
             setPhase(ev.code === 1000 ? "closed" : "error");
             if (ev.code === 4401 || ev.code === 1006) {
                 setError(prev => prev ?? "The relay refused the connection — the ticket may have expired.");
             }
         };
-    }, []);
+    }, [attach]);
 
     /* ── Build the terminal once ─────────────────────────────── */
     useEffect(() => {
@@ -195,19 +239,19 @@ export default function AdminRelayPage() {
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                    <span style={{ ...chip, background: agentUp ? t.statusSuccessBg : t.bgTertiary, color: agentUp ? t.statusSuccess : t.textMuted }}>
+                    <span style={{
+                        ...chip,
+                        background: agents.length ? t.statusSuccessBg : t.bgTertiary,
+                        color: agents.length ? t.statusSuccess : t.textMuted,
+                    }}>
                         <span style={{
                             width: 6, height: 6, borderRadius: "50%",
-                            background: agentUp ? t.statusSuccess : t.textMuted,
+                            background: agents.length ? t.statusSuccess : t.textMuted,
                         }} />
-                        {agentUp ? "Agent online" : "Agent offline"}
+                        {agents.length
+                            ? `${agents.length} machine${agents.length > 1 ? "s" : ""} online`
+                            : "No agent connected"}
                     </span>
-                    {viewers > 1 && (
-                        <span style={{ ...chip, background: t.bgTertiary, color: t.textSecondary }}>
-                            <Users style={{ width: 11, height: 11 }} />
-                            {viewers} watching
-                        </span>
-                    )}
                     <button
                         onClick={() => (busy ? disconnect() : void connect())}
                         style={{
@@ -250,27 +294,88 @@ export default function AdminRelayPage() {
                 </div>
             )}
 
-            {!agentUp && phase === "attached" && (
-                <div style={{
-                    padding: "12px 15px", marginBottom: 16,
-                    borderRadius: t.cardRadius,
-                    border: `1px solid ${t.borderPrimary}`,
-                    background: t.bgTertiary, color: t.textSecondary,
-                    fontSize: "0.82rem", lineHeight: 1.55,
-                }}>
-                    Attached to the relay, but no agent is connected. Start it on the VM:
-                    <code style={{
-                        display: "block", marginTop: 8, padding: "8px 10px",
-                        borderRadius: t.buttonRadius, background: t.bgCard,
-                        fontFamily: t.fontMono, fontSize: "0.78rem", color: t.textPrimary,
-                        overflowX: "auto", whiteSpace: "pre",
-                    }}>
-{`cd relay/agent && npm install
-RELAY_URL=wss://${typeof window !== "undefined" ? window.location.host : "your-host"}/api/relay/agent \\
-RELAY_AGENT_TOKEN=… node claude-relay.mjs`}
-                    </code>
+            {/* Machine picker. Only worth showing once there is a choice. */}
+            {phase === "attached" && agents.length > 0 && (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 14 }}>
+                    {agents.map(a => {
+                        const active = attached === a.id;
+                        const broken = a.meta?.commandFound === false;
+                        return (
+                            <button
+                                key={a.id}
+                                onClick={() => attach(a.id)}
+                                title={[
+                                    a.meta?.platform,
+                                    a.meta?.commandVersion || a.meta?.command,
+                                    a.meta?.cwd,
+                                    a.meta?.terminal && `terminal: ${a.meta.terminal}${a.meta.resizable ? "" : " (fixed 80x24)"}`,
+                                ].filter(Boolean).join(" · ")}
+                                style={{
+                                    display: "inline-flex", alignItems: "center", gap: 8,
+                                    padding: "8px 13px", borderRadius: t.buttonRadius,
+                                    border: `1px solid ${active ? t.accentPrimary : t.borderPrimary}`,
+                                    background: active ? t.accentPrimaryMuted : t.bgCard,
+                                    color: active ? t.accentPrimary : t.textSecondary,
+                                    fontSize: "0.8rem", fontWeight: 600, cursor: "pointer",
+                                    fontFamily: t.fontFamily,
+                                }}
+                            >
+                                <Monitor style={{ width: 13, height: 13, flexShrink: 0 }} />
+                                {a.name}
+                                {broken && (
+                                    <span style={{
+                                        fontSize: "0.62rem", fontWeight: 800, letterSpacing: "0.04em",
+                                        padding: "1px 6px", borderRadius: 20,
+                                        background: t.statusErrorBg, color: t.statusError,
+                                    }}>
+                                        NO CLAUDE
+                                    </span>
+                                )}
+                                {a.viewers > 1 && (
+                                    <span style={{
+                                        display: "inline-flex", alignItems: "center", gap: 3,
+                                        fontSize: "0.66rem", color: t.textMuted,
+                                    }}>
+                                        <Users style={{ width: 10, height: 10 }} />{a.viewers}
+                                    </span>
+                                )}
+                            </button>
+                        );
+                    })}
                 </div>
             )}
+
+            {/* Environment trouble on the attached machine, said plainly. */}
+            {(() => {
+                const current = agents.find(a => a.id === attached);
+                if (!current || current.meta?.commandFound !== false) return null;
+                return (
+                    <div style={{
+                        display: "flex", alignItems: "flex-start", gap: 10,
+                        padding: "12px 15px", marginBottom: 14,
+                        borderRadius: t.cardRadius,
+                        border: `1px solid ${t.statusError}40`,
+                        background: t.statusErrorBg, color: t.textSecondary,
+                        fontSize: "0.82rem", lineHeight: 1.55,
+                    }}>
+                        <AlertTriangle style={{ width: 15, height: 15, flexShrink: 0, marginTop: 2, color: t.statusError }} />
+                        <span>
+                            <strong style={{ color: t.statusError }}>
+                                &ldquo;{current.meta?.command}&rdquo; is not on PATH on {current.name}
+                            </strong>{" "}
+                            ({current.meta?.platform}). A service or non-login shell has a narrower
+                            PATH than your terminal. Set{" "}
+                            <code style={{ fontFamily: t.fontMono }}>RELAY_COMMAND</code> to the full
+                            path and restart the agent, or set{" "}
+                            <code style={{ fontFamily: t.fontMono }}>RELAY_SHELL=1</code> for a plain
+                            shell to go find it.
+                        </span>
+                    </div>
+                );
+            })()}
+
+            {/* The guide stays visible until a machine is actually attached. */}
+            {!(phase === "attached" && agents.length > 0) && <RelaySetup host={host} />}
 
             <div style={{
                 borderRadius: t.cardRadius,
