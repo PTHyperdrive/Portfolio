@@ -65,7 +65,7 @@ node claude-relay.mjs
 mkdir claude-relay
 cd claude-relay
 npm init -y
-npm install ws
+npm install ws node-pty
 Invoke-WebRequest -Uri "https://www.notrespond.com/api/relay/agent-source" -Headers @{ Authorization = "Bearer PASTE_RELAY_AGENT_TOKEN" } -OutFile claude-relay.mjs
 $env:RELAY_URL = "wss://www.notrespond.com/api/relay/agent"
 $env:RELAY_AGENT_TOKEN = "PASTE_RELAY_AGENT_TOKEN"
@@ -79,7 +79,7 @@ node claude-relay.mjs
 mkdir claude-relay
 cd claude-relay
 npm init -y
-npm install ws
+npm install ws node-pty
 curl -H "Authorization: Bearer PASTE_RELAY_AGENT_TOKEN" "https://www.notrespond.com/api/relay/agent-source" -o claude-relay.mjs
 set RELAY_URL=wss://www.notrespond.com/api/relay/agent
 set RELAY_AGENT_TOKEN=PASTE_RELAY_AGENT_TOKEN
@@ -95,22 +95,36 @@ shows `C:\Users\you>`, PowerShell shows `PS C:\Users\you>`.
 
 ## Terminal quality by platform
 
-`node-pty` is a native module and optional, but what happens without it differs:
+`node-pty` is a native module. Whether it is optional depends on the platform,
+and on Windows it is not:
 
 | Platform | With node-pty | Without |
 |---|---|---|
-| Linux | full pty, resizable | `script(1)` — real pty, fixed 80×24 |
-| macOS | full pty, resizable | `script` — real pty, fixed 80×24 |
-| Windows | ConPTY, resizable | plain pipes — poor line editing and colour |
+| Linux | full pty, resizable | `script(1)` — real pty, fixed 80x24. Claude Code runs. |
+| macOS | full pty, resizable | `script` — real pty, fixed 80x24. Claude Code runs. |
+| Windows | ConPTY, resizable | **plain pipes — Claude Code will not run** |
 
-There is no `script(1)` on Windows, so node-pty matters most there. Build
-prerequisites:
+There is no `script(1)` on Windows. Given plain pipes, Claude Code sees a
+non-interactive stdin, switches to `--print` mode, waits three seconds for
+piped input and exits:
+
+```
+Error: Input must be provided either through stdin or as a prompt argument when using --print
+```
+
+The agent detects that combination and refuses to start rather than restarting
+the command in a loop, which only buries the reason. Set
+`RELAY_ALLOW_NO_PTY=1` to override it for a command that does not need a
+terminal.
+
+Build prerequisites:
 
 - Linux: `sudo apt install -y build-essential python3`
 - macOS: `xcode-select --install`
-- Windows: Visual Studio Build Tools (C++ workload)
+- Windows: Visual Studio Build Tools, C++ workload
 
-The panel shows which one an agent ended up using, so you are never guessing.
+If building it on Windows is not practical, run the agent under WSL or on a
+Linux machine instead — the relay does not care where the terminal lives.
 
 ## When `claude` is not found
 

@@ -48,6 +48,22 @@ const DEFAULT_SHELL = IS_WINDOWS ? "powershell.exe" : "bash";
 const COMMAND = process.env.RELAY_COMMAND || (WANT_SHELL ? DEFAULT_SHELL : "claude");
 const CWD = process.env.RELAY_CWD || process.env.HOME || process.env.USERPROFILE || process.cwd();
 
+/**
+ * Claude Code needs a real terminal.
+ *
+ * Handed plain pipes it sees a non-interactive stdin, switches to --print mode,
+ * waits three seconds for piped input and exits:
+ *
+ *   Error: Input must be provided either through stdin or as a prompt argument
+ *
+ * The agent would then restart it, and the whole thing becomes a loop that
+ * looks like a relay fault rather than a missing native module. So refuse up
+ * front and say which module to install. RELAY_ALLOW_NO_PTY=1 overrides it for
+ * commands that genuinely do not care.
+ */
+const NEEDS_PTY = !WANT_SHELL && /claude/i.test(COMMAND);
+const ALLOW_NO_PTY = process.env.RELAY_ALLOW_NO_PTY === "1";
+
 if (!RELAY_URL || !TOKEN) {
     console.error("RELAY_URL and RELAY_AGENT_TOKEN must both be set.");
     console.error("");
@@ -176,10 +192,35 @@ async function openTerminal() {
 
 let backoff = 1000;
 let stopping = false;
+/** Consecutive launches that died within a few seconds. */
+let fastExits = 0;
+const FAST_EXIT_MS = 5000;
+const FAST_EXIT_LIMIT = 3;
 
 async function connect() {
-    const term = preflight.commandFound ? await openTerminal() : null;
-    const terminalKind = term ? term.kind : "none";
+    let term = preflight.commandFound ? await openTerminal() : null;
+
+    // A pty-less terminal cannot run Claude Code. Drop the child rather than
+    // let it fail, exit, and be restarted every few seconds.
+    let ptyMissing = false;
+    if (term && term.kind === "pipes" && NEEDS_PTY && !ALLOW_NO_PTY) {
+        ptyMissing = true;
+        term.kill();
+        term = null;
+        console.error(
+            `[agent] node-pty is not installed, so there is no real terminal here.\n` +
+            `        ${COMMAND} needs one: without it, it reads stdin as a pipe, finds nothing,\n` +
+            `        and exits with "Input must be provided either through stdin or as a prompt".\n` +
+            `        Fix:  npm install node-pty\n` +
+            (IS_WINDOWS
+                ? `        On Windows that needs Visual Studio Build Tools (C++ workload).\n` +
+                  `        Alternatives: run this agent under WSL, or on a Linux machine instead.\n`
+                : `        Needs build-essential and python3 on Linux, or xcode-select --install on macOS.\n`) +
+            `        To run something that does not need a terminal anyway: RELAY_ALLOW_NO_PTY=1`,
+        );
+    }
+
+    const terminalKind = ptyMissing ? "none (node-pty required)" : (term ? term.kind : "none");
 
     if (term) {
         console.log(`[agent] terminal    ${term.kind}${term.resizable ? "" : " (fixed 80x24, no resize)"}`);
@@ -195,8 +236,29 @@ async function connect() {
         ws.send(JSON.stringify({
             type: "hello",
             name: NAME,
-            meta: { ...preflight, terminal: terminalKind, resizable: term?.resizable ?? false },
+            meta: {
+                ...preflight,
+                terminal: terminalKind,
+                resizable: term?.resizable ?? false,
+                ptyMissing,
+            },
         }));
+
+        if (ptyMissing) {
+            ws.send(JSON.stringify({
+                type: "notice",
+                text:
+                    `\r\n\x1b[31mnode-pty is not installed on ${NAME}, so there is no real terminal.\x1b[0m\r\n` +
+                    `${COMMAND} needs one — without it it reads stdin as a pipe, finds nothing, and exits.\r\n` +
+                    `\r\n  npm install node-pty\r\n\r\n` +
+                    (IS_WINDOWS
+                        ? `On Windows that needs Visual Studio Build Tools (C++ workload).\r\n` +
+                          `Alternatives: run the agent under WSL, or on a Linux machine.\r\n`
+                        : `Needs build-essential and python3, or xcode-select --install on macOS.\r\n`) +
+                    `Then restart the agent.\r\n`,
+            }));
+            return;
+        }
 
         if (!preflight.commandFound) {
             // Connect regardless, so the failure is visible where the operator
@@ -223,12 +285,39 @@ async function connect() {
         if (ws.readyState === WebSocket.OPEN) ws.send(chunk, { binary: true });
     });
 
+    const startedAt = Date.now();
     term?.onExit(code => {
+        const lived = Date.now() - startedAt;
+
+        // Something that dies immediately, every time, is misconfigured rather
+        // than crashed. Restarting it forever only buries the reason.
+        if (lived < FAST_EXIT_MS) fastExits += 1;
+        else fastExits = 0;
+
+        const giveUp = fastExits >= FAST_EXIT_LIMIT;
+
         if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: "notice", text: `\r\n[${COMMAND} exited with code ${code}]\r\n` }));
-            ws.close(1000, "terminal exited");
+            ws.send(JSON.stringify({
+                type: "notice",
+                text: giveUp
+                    ? `\r\n\x1b[31m${COMMAND} exited with code ${code} within ${Math.round(lived / 1000)}s, ` +
+                      `${fastExits} times running — not restarting it again.\x1b[0m\r\n` +
+                      `Something is wrong with the command or its environment rather than the relay. ` +
+                      `Check the agent's console on ${NAME}, then restart it.\r\n`
+                    : `\r\n[${COMMAND} exited with code ${code}]\r\n`,
+            }));
+            if (!giveUp) ws.close(1000, "terminal exited");
         }
-        console.log(`[agent] ${COMMAND} exited (${code}); restarting`);
+
+        if (giveUp) {
+            console.error(
+                `[agent] ${COMMAND} exited ${fastExits} times within ${FAST_EXIT_MS / 1000}s. ` +
+                `Not restarting — fix the command or its environment, then start the agent again.`,
+            );
+            stopping = true;
+            return;
+        }
+        console.log(`[agent] ${COMMAND} exited (${code}) after ${lived}ms; restarting`);
     });
 
     ws.on("message", (data, isBinary) => {

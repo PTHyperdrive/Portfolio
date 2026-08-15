@@ -73,7 +73,7 @@ export default function RelaySetup({ host }: { host: string }) {
         powershell: `mkdir claude-relay
 cd claude-relay
 npm init -y
-npm install ws
+npm install ws node-pty
 Invoke-WebRequest -Uri "${srcUrl}" -Headers @{ Authorization = "Bearer ${TOKEN}" } -OutFile claude-relay.mjs
 $env:RELAY_URL = "${wsUrl}"
 $env:RELAY_AGENT_TOKEN = "${TOKEN}"
@@ -83,7 +83,7 @@ node claude-relay.mjs`,
         cmd: `mkdir claude-relay
 cd claude-relay
 npm init -y
-npm install ws
+npm install ws node-pty
 curl -f -H "Authorization: Bearer ${TOKEN}" "${srcUrl}" -o claude-relay.mjs
 set RELAY_URL=${wsUrl}
 set RELAY_AGENT_TOKEN=${TOKEN}
@@ -112,31 +112,37 @@ node claude-relay.mjs`,
     const ptyNote: Record<Shell, React.ReactNode> = {
         powershell: (
             <>
-                Optional but worth it: <code>npm install node-pty</code> gives a real terminal via
-                ConPTY, with resizing. Without it the agent falls back to plain pipes — it works,
-                but line editing and colour are poor. It needs Visual Studio Build Tools (C++
-                workload) to compile.
+                <strong style={{ color: t.statusWarning }}>node-pty is required here, not optional.</strong>{" "}
+                Windows has no <code>script(1)</code> to fall back on, and without a real terminal
+                Claude Code sees a non-interactive pipe, switches to <code>--print</code> mode,
+                finds no piped input and exits with &ldquo;Input must be provided either through
+                stdin or as a prompt argument&rdquo;. Compiling it needs Visual Studio Build Tools
+                (C++ workload). If that is not practical, run the agent under WSL or on a Linux
+                machine instead.
             </>
         ),
         cmd: (
             <>
-                Optional but worth it: <code>npm install node-pty</code> gives a real terminal via
-                ConPTY. Without it the agent falls back to plain pipes — usable, but line editing
-                and colour are poor. Needs Visual Studio Build Tools (C++ workload).
+                <strong style={{ color: t.statusWarning }}>node-pty is required here, not optional.</strong>{" "}
+                Windows has no <code>script(1)</code> fallback, and without a real terminal Claude
+                Code exits immediately with &ldquo;Input must be provided either through stdin or
+                as a prompt argument&rdquo;. Needs Visual Studio Build Tools (C++ workload);
+                otherwise use WSL or a Linux machine.
             </>
         ),
         linux: (
             <>
                 Optional: <code>npm install node-pty</code> adds resizing. Without it the agent uses{" "}
-                <code>script(1)</code>, which is still a real terminal but fixed at 80×24. Needs{" "}
-                <code>build-essential</code> and <code>python3</code>.
+                <code>script(1)</code>, which is still a real terminal — so Claude Code runs — but
+                fixed at 80×24. Building it needs <code>build-essential</code> and{" "}
+                <code>python3</code>.
             </>
         ),
         macos: (
             <>
                 Optional: <code>npm install node-pty</code> adds resizing. Without it the agent uses{" "}
-                <code>script</code>, a real terminal fixed at 80×24. Needs{" "}
-                <code>xcode-select --install</code>.
+                <code>script</code>, a real terminal fixed at 80×24, which Claude Code is happy
+                with. Building it needs <code>xcode-select --install</code>.
             </>
         ),
     };
