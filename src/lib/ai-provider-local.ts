@@ -34,6 +34,50 @@ function authHeaders(node: AiNode): Record<string, string> {
     return key ? { Authorization: `Bearer ${key}` } : {};
 }
 
+/**
+ * Turn a transport failure into something an operator can act on.
+ *
+ * `AbortSignal.timeout()` rejects with "The operation was aborted due to
+ * timeout", which says nothing about which host, or whether the box is off,
+ * the port is closed, or the model is simply slow to load. That message was
+ * being surfaced verbatim in the admin panel and read as an application bug
+ * rather than an unreachable machine.
+ */
+function describeTransportError(node: AiNode, err: unknown, timeoutMs: number): string {
+    const host = node.baseUrl ? new URL(node.baseUrl).host : "the configured host";
+    const raw = err instanceof Error ? err.message : String(err);
+
+    if (err instanceof Error && (err.name === "TimeoutError" || /aborted due to timeout/i.test(raw))) {
+        return `${host} did not answer within ${timeoutMs / 1000}s — the machine is off, ` +
+            `the runtime is not listening, or a firewall is dropping the connection.`;
+    }
+    if (/ECONNREFUSED|refused/i.test(raw)) {
+        return `${host} refused the connection — the machine is up but nothing is serving on that port.`;
+    }
+    if (/EHOSTUNREACH|ENETUNREACH|unreachable/i.test(raw)) {
+        return `${host} is not reachable from the web server — check routing and firewall rules.`;
+    }
+    if (/ENOTFOUND|getaddrinfo/i.test(raw)) {
+        return `${host} could not be resolved — check the hostname in this node's base URL.`;
+    }
+    return `${host}: ${raw}`;
+}
+
+/**
+ * LM Studio and friends serve the OpenAI routes under /v1. A base URL without
+ * it produces a 404 on every call, which reads as "model not found" rather
+ * than "wrong URL" — so say it plainly when the shape looks wrong.
+ */
+function looksMissingVersionPrefix(baseUrl: string | null): boolean {
+    if (!baseUrl) return false;
+    try {
+        const path = new URL(baseUrl).pathname.replace(/\/$/, "");
+        return path === "";
+    } catch {
+        return false;
+    }
+}
+
 export const localAdapter: ProviderAdapter = {
     kind: "LOCAL",
     vendor: "Local",
@@ -146,12 +190,27 @@ export const localAdapter: ProviderAdapter = {
     },
 
     async probe(node) {
+        // 5s was too tight: a runtime that is still loading a model answers
+        // late rather than never, and reporting that as "offline" sends the
+        // operator looking for a network fault that does not exist.
+        const timeoutMs = 12_000;
+
         try {
             const res = await fetch(endpoint(node, "/models"), {
                 headers: authHeaders(node),
-                signal: AbortSignal.timeout(5000),
+                signal: AbortSignal.timeout(timeoutMs),
             });
-            if (!res.ok) return { ok: false, detail: `HTTP ${res.status}` };
+
+            if (res.status === 404 && looksMissingVersionPrefix(node.baseUrl)) {
+                return {
+                    ok: false,
+                    detail:
+                        `${node.baseUrl} returned 404. LM Studio serves the OpenAI routes under ` +
+                        `/v1 — the base URL is probably missing it.`,
+                };
+            }
+            if (!res.ok) return { ok: false, detail: `HTTP ${res.status} from ${node.baseUrl}` };
+
             const body = await res.json();
             const ids: string[] = (body?.data ?? [])
                 .map((m: { id?: string }) => m.id)
@@ -160,7 +219,7 @@ export const localAdapter: ProviderAdapter = {
                 ? { ok: true, detail: `reachable, but "${node.modelId}" is not loaded (${ids.join(", ")})` }
                 : { ok: true, detail: "reachable" };
         } catch (err) {
-            return { ok: false, detail: err instanceof Error ? err.message : "unreachable" };
+            return { ok: false, detail: describeTransportError(node, err, timeoutMs) };
         }
     },
 };
