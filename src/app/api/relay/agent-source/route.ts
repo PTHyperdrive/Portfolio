@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { authenticateAgentSecret } from "../../../../../lib/relay-agent-auth.mjs";
+import { prisma } from "@/lib/db";
+import { deriveAgentSecret, secretsEqual } from "../../../../../lib/relay-agent-crypto.mjs";
 
 /**
  * GET /api/relay/agent-source
@@ -29,8 +30,22 @@ export async function GET(req: Request) {
     // The machine has no agent yet, so it presents its static per-machine
     // secret rather than a rolling proof. Revoking that machine closes this
     // too, which is the point of moving off one shared token.
-    const name = await authenticateAgentSecret(secret);
-    if (!name) {
+    //
+    // Prisma rather than the mariadb helper server.mjs uses: Next's bundler
+    // rewrites that module's createRequire("mariadb") into something broken,
+    // which surfaced as a 500 reading "_.createPool is not a function".
+    if (!/^[a-f0-9]{64}$/i.test(secret)) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const machines = await prisma.relayAgent.findMany({
+        where: { revokedAt: null },
+        select: { name: true, generation: true },
+    });
+    const match = machines.find(m =>
+        secretsEqual(secret.toLowerCase(), deriveAgentSecret(m.name, m.generation)));
+
+    if (!match) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

@@ -6,6 +6,64 @@ import {
 } from "lucide-react";
 import { useThemeTokens } from "@/lib/useThemeTokens";
 
+type Shell = "cmd" | "powershell" | "unix";
+
+const SHELL_LABELS: Record<Shell, string> = {
+    cmd: "Windows · cmd.exe",
+    powershell: "Windows · PowerShell",
+    unix: "Linux / macOS",
+};
+
+/**
+ * The whole setup, with this machine's own name and secret already in it.
+ *
+ * A placeholder to substitute by hand cost two debugging rounds: it was pasted
+ * verbatim into the download command, the request 401'd, and the failure only
+ * showed up two steps later as node reporting a syntax error in a file that was
+ * really a JSON error body. Nothing here needs editing.
+ */
+function setupFor(shell: Shell, host: string, name: string, secret: string): string {
+    const src = `https://${host}/api/relay/agent-source`;
+    const ws = `wss://${host}/api/relay/agent`;
+
+    if (shell === "powershell") {
+        return [
+            "mkdir claude-relay -Force",
+            "cd claude-relay",
+            "npm init -y",
+            "npm install ws node-pty",
+            `Invoke-WebRequest -Uri "${src}" -Headers @{ Authorization = "Bearer ${secret}" } -OutFile claude-relay.mjs`,
+            `$env:RELAY_URL = "${ws}"`,
+            `$env:RELAY_AGENT_NAME = "${name}"`,
+            `$env:RELAY_AGENT_SECRET = "${secret}"`,
+            "node claude-relay.mjs",
+        ].join("\n");
+    }
+    if (shell === "cmd") {
+        return [
+            "mkdir claude-relay",
+            "cd claude-relay",
+            "npm init -y",
+            "npm install ws node-pty",
+            `curl -f -H "Authorization: Bearer ${secret}" "${src}" -o claude-relay.mjs`,
+            `set RELAY_URL=${ws}`,
+            `set RELAY_AGENT_NAME=${name}`,
+            `set RELAY_AGENT_SECRET=${secret}`,
+            "node claude-relay.mjs",
+        ].join("\n");
+    }
+    return [
+        "mkdir -p ~/claude-relay && cd ~/claude-relay",
+        "npm init -y",
+        "npm install ws node-pty",
+        `curl -fsSL -H "Authorization: Bearer ${secret}" "${src}" -o claude-relay.mjs`,
+        `export RELAY_URL="${ws}"`,
+        `export RELAY_AGENT_NAME="${name}"`,
+        `export RELAY_AGENT_SECRET="${secret}"`,
+        "node claude-relay.mjs",
+    ].join("\n");
+}
+
 interface AgentKey {
     id: string;
     name: string;
@@ -39,6 +97,7 @@ export default function AgentKeys({ host }: { host: string }) {
     const [busy, setBusy] = useState<string | null>(null);
     const [shown, setShown] = useState<Set<string>>(new Set());
     const [copied, setCopied] = useState<string | null>(null);
+    const [shell, setShell] = useState<Shell>("cmd");
 
     const load = useCallback(async () => {
         try {
@@ -252,20 +311,56 @@ export default function AgentKeys({ host }: { host: string }) {
                         </div>
 
                         {shown.has(k.id) && k.secret && (
-                            <div style={{
-                                display: "flex", alignItems: "center", gap: 8, marginTop: 8,
-                                padding: "7px 10px", borderRadius: t.buttonRadius,
-                                background: t.isLight ? "#f6f8fa" : "#0d1117",
-                                border: `1px solid ${t.borderPrimary}`,
-                            }}>
-                                <code style={{ ...mono, flex: 1, wordBreak: "break-all", color: t.textPrimary }}>
-                                    {k.secret}
-                                </code>
-                                <button onClick={() => copy(k.id, k.secret!)} style={iconBtn(t)}>
-                                    {copied === k.id
-                                        ? <Check style={{ width: 12, height: 12 }} />
-                                        : <Copy style={{ width: 12, height: 12 }} />}
-                                </button>
+                            <div style={{ marginTop: 10 }}>
+                                <div style={{ display: "flex", gap: 6, marginBottom: 7, flexWrap: "wrap" }}>
+                                    {(Object.keys(SHELL_LABELS) as Shell[]).map(sh => (
+                                        <button
+                                            key={sh}
+                                            onClick={() => setShell(sh)}
+                                            style={{
+                                                padding: "3px 10px", borderRadius: t.buttonRadius,
+                                                border: `1px solid ${shell === sh ? t.accentPrimary : t.borderPrimary}`,
+                                                background: shell === sh ? t.accentPrimaryMuted : "transparent",
+                                                color: shell === sh ? t.accentPrimary : t.textMuted,
+                                                fontSize: "0.7rem", fontWeight: 600, cursor: "pointer",
+                                                fontFamily: t.fontFamily,
+                                            }}
+                                        >
+                                            {SHELL_LABELS[sh]}
+                                        </button>
+                                    ))}
+                                    <button
+                                        onClick={() => copy(k.id, setupFor(shell, host, k.name, k.secret!))}
+                                        style={{
+                                            marginLeft: "auto",
+                                            display: "inline-flex", alignItems: "center", gap: 5,
+                                            padding: "3px 10px", borderRadius: t.buttonRadius,
+                                            border: `1px solid ${t.borderPrimary}`,
+                                            background: t.bgCard, color: t.textMuted,
+                                            fontSize: "0.7rem", fontWeight: 600, cursor: "pointer",
+                                            fontFamily: t.fontFamily,
+                                        }}
+                                    >
+                                        {copied === k.id
+                                            ? <><Check style={{ width: 11, height: 11 }} /> Copied</>
+                                            : <><Copy style={{ width: 11, height: 11 }} /> Copy setup</>}
+                                    </button>
+                                </div>
+                                <pre style={{
+                                    margin: 0, padding: "10px 12px", overflowX: "auto",
+                                    borderRadius: t.buttonRadius,
+                                    background: t.isLight ? "#f6f8fa" : "#0d1117",
+                                    border: `1px solid ${t.borderPrimary}`,
+                                    fontFamily: t.fontMono, fontSize: "0.72rem", lineHeight: 1.65,
+                                    color: t.isLight ? t.textPrimary : "#e6edf3",
+                                }}>
+                                    <code>{setupFor(shell, host, k.name, k.secret)}</code>
+                                </pre>
+                                <p style={{ marginTop: 6, fontSize: "0.73rem", color: t.textMuted }}>
+                                    Complete as it stands — the name and secret for{" "}
+                                    <strong style={{ color: t.textPrimary }}>{k.name}</strong> are
+                                    already in it. Nothing to substitute.
+                                </p>
                             </div>
                         )}
                     </div>
@@ -274,9 +369,9 @@ export default function AgentKeys({ host }: { host: string }) {
 
             {keys.length > 0 && (
                 <p style={{ marginTop: 10, color: t.textMuted, fontSize: "0.78rem" }}>
-                    On the machine: <code style={mono}>RELAY_AGENT_NAME</code> must match the name
-                    here, and <code style={mono}>RELAY_AGENT_SECRET</code> its secret. The relay URL
-                    is <code style={mono}>wss://{host}/api/relay/agent</code>.
+                    Press the eye on a machine for its full setup command, ready to paste on that
+                    box. <code style={mono}>RELAY_AGENT_NAME</code> must match the name here exactly
+                    — the server authenticates the credential, not the announcement.
                 </p>
             )}
         </div>

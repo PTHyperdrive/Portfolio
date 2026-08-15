@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/api-auth";
-import { deriveAgentSecret } from "../../../../../../../lib/relay-agent-auth.mjs";
+import { deriveAgentSecret } from "../../../../../../../lib/relay-agent-crypto.mjs";
 import { audit } from "@/lib/audit";
 
 export const dynamic = "force-dynamic";
