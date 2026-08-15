@@ -1,5 +1,6 @@
 "use client";
 
+import { apiFetch } from "@/lib/api-client";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Cpu, ChevronDown, Lock, Circle, Check, Loader2, AlertTriangle } from "lucide-react";
 import { useThemeTokens } from "@/lib/useThemeTokens";
@@ -60,7 +61,7 @@ export default function ModelPicker({
             };
         });
         try {
-            const res = await fetch(`/api/ai/nodes/${nodeId}/models`);
+            const res = await apiFetch(`/api/ai/nodes/${nodeId}/models`);
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Could not list models");
             setCatalog(prev => ({

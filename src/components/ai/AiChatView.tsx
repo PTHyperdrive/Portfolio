@@ -1,5 +1,6 @@
 "use client";
 
+import { apiFetch } from "@/lib/api-client";
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
     Send, Square, Copy, Check, Bot, User as UserIcon,
@@ -95,7 +96,7 @@ export default function AiChatView({
         let cancelled = false;
         (async () => {
             try {
-                const res = await fetch("/api/ai/nodes");
+                const res = await apiFetch("/api/ai/nodes");
                 if (!res.ok) throw new Error("Failed to load models");
                 const data = await res.json();
                 if (cancelled) return;
@@ -113,7 +114,7 @@ export default function AiChatView({
     /* ── Skills the user may attach ────────────────────────────── */
     const loadSkills = useCallback(async () => {
         try {
-            const res = await fetch("/api/ai/skills");
+            const res = await apiFetch("/api/ai/skills");
             if (!res.ok) return;
             const data = await res.json();
             setSkills(data.skills);
@@ -134,7 +135,7 @@ export default function AiChatView({
     const hydrate = useCallback(async (id: string) => {
         setLoadingThread(true);
         try {
-            const res = await fetch(`/api/ai/conversations/${id}`);
+            const res = await apiFetch(`/api/ai/conversations/${id}`);
             if (!res.ok) throw new Error();
             const data = await res.json();
             // A slow response for a thread we have since left must not land.
@@ -225,7 +226,7 @@ export default function AiChatView({
         setSkillIds(ids);
         const thread = threadRef.current;
         if (!thread) return;
-        void fetch(`/api/ai/conversations/${thread}`, {
+        void apiFetch(`/api/ai/conversations/${thread}`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ skillIds: ids }),
@@ -256,7 +257,7 @@ export default function AiChatView({
         // A thread must exist before we can stream into it.
         if (!threadRef.current) {
             try {
-                const res = await fetch("/api/ai/conversations", {
+                const res = await apiFetch("/api/ai/conversations", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     // Title it up front so the sidebar row reads correctly from
@@ -278,7 +279,7 @@ export default function AiChatView({
                 // Attach the skills the user picked before sending, so the
                 // very first message is answered with them already applied.
                 if (skillIds.length) {
-                    await fetch(`/api/ai/conversations/${data.conversation.id}`, {
+                    await apiFetch(`/api/ai/conversations/${data.conversation.id}`, {
                         method: "PATCH",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ skillIds }),
@@ -316,7 +317,7 @@ export default function AiChatView({
         abortRef.current = controller;
 
         try {
-            const res = await fetch("/api/ai/chat", {
+            const res = await apiFetch("/api/ai/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -525,7 +526,7 @@ export default function AiChatView({
             const form = new FormData();
             for (const file of Array.from(picked).slice(0, 10)) form.append("files", file);
 
-            const res = await fetch("/api/ai/files", { method: "POST", body: form });
+            const res = await apiFetch("/api/ai/files", { method: "POST", body: form });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error ?? "Upload failed.");
 

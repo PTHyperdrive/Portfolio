@@ -1110,6 +1110,8 @@ enum AuditAction {
   // Claude Code relay — a terminal on the operator's own machine is the most
   // privileged surface here, so every attach is recorded.
   ADMIN_RELAY_ATTACH
+  // Successful TOTP entry at the unlisted vault page.
+  ADMIN_VAULT_LOGIN
   // User-authored skills
   AI_SKILL_CREATE
   AI_SKILL_UPDATE

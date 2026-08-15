@@ -1,5 +1,6 @@
 "use client";
 
+import { apiFetch } from "@/lib/api-client";
 import { useState, useEffect, useCallback } from "react";
 import {
     X, Plus, Trash2, Save, Wand2, Users, FileText, AlertTriangle, Paperclip,
@@ -61,7 +62,7 @@ export default function SkillManager({
 
     const load = useCallback(async () => {
         try {
-            const res = await fetch("/api/ai/skills");
+            const res = await apiFetch("/api/ai/skills");
             if (!res.ok) throw new Error();
             const data = await res.json();
             setSkills(data.skills);
@@ -77,7 +78,7 @@ export default function SkillManager({
     const edit = async (id: string) => {
         setError(null);
         try {
-            const res = await fetch(`/api/ai/skills/${id}`);
+            const res = await apiFetch(`/api/ai/skills/${id}`);
             if (!res.ok) throw new Error();
             const { skill } = await res.json();
             setDraft({
@@ -112,7 +113,7 @@ export default function SkillManager({
         };
 
         try {
-            const res = await fetch(
+            const res = await apiFetch(
                 draft.id ? `/api/ai/skills/${draft.id}` : "/api/ai/skills",
                 {
                     method: draft.id ? "PATCH" : "POST",
@@ -135,7 +136,7 @@ export default function SkillManager({
     const remove = async (id: string) => {
         setBusy(true);
         try {
-            const res = await fetch(`/api/ai/skills/${id}`, { method: "DELETE" });
+            const res = await apiFetch(`/api/ai/skills/${id}`, { method: "DELETE" });
             if (!res.ok) throw new Error();
             if (draft.id === id) setDraft(EMPTY);
             await load();

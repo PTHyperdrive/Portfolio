@@ -1,5 +1,6 @@
 "use client";
 
+import { apiFetch } from "@/lib/api-client";
 import { useState, useEffect, useCallback } from "react";
 import { X } from "lucide-react";
 import { useIsMobile } from "@/lib/useIsMobile";
@@ -18,7 +19,7 @@ export default function AiStudioPage() {
 
     const loadConversations = useCallback(async () => {
         try {
-            const res = await fetch("/api/ai/conversations");
+            const res = await apiFetch("/api/ai/conversations");
             if (!res.ok) return;
             const data = await res.json();
             setConversations(data.conversations);
@@ -45,7 +46,7 @@ export default function AiStudioPage() {
         setConversations(prev => prev.filter(c => c.id !== id));
         if (activeId === id) setActiveId(null);
         try {
-            await fetch(`/api/ai/conversations/${id}`, { method: "DELETE" });
+            await apiFetch(`/api/ai/conversations/${id}`, { method: "DELETE" });
         } finally {
             loadConversations();
         }
