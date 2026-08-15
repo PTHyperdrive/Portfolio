@@ -6,10 +6,6 @@ export const CLAUDE_OAUTH_AUTHORIZE_URL = "https://claude.ai/oauth/authorize";
 export const CLAUDE_OAUTH_TOKEN_URL = "https://platform.claude.com/v1/oauth/token";
 export const CLAUDE_OAUTH_REDIRECT_URI = "https://platform.claude.com/oauth/code/callback";
 
-const CLAUDE_TOKEN_ENDPOINTS = [
-    "https://platform.claude.com/v1/oauth/token",
-    "https://console.anthropic.com/v1/oauth/tokens",
-];
 
 export interface PKCEPair {
     codeVerifier: string;
@@ -193,6 +189,64 @@ function formatOAuthErrorMessage(data: Record<string, unknown>, fallbackStatus: 
     return `OAuth request failed with HTTP ${fallbackStatus}`;
 }
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * POST to the token endpoint with automatic retry on 429.
+ *
+ * Anthropic rate-limits the token endpoint aggressively — a single extra
+ * request is enough to trip it. We retry up to 3 times with exponential
+ * back-off (2 s → 4 s → 8 s) so the admin does not have to click again.
+ */
+async function tokenRequest(
+    body: Record<string, string>,
+    maxRetries = 3,
+): Promise<Record<string, unknown>> {
+    let lastStatus = 0;
+    let lastData: Record<string, unknown> = {};
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        const res = await fetch(CLAUDE_OAUTH_TOKEN_URL, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded",
+                Accept: "application/json",
+                "User-Agent": "claude-code/0.2.29",
+            },
+            body: new URLSearchParams(body).toString(),
+        });
+
+        lastStatus = res.status;
+        lastData = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+
+        if (res.status === 429) {
+            // Read Retry-After header if present, otherwise exponential back-off
+            const retryAfter = res.headers.get("retry-after");
+            const waitMs = retryAfter
+                ? Math.min(parseInt(retryAfter, 10) * 1000, 30_000)
+                : 2000 * Math.pow(2, attempt);
+
+            if (attempt < maxRetries) {
+                console.log(`[claude-oauth] 429 rate-limited, retrying in ${waitMs}ms (attempt ${attempt + 1}/${maxRetries})`);
+                await sleep(waitMs);
+                continue;
+            }
+        }
+
+        if (res.status === 404 || res.status === 403) {
+            throw new Error(`Endpoint returned HTTP ${res.status}`);
+        }
+
+        if (!res.ok) {
+            throw new Error(formatOAuthErrorMessage(lastData, res.status));
+        }
+
+        return lastData;
+    }
+
+    throw new Error(formatOAuthErrorMessage(lastData, lastStatus));
+}
+
 /**
  * Exchange an OAuth authorization code for a Claude subscription token.
  */
@@ -207,95 +261,27 @@ export async function exchangeClaudeCode(params: {
         return { accessToken: code };
     }
 
-    let lastError: Error | null = null;
+    const data = await tokenRequest({
+        grant_type: "authorization_code",
+        client_id: CLAUDE_OAUTH_CLIENT_ID,
+        code,
+        redirect_uri: params.redirectUri,
+        code_verifier: params.codeVerifier,
+    });
 
-    for (const endpoint of CLAUDE_TOKEN_ENDPOINTS) {
-        try {
-            const res = await fetch(endpoint, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
-                    Accept: "application/json",
-                    "User-Agent": "Claude-Code/0.2.29",
-                },
-                body: new URLSearchParams({
-                    grant_type: "authorization_code",
-                    client_id: CLAUDE_OAUTH_CLIENT_ID,
-                    code,
-                    redirect_uri: params.redirectUri,
-                    code_verifier: params.codeVerifier,
-                }).toString(),
-            });
-
-            const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-
-            if (res.status === 429) {
-                throw new Error(formatOAuthErrorMessage(data, 429));
-            }
-
-            if (res.status === 404 || res.status === 403) continue;
-
-            if (!res.ok) {
-                throw new Error(formatOAuthErrorMessage(data, res.status));
-            }
-
-            return readTokenResponse(data);
-        } catch (err) {
-            if (err instanceof Error && err.message.includes("429")) {
-                throw err;
-            }
-            if (err instanceof Error && (err.message.includes("404") || err.message.includes("403"))) continue;
-            lastError = err instanceof Error ? err : new Error(String(err));
-        }
-    }
-
-    throw lastError || new Error("OAuth token exchange failed. Verify authorization code.");
+    return readTokenResponse(data);
 }
 
 /**
  * Trade a refresh token for a fresh access token.
  */
 export async function refreshClaudeToken(refreshToken: string): Promise<ClaudeTokens> {
-    let lastError: Error | null = null;
+    const data = await tokenRequest({
+        grant_type: "refresh_token",
+        client_id: CLAUDE_OAUTH_CLIENT_ID,
+        refresh_token: refreshToken,
+    });
 
-    for (const endpoint of CLAUDE_TOKEN_ENDPOINTS) {
-        try {
-            const res = await fetch(endpoint, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
-                    Accept: "application/json",
-                    "User-Agent": "Claude-Code/0.2.29",
-                },
-                body: new URLSearchParams({
-                    grant_type: "refresh_token",
-                    client_id: CLAUDE_OAUTH_CLIENT_ID,
-                    refresh_token: refreshToken,
-                }).toString(),
-            });
-
-            const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-
-            if (res.status === 429) {
-                throw new Error(formatOAuthErrorMessage(data, 429));
-            }
-
-            if (res.status === 404 || res.status === 403) continue;
-
-            if (!res.ok) {
-                throw new Error(formatOAuthErrorMessage(data, res.status));
-            }
-
-            const tokens = readTokenResponse(data);
-            return { ...tokens, refreshToken: tokens.refreshToken ?? refreshToken };
-        } catch (err) {
-            if (err instanceof Error && err.message.includes("429")) {
-                throw err;
-            }
-            if (err instanceof Error && (err.message.includes("404") || err.message.includes("403"))) continue;
-            lastError = err instanceof Error ? err : new Error(String(err));
-        }
-    }
-
-    throw lastError || new Error("OAuth refresh token endpoint returned HTTP error.");
+    const tokens = readTokenResponse(data);
+    return { ...tokens, refreshToken: tokens.refreshToken ?? refreshToken };
 }
