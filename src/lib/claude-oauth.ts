@@ -3,16 +3,12 @@ import crypto from "crypto";
 /** Default Anthropic / Claude Code OAuth client id */
 export const CLAUDE_OAUTH_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 export const CLAUDE_OAUTH_AUTHORIZE_URL = "https://claude.ai/oauth/authorize";
-export const CLAUDE_OAUTH_TOKEN_URL = "https://console.anthropic.com/v1/oauth/tokens";
+export const CLAUDE_OAUTH_TOKEN_URL = "https://platform.claude.com/v1/oauth/token";
 export const CLAUDE_OAUTH_REDIRECT_URI = "https://platform.claude.com/oauth/code/callback";
 
 const CLAUDE_TOKEN_ENDPOINTS = [
     "https://platform.claude.com/v1/oauth/token",
-    "https://platform.claude.com/oauth/token",
     "https://console.anthropic.com/v1/oauth/tokens",
-    "https://console.anthropic.com/v1/oauth/token",
-    "https://api.anthropic.com/v1/oauth/tokens",
-    "https://api.anthropic.com/v1/oauth/token",
 ];
 
 export interface PKCEPair {
@@ -175,6 +171,9 @@ function readTokenResponse(data: Record<string, unknown>): ClaudeTokens {
 }
 
 function formatOAuthErrorMessage(data: Record<string, unknown>, fallbackStatus: number): string {
+    if (fallbackStatus === 429) {
+        return "Anthropic rate limit reached (HTTP 429). Please wait a moment before trying again, or use Option 2 CLI extraction.";
+    }
     if (typeof data.error_description === "string" && data.error_description) {
         return data.error_description;
     }
@@ -184,7 +183,7 @@ function formatOAuthErrorMessage(data: Record<string, unknown>, fallbackStatus: 
     if (data.error && typeof data.error === "object") {
         const errObj = data.error as Record<string, unknown>;
         if (typeof errObj.message === "string" && errObj.message) {
-            return errObj.message;
+            return typeof errObj.type === "string" ? `${errObj.type}: ${errObj.message}` : errObj.message;
         }
         return JSON.stringify(errObj);
     }
@@ -228,9 +227,13 @@ export async function exchangeClaudeCode(params: {
                 }).toString(),
             });
 
-            if (res.status === 404 || res.status === 403) continue;
-
             const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+
+            if (res.status === 429) {
+                throw new Error(formatOAuthErrorMessage(data, 429));
+            }
+
+            if (res.status === 404 || res.status === 403) continue;
 
             if (!res.ok) {
                 throw new Error(formatOAuthErrorMessage(data, res.status));
@@ -238,12 +241,15 @@ export async function exchangeClaudeCode(params: {
 
             return readTokenResponse(data);
         } catch (err) {
+            if (err instanceof Error && err.message.includes("429")) {
+                throw err;
+            }
             if (err instanceof Error && (err.message.includes("404") || err.message.includes("403"))) continue;
             lastError = err instanceof Error ? err : new Error(String(err));
         }
     }
 
-    throw lastError || new Error("OAuth token exchange failed across all endpoints. Verify authorization code.");
+    throw lastError || new Error("OAuth token exchange failed. Verify authorization code.");
 }
 
 /**
@@ -268,9 +274,13 @@ export async function refreshClaudeToken(refreshToken: string): Promise<ClaudeTo
                 }).toString(),
             });
 
-            if (res.status === 404 || res.status === 403) continue;
-
             const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+
+            if (res.status === 429) {
+                throw new Error(formatOAuthErrorMessage(data, 429));
+            }
+
+            if (res.status === 404 || res.status === 403) continue;
 
             if (!res.ok) {
                 throw new Error(formatOAuthErrorMessage(data, res.status));
@@ -279,6 +289,9 @@ export async function refreshClaudeToken(refreshToken: string): Promise<ClaudeTo
             const tokens = readTokenResponse(data);
             return { ...tokens, refreshToken: tokens.refreshToken ?? refreshToken };
         } catch (err) {
+            if (err instanceof Error && err.message.includes("429")) {
+                throw err;
+            }
             if (err instanceof Error && (err.message.includes("404") || err.message.includes("403"))) continue;
             lastError = err instanceof Error ? err : new Error(String(err));
         }
