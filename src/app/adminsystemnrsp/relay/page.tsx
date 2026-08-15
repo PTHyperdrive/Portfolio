@@ -41,7 +41,12 @@ export default function AdminRelayPage() {
     const isMobile = useIsMobile();
 
     const hostRef = useRef<HTMLDivElement>(null);
-    const termRef = useRef<{ dispose: () => void; write: (d: string | Uint8Array) => void } | null>(null);
+    const termRef = useRef<{
+        dispose: () => void;
+        write: (d: string | Uint8Array) => void;
+        cols: number;
+        rows: number;
+    } | null>(null);
     const fitRef = useRef<{ fit: () => void } | null>(null);
     const wsRef = useRef<WebSocket | null>(null);
     /** Which agent this console is watching. A ref so the socket handler
@@ -62,6 +67,23 @@ export default function AdminRelayPage() {
         attachedRef.current = null;
         setAttached(null);
         setPhase("closed");
+    }, []);
+
+    /**
+     * Measure the terminal and tell the agent.
+     *
+     * Claude Code lays its whole UI out against the terminal width it is told
+     * about. If that is wrong the box borders wrap and the screen looks
+     * shredded — which is exactly what happened, because the only resize was
+     * sent on socket open, before this console had attached to any agent, and
+     * the hub drops control frames from a viewer that is not watching anything.
+     */
+    const syncSize = useCallback(() => {
+        const ws = wsRef.current;
+        const term = termRef.current;
+        if (!term || ws?.readyState !== WebSocket.OPEN) return;
+        fitRef.current?.fit();
+        ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
     }, []);
 
     /** Point this console at one machine. Switching is just another attach. */
@@ -97,12 +119,9 @@ export default function AdminRelayPage() {
         wsRef.current = ws;
 
         ws.onopen = () => {
+            // No size is sent here on purpose: nothing is attached yet, so the
+            // hub has no agent to forward it to. It goes out on "attached".
             setPhase("attached");
-            // Tell the agent our size straight away, or Claude Code renders
-            // its UI for whatever the pty was created with.
-            const dims = fitRef.current as unknown as { proposeDimensions?: () => { cols: number; rows: number } } | null;
-            const d = dims?.proposeDimensions?.();
-            if (d) ws.send(JSON.stringify({ type: "resize", cols: d.cols, rows: d.rows }));
         };
 
         ws.onmessage = ev => {
@@ -122,6 +141,10 @@ export default function AdminRelayPage() {
                 } else if (msg.type === "attached") {
                     attachedRef.current = msg.id;
                     setAttached(msg.id);
+                    // Now there is an agent to receive it. Deferred a tick so
+                    // the layout has settled — the setup panel disappears at
+                    // this point, which changes the terminal's height.
+                    setTimeout(syncSize, 60);
                 } else if (msg.type === "notice") {
                     termRef.current?.write(msg.text);
                 }
@@ -141,7 +164,7 @@ export default function AdminRelayPage() {
                 setError(prev => prev ?? "The relay refused the connection — the ticket may have expired.");
             }
         };
-    }, [attach]);
+    }, [attach, syncSize]);
 
     /* ── Build the terminal once ─────────────────────────────── */
     useEffect(() => {
@@ -183,20 +206,27 @@ export default function AdminRelayPage() {
             termRef.current = term as unknown as typeof termRef.current;
             fitRef.current = fit as unknown as typeof fitRef.current;
 
-            const onResize = () => {
+            // A ResizeObserver rather than window.resize: the terminal's box
+            // changes height whenever the setup panel or an error banner
+            // appears, and none of those are window resizes.
+            const observer = new ResizeObserver(() => {
                 fit.fit();
                 const ws = wsRef.current;
-                if (ws?.readyState === WebSocket.OPEN) {
-                    ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
+                if (ws?.readyState === WebSocket.OPEN && termRef.current) {
+                    ws.send(JSON.stringify({
+                        type: "resize",
+                        cols: termRef.current.cols,
+                        rows: termRef.current.rows,
+                    }));
                 }
-            };
-            window.addEventListener("resize", onResize);
+            });
+            if (hostRef.current) observer.observe(hostRef.current);
 
             term.write(
                 "\x1b[90mNot attached. Press Attach to connect to the relay agent.\x1b[0m\r\n",
             );
 
-            return () => window.removeEventListener("resize", onResize);
+            return () => observer.disconnect();
         })();
 
         return () => {
