@@ -33,6 +33,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
             id: true,
             title: true,
             nodeId: true,
+            modelId: true,
             updatedAt: true,
             showReasoning: true,
             reasoningEffort: true,

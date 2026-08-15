@@ -61,7 +61,7 @@ export const googleAdapter: ProviderAdapter = {
         }
 
         const stream = await client.models.generateContentStream({
-            model: node.modelId,
+            model: req.modelId || node.modelId,
             contents,
             config: {
                 systemInstruction: req.system,
@@ -111,5 +111,17 @@ export const googleAdapter: ProviderAdapter = {
         } catch (err) {
             return { ok: false, detail: err instanceof Error ? err.message : "unreachable" };
         }
+    },
+
+    async listModels(node) {
+        const client = googleClient(node);
+        const out: string[] = [];
+        // The SDK paginates; a handful of pages is plenty for a picker.
+        for await (const m of await client.models.list()) {
+            // Names come back as "models/gemini-…"; the request wants the bare id.
+            if (m.name) out.push(m.name.replace(/^models\//, ""));
+            if (out.length >= 100) break;
+        }
+        return out;
     },
 };

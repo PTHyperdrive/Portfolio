@@ -24,6 +24,14 @@ export interface AiNodeSummary {
     lastCheckAt: string | null;
 }
 
+/** A model a node is serving right now, discovered rather than configured. */
+export interface NodeModels {
+    models: string[];
+    defaultModelId: string;
+    loading: boolean;
+    error?: string;
+}
+
 export interface ConversationSummary {
     id: string;
     title: string;

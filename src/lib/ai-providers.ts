@@ -77,6 +77,14 @@ export interface ChatRequest {
     maxTokens: number;
     /** "off" | "low" | "medium" | "high" — mapped per provider, or ignored. */
     effort?: string | null;
+    /**
+     * Model to use for this turn, overriding the node's default.
+     *
+     * One host commonly serves several models at once, so the node is the
+     * machine and this is the choice made on it. Absent means "whatever the
+     * node is configured with".
+     */
+    modelId?: string | null;
 }
 
 /** Streamed events, uniform across providers. */
@@ -100,6 +108,23 @@ export interface ProviderAdapter {
     stream(node: AiNode, req: ChatRequest, signal: AbortSignal): AsyncGenerator<ChatEvent>;
     /** Cheap reachability probe for the admin panel. */
     probe(node: AiNode): Promise<{ ok: boolean; detail: string }>;
+    /**
+     * Models this node can actually serve right now.
+     *
+     * Asked of the provider rather than read from configuration, because an
+     * operator loading a second model into LM Studio should not also have to
+     * remember to tell the platform about it.
+     */
+    listModels(node: AiNode): Promise<string[]>;
+}
+
+/**
+ * Embedding models cannot hold a conversation, and offering one in a chat
+ * picker only produces a confusing failure. Filtered by name because no
+ * provider marks them in a machine-readable way.
+ */
+export function isChatModel(id: string): boolean {
+    return !/embed|embedding/i.test(id);
 }
 
 /* ─── Shared transcript construction ─────────────────────────────── */

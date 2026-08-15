@@ -101,7 +101,7 @@ export const anthropicAdapter: ProviderAdapter = {
 
         const stream = client.messages.stream(
             {
-                model: node.modelId,
+                model: req.modelId || node.modelId,
                 max_tokens: req.maxTokens,
                 system: req.system,
                 messages,
@@ -163,5 +163,11 @@ export const anthropicAdapter: ProviderAdapter = {
         } catch (err) {
             return { ok: false, detail: err instanceof Error ? err.message : "unreachable" };
         }
+    },
+
+    async listModels(node) {
+        const client = await anthropicClient(node);
+        const page = await client.models.list({ limit: 50 });
+        return page.data.map(m => m.id);
     },
 };

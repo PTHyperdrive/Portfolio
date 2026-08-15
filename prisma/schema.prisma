@@ -604,6 +604,9 @@ model AiConversation {
   id              String           @id @default(cuid())
   userId          String
   nodeId          String?
+  /// Model chosen on that node for this thread. Null means the node's default.
+  /// A node is a machine, and one machine often serves several models.
+  modelId         String?          @db.VarChar(160)
   kind            ConversationKind @default(STUDIO)
   title           String           @default("New chat") @db.VarChar(200)
   /// Display preference for a reasoning model's scratchpad. Always effective,

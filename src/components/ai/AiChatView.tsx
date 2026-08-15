@@ -43,6 +43,8 @@ export default function AiChatView({
 
     const [nodes, setNodes] = useState<AiNodeSummary[]>([]);
     const [nodeId, setNodeId] = useState<string | null>(null);
+    /** Model chosen on that node; null means the node's configured default. */
+    const [modelId, setModelId] = useState<string | null>(null);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState("");
     const [phase, setPhase] = useState<ChatPhase>("idle");
@@ -139,6 +141,7 @@ export default function AiChatView({
             if (threadRef.current !== id) return;
             setMessages(data.conversation.messages);
             if (data.conversation.nodeId) setNodeId(data.conversation.nodeId);
+            setModelId(data.conversation.modelId ?? null);
             setShowReasoning(data.conversation.showReasoning ?? true);
             if (data.conversation.reasoningEffort) setEffort(data.conversation.reasoningEffort);
             setSkillIds(data.conversation.skillIds ?? []);
@@ -173,6 +176,7 @@ export default function AiChatView({
             // Skills belong to the thread, so a new thread starts with none
             // until its own set arrives from the server.
             setSkillIds([]);
+            setModelId(null);
         }
 
         if (!activeId) { hydratedRef.current = null; return; }
@@ -319,6 +323,7 @@ export default function AiChatView({
                     conversationId: threadRef.current,
                     content,
                     nodeId,
+                    ...(modelId ? { modelId } : {}),
                     showReasoning,
                     reasoningEffort: effort,
                     ...(images.length ? { images } : {}),
@@ -427,7 +432,7 @@ export default function AiChatView({
                 setPhase("idle");
             }
         }
-    }, [nodeId, showReasoning, effort, skillIds, onActiveChange, onConversationsChanged]);
+    }, [nodeId, modelId, showReasoning, effort, skillIds, onActiveChange, onConversationsChanged]);
 
     useEffect(() => { runTurnRef.current = runTurn; }, [runTurn]);
 
@@ -587,7 +592,13 @@ export default function AiChatView({
                             <History style={{ width: 17, height: 17 }} />
                         </button>
                     )}
-                    <ModelPicker nodes={nodes} selectedId={nodeId} onSelect={setNodeId} disabled={busy} />
+                    <ModelPicker
+                        nodes={nodes}
+                        selectedId={nodeId}
+                        selectedModelId={modelId}
+                        onSelect={(n, m) => { setNodeId(n); setModelId(m); }}
+                        disabled={busy}
+                    />
                 </div>
 
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
@@ -1185,7 +1196,7 @@ export default function AiChatView({
                     {selectedNode
                         ? busy
                             ? "Stop also clears the queue · Enter queues the next message"
-                            : `${selectedNode.displayName} · ${selectedNode.gpuLabel}`
+                            : `${(modelId || selectedNode.modelId).split("/").pop()} · ${selectedNode.gpuLabel}`
                               + `${skillIds.length ? ` · ${skillIds.length} skill${skillIds.length > 1 ? "s" : ""}` : ""}`
                               + " · Enter to send, Shift+Enter for a new line"
                         : "Ask an administrator to bring an inference node online."}

@@ -51,6 +51,12 @@ const bodySchema = z.object({
     conversationId: z.string().min(1).max(64),
     content: z.string().trim().min(1).max(32_000),
     nodeId: z.string().min(1).max(64).nullable().optional(),
+    /**
+     * Model to run on that node. Constrained in shape only — the provider is
+     * the authority on what it actually serves, and reports a bad id far more
+     * precisely than a guess here could.
+     */
+    modelId: z.string().trim().min(1).max(160).regex(/^[\w./:-]+$/).nullable().optional(),
     /** Forward the model's scratchpad to the client. Applied on our side. */
     showReasoning: z.boolean().optional(),
     /** Mapped per provider; ignored by local nodes without reasoningControl. */
@@ -106,13 +112,15 @@ export async function POST(req: Request) {
     if (!parsed.success) {
         return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
-    const { conversationId, content, nodeId, showReasoning, reasoningEffort, images, files } = parsed.data;
+    const {
+        conversationId, content, nodeId, modelId, showReasoning, reasoningEffort, images, files,
+    } = parsed.data;
 
     // ── Ownership ────────────────────────────────────────────────
     const conversation = await prisma.aiConversation.findFirst({
         where: { id: conversationId, userId },
         select: {
-            id: true, nodeId: true, title: true, kind: true,
+            id: true, nodeId: true, modelId: true, title: true, kind: true,
             showReasoning: true, reasoningEffort: true,
         },
     });
@@ -205,10 +213,14 @@ export async function POST(req: Request) {
     const wantReasoning = showReasoning ?? conversation.showReasoning;
     const effort = reasoningEffort ?? conversation.reasoningEffort ?? undefined;
 
+    // A support thread has no picker, so it always runs the node default.
+    const effectiveModel = isSupport ? null : (modelId ?? conversation.modelId ?? null);
+
     await prisma.aiConversation.update({
         where: { id: conversationId },
         data: {
             nodeId: node.id,
+            ...(modelId !== undefined ? { modelId } : {}),
             ...(autoTitle ? { title: autoTitle } : {}),
             ...(showReasoning !== undefined ? { showReasoning } : {}),
             ...(reasoningEffort !== undefined ? { reasoningEffort } : {}),
@@ -342,7 +354,7 @@ export async function POST(req: Request) {
                     conversationId,
                     role: "assistant",
                     content: "",
-                    modelId: node.modelId,
+                    modelId: effectiveModel ?? node.modelId,
                     gpuLabel: node.gpuLabel,
                     provider: node.provider,
                     speaker,
@@ -362,7 +374,7 @@ export async function POST(req: Request) {
             try {
                 for await (const event of adapter.stream(
                     node,
-                    { system, turns, maxTokens: node.maxTokens, effort },
+                    { system, turns, maxTokens: node.maxTokens, effort, modelId: effectiveModel },
                     req.signal,
                 )) {
                     switch (event.type) {
@@ -425,7 +437,7 @@ export async function POST(req: Request) {
                     metadata: {
                         conversationId,
                         provider: node.provider,
-                        model: node.modelId,
+                        model: effectiveModel ?? node.modelId,
                         gpu: node.gpuLabel,
                         tier: node.tier,
                         skills: skills.map(s => s.name),

@@ -118,7 +118,8 @@ export const localAdapter: ProviderAdapter = {
             method: "POST",
             headers: { "Content-Type": "application/json", ...authHeaders(node) },
             body: JSON.stringify({
-                model: node.modelId,
+                // One host often serves several models; the caller picks which.
+                model: req.modelId || node.modelId,
                 messages,
                 max_tokens: req.maxTokens,
                 stream: true,
@@ -221,5 +222,17 @@ export const localAdapter: ProviderAdapter = {
         } catch (err) {
             return { ok: false, detail: describeTransportError(node, err, timeoutMs) };
         }
+    },
+
+    async listModels(node) {
+        const res = await fetch(endpoint(node, "/models"), {
+            headers: authHeaders(node),
+            signal: AbortSignal.timeout(12_000),
+        });
+        if (!res.ok) throw new Error(`${node.displayName} returned HTTP ${res.status} listing models.`);
+        const body = await res.json();
+        return (body?.data ?? [])
+            .map((m: { id?: string }) => m.id)
+            .filter((v: unknown): v is string => typeof v === "string");
     },
 };
