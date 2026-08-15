@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { Terminal as TerminalIcon, Plug, PlugZap, AlertTriangle, RotateCcw, Users, Monitor } from "lucide-react";
+import { Terminal as TerminalIcon, Plug, PlugZap, AlertTriangle, RotateCcw, Users, Monitor, Eraser } from "lucide-react";
 import RelaySetup from "./RelaySetup";
 import AgentKeys from "./AgentKeys";
 import { useThemeTokens } from "@/lib/useThemeTokens";
@@ -87,6 +87,23 @@ export default function AdminRelayPage() {
         ws.send(JSON.stringify({ type: "resize", cols: term.cols, rows: term.rows }));
     }, []);
 
+    /**
+     * Drop every relay session.
+     *
+     * Sent over the console's own socket rather than a new endpoint: the hub
+     * lives in the custom server's module registry, which a Next route is a
+     * separate instance of and cannot see into. This socket is already
+     * authenticated and already talking to the right object.
+     */
+    const clearSessions = useCallback(() => {
+        const ws = wsRef.current;
+        if (ws?.readyState !== WebSocket.OPEN) return;
+        attachedRef.current = null;
+        setAttached(null);
+        termRef.current?.write("\u001b[2J\u001b[H");
+        ws.send(JSON.stringify({ type: "reset" }));
+    }, []);
+
     /** Point this console at one machine. Switching is just another attach. */
     const attach = useCallback((id: string) => {
         const ws = wsRef.current;
@@ -146,6 +163,8 @@ export default function AdminRelayPage() {
                     // the layout has settled — the setup panel disappears at
                     // this point, which changes the terminal's height.
                     setTimeout(syncSize, 60);
+                } else if (msg.type === "reset-done") {
+                    setAgents([]);
                 } else if (msg.type === "notice") {
                     termRef.current?.write(msg.text);
                 }
@@ -289,6 +308,23 @@ export default function AdminRelayPage() {
                             ? `${agents.length} machine${agents.length > 1 ? "s" : ""} online`
                             : "No agent connected"}
                     </span>
+                    {phase === "attached" && (
+                        <button
+                            onClick={clearSessions}
+                            title="Close every agent and console session. Agents reconnect on their own."
+                            style={{
+                                display: "inline-flex", alignItems: "center", gap: 7,
+                                padding: "9px 14px", borderRadius: t.buttonRadius,
+                                border: `1px solid ${t.borderPrimary}`,
+                                background: "transparent", color: t.textSecondary,
+                                fontSize: "0.82rem", fontWeight: 600, cursor: "pointer",
+                                fontFamily: t.fontFamily,
+                            }}
+                        >
+                            <Eraser style={{ width: 14, height: 14 }} />
+                            Clear sessions
+                        </button>
+                    )}
                     <button
                         onClick={() => (busy ? disconnect() : void connect())}
                         style={{
