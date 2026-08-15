@@ -1,0 +1,20 @@
+{
+  "name": "claude-relay-agent",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Wraps Claude Code in a pty on the operator's own VM and dials out to the platform.",
+  "main": "claude-relay.mjs",
+  "scripts": {
+    "start": "node claude-relay.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "optionalDependencies": {
+    "node-pty": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

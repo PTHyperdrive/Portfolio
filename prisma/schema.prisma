@@ -1104,6 +1104,9 @@ enum AuditAction {
   AI_TOOL_DENIED
   AI_KNOWLEDGE_SEARCH
   ADMIN_AI_DOC_MODIFY
+  // Claude Code relay — a terminal on the operator's own machine is the most
+  // privileged surface here, so every attach is recorded.
+  ADMIN_RELAY_ATTACH
   // User-authored skills
   AI_SKILL_CREATE
   AI_SKILL_UPDATE

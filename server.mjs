@@ -14,7 +14,10 @@ import { createServer } from "node:http";
 import { connect as tlsConnect } from "node:tls";
 import { readFileSync } from "node:fs";
 import next from "next";
+import { WebSocketServer } from "ws";
 import pkg from "@next/env";
+import { verifyTicket, verifyAgentToken } from "./lib/relay-ticket.mjs";
+import { registerAgent, registerViewer } from "./lib/relay-hub.mjs";
 const { loadEnvConfig } = pkg;
 
 // ── Environment ─────────────────────────────────────────────────
@@ -66,9 +69,57 @@ app.prepare().then(() => {
 
     const server = createServer(handle);
 
+    // ── Claude Code relay ───────────────────────────────────────
+    // Two endpoints on one hub: the agent on the operator's VM dials in on
+    // /api/relay/agent, and admin browsers attach on /api/relay/console. Both
+    // are authenticated here, before the socket is accepted — an unauthorised
+    // upgrade is answered with a plain HTTP error and the socket destroyed,
+    // rather than being upgraded and then closed, which would let an anonymous
+    // caller confirm the endpoint exists.
+    const relayWss = new WebSocketServer({ noServer: true });
+
+    const denyUpgrade = (socket, code, reason) => {
+        socket.write(`HTTP/1.1 ${code} ${reason}\r\nConnection: close\r\n\r\n`);
+        socket.destroy();
+    };
+
+    function handleRelayUpgrade(req, socket, head, pathname, params) {
+        if (pathname === "/api/relay/agent") {
+            const header = req.headers.authorization || "";
+            const token = header.startsWith("Bearer ") ? header.slice(7) : "";
+            if (!verifyAgentToken(token)) {
+                console.warn("[relay] ✘ agent rejected: bad or missing bearer token");
+                return denyUpgrade(socket, 401, "Unauthorized");
+            }
+            relayWss.handleUpgrade(req, socket, head, ws => {
+                const ok = registerAgent(ws, { onLog: m => console.log(`[relay] ${m}`) });
+                if (!ok) console.warn("[relay] ✘ second agent refused");
+            });
+            return;
+        }
+
+        // Browser console. The ticket is minted by an admin-only API route, so
+        // a valid signature is proof of an admin session without this server
+        // needing to understand NextAuth at all.
+        const userId = verifyTicket(params.get("ticket") || "");
+        if (!userId) {
+            console.warn("[relay] ✘ console rejected: invalid or expired ticket");
+            return denyUpgrade(socket, 401, "Unauthorized");
+        }
+        relayWss.handleUpgrade(req, socket, head, ws => {
+            console.log(`[relay] console attached (user ${userId})`);
+            registerViewer(ws);
+        });
+    }
+
     // ── WebSocket upgrade handler ───────────────────────────────
     server.on("upgrade", (req, socket, head) => {
         const url = req.url || "";
+
+        if (url.startsWith("/api/relay/")) {
+            const parsed = new URL(url, "http://localhost");
+            return handleRelayUpgrade(req, socket, head, parsed.pathname, parsed.searchParams);
+        }
 
         // Only intercept /novnc/ paths; let Next.js handle HMR etc.
         if (!url.startsWith("/novnc/") || !pveHost) return;
