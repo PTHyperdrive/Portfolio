@@ -4,122 +4,166 @@ import { useState } from "react";
 import { Terminal, Copy, Check, AlertTriangle } from "lucide-react";
 import { useThemeTokens } from "@/lib/useThemeTokens";
 
-type Os = "linux" | "windows" | "macos";
+type Shell = "powershell" | "cmd" | "linux" | "macos";
 
-const LABELS: Record<Os, string> = {
+const LABELS: Record<Shell, string> = {
+    powershell: "Windows · PowerShell",
+    cmd: "Windows · cmd.exe",
     linux: "Linux",
     macos: "macOS",
-    windows: "Windows",
 };
 
 /**
  * Setup instructions for the relay agent.
  *
- * Split by platform because the differences are not cosmetic: environment
- * variables are set differently in PowerShell, `script(1)` does not exist on
- * Windows so node-pty stops being optional there, and the path Claude Code
- * installs to differs on each.
+ * Two things this has to get right, both learned the hard way:
  *
- * The token is never printed here. It sits in the server's .env, and echoing it
- * into a page — which ends up in screenshots and shoulder-surfing range — would
- * undo the reason it is a secret.
+ * 1. No repository. The first version opened with "cd relay/agent", which
+ *    assumed the whole project was checked out on the machine you wanted to
+ *    reach. On a fresh workstation that fails immediately and unhelpfully. The
+ *    agent is now downloaded from the server, so a machine needs nothing but
+ *    Node.
+ *
+ * 2. No comments inside the copyable block. A trailing `# note` is a comment in
+ *    bash and PowerShell but *not* in cmd.exe, where it was handed to npm as a
+ *    package name and produced EINVALIDTAGNAME. Explanations belong outside the
+ *    block, where they cannot be pasted by accident.
+ *
+ * cmd.exe gets its own tab rather than a footnote, because `$env:VAR = "..."`
+ * is PowerShell syntax and fails there with a message about volume labels that
+ * tells you nothing about the real problem.
  */
 export default function RelaySetup({ host }: { host: string }) {
     const t = useThemeTokens();
-    const [os, setOs] = useState<Os>("linux");
+    const [shell, setShell] = useState<Shell>("powershell");
     const [copied, setCopied] = useState(false);
 
-    const url = `wss://${host}/api/relay/agent`;
+    const wsUrl = `wss://${host}/api/relay/agent`;
+    const srcUrl = `https://${host}/api/relay/agent-source`;
+    const TOKEN = "PASTE_RELAY_AGENT_TOKEN";
 
-    const snippets: Record<Os, string> = {
-        linux: `cd relay/agent
-npm install                    # node-pty is optional but gives resize support
-
-export RELAY_URL=${url}
-export RELAY_AGENT_TOKEN=<from the server's .env>
-export RELAY_AGENT_NAME=vm-dev          # how this machine appears in the picker
+    const snippets: Record<Shell, string> = {
+        powershell: `mkdir claude-relay
+cd claude-relay
+npm init -y
+npm install ws
+Invoke-WebRequest -Uri "${srcUrl}" -Headers @{ Authorization = "Bearer ${TOKEN}" } -OutFile claude-relay.mjs
+$env:RELAY_URL = "${wsUrl}"
+$env:RELAY_AGENT_TOKEN = "${TOKEN}"
+$env:RELAY_AGENT_NAME = "workstation"
 node claude-relay.mjs`,
-        macos: `cd relay/agent
-npm install
 
-export RELAY_URL=${url}
-export RELAY_AGENT_TOKEN=<from the server's .env>
-export RELAY_AGENT_NAME=mac-mini
+        cmd: `mkdir claude-relay
+cd claude-relay
+npm init -y
+npm install ws
+curl -H "Authorization: Bearer ${TOKEN}" "${srcUrl}" -o claude-relay.mjs
+set RELAY_URL=${wsUrl}
+set RELAY_AGENT_TOKEN=${TOKEN}
+set RELAY_AGENT_NAME=workstation
 node claude-relay.mjs`,
-        windows: `cd relay\\agent
-npm install                    # node-pty matters here: without it there is no real terminal
 
-$env:RELAY_URL        = "${url}"
-$env:RELAY_AGENT_TOKEN = "<from the server's .env>"
-$env:RELAY_AGENT_NAME  = "workstation"
+        linux: `mkdir -p ~/claude-relay && cd ~/claude-relay
+npm init -y
+npm install ws
+curl -fsSL -H "Authorization: Bearer ${TOKEN}" "${srcUrl}" -o claude-relay.mjs
+export RELAY_URL="${wsUrl}"
+export RELAY_AGENT_TOKEN="${TOKEN}"
+export RELAY_AGENT_NAME="vm-dev"
+node claude-relay.mjs`,
+
+        macos: `mkdir -p ~/claude-relay && cd ~/claude-relay
+npm init -y
+npm install ws
+curl -fsSL -H "Authorization: Bearer ${TOKEN}" "${srcUrl}" -o claude-relay.mjs
+export RELAY_URL="${wsUrl}"
+export RELAY_AGENT_TOKEN="${TOKEN}"
+export RELAY_AGENT_NAME="mac-mini"
 node claude-relay.mjs`,
     };
 
-    const notes: Record<Os, React.ReactNode> = {
+    const ptyNote: Record<Shell, React.ReactNode> = {
+        powershell: (
+            <>
+                Optional but worth it: <code>npm install node-pty</code> gives a real terminal via
+                ConPTY, with resizing. Without it the agent falls back to plain pipes — it works,
+                but line editing and colour are poor. It needs Visual Studio Build Tools (C++
+                workload) to compile.
+            </>
+        ),
+        cmd: (
+            <>
+                Optional but worth it: <code>npm install node-pty</code> gives a real terminal via
+                ConPTY. Without it the agent falls back to plain pipes — usable, but line editing
+                and colour are poor. Needs Visual Studio Build Tools (C++ workload).
+            </>
+        ),
         linux: (
             <>
-                <code style={{ fontFamily: t.fontMono }}>node-pty</code> needs{" "}
-                <code style={{ fontFamily: t.fontMono }}>build-essential</code> and{" "}
-                <code style={{ fontFamily: t.fontMono }}>python3</code>. Without it the agent falls
-                back to <code style={{ fontFamily: t.fontMono }}>script(1)</code>, which is a real
-                terminal but cannot be resized — it stays at 80×24 and the panel says so.
+                Optional: <code>npm install node-pty</code> adds resizing. Without it the agent uses{" "}
+                <code>script(1)</code>, which is still a real terminal but fixed at 80×24. Needs{" "}
+                <code>build-essential</code> and <code>python3</code>.
             </>
         ),
         macos: (
             <>
-                <code style={{ fontFamily: t.fontMono }}>node-pty</code> needs Xcode command line
-                tools (<code style={{ fontFamily: t.fontMono }}>xcode-select --install</code>).
-                Without it the agent uses <code style={{ fontFamily: t.fontMono }}>script</code> at a
-                fixed 80×24.
-            </>
-        ),
-        windows: (
-            <>
-                There is no <code style={{ fontFamily: t.fontMono }}>script(1)</code> on Windows, so{" "}
-                <code style={{ fontFamily: t.fontMono }}>node-pty</code> is what gives you a real
-                terminal — it uses ConPTY. Without it the agent falls back to plain pipes: it works,
-                but line editing and colour will be poor. Install the build tools with{" "}
-                <code style={{ fontFamily: t.fontMono }}>npm i -g windows-build-tools</code> or
-                Visual Studio Build Tools.
+                Optional: <code>npm install node-pty</code> adds resizing. Without it the agent uses{" "}
+                <code>script</code>, a real terminal fixed at 80×24. Needs{" "}
+                <code>xcode-select --install</code>.
             </>
         ),
     };
 
-    const box: React.CSSProperties = {
-        padding: "12px 14px",
-        borderRadius: t.cardRadius,
+    const code: React.CSSProperties = {
+        fontFamily: t.fontMono,
+        fontSize: "0.82em",
+        background: t.bgCard,
         border: `1px solid ${t.borderPrimary}`,
-        background: t.bgTertiary,
-        fontSize: "0.8rem",
-        lineHeight: 1.6,
-        color: t.textSecondary,
+        borderRadius: 4,
+        padding: "1px 5px",
     };
 
     return (
-        <div style={{ ...box, marginBottom: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+        <div style={{
+            padding: "14px 16px",
+            marginBottom: 16,
+            borderRadius: t.cardRadius,
+            border: `1px solid ${t.borderPrimary}`,
+            background: t.bgTertiary,
+            fontSize: "0.82rem",
+            lineHeight: 1.6,
+            color: t.textSecondary,
+        }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
                 <Terminal style={{ width: 15, height: 15, color: t.accentPrimary }} />
-                <strong style={{ color: t.textPrimary, fontSize: "0.86rem" }}>
+                <strong style={{ color: t.textPrimary, fontSize: "0.88rem" }}>
                     Start an agent on any machine that runs Claude Code
                 </strong>
-                <span style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
-                    {(Object.keys(LABELS) as Os[]).map(k => (
-                        <button
-                            key={k}
-                            onClick={() => setOs(k)}
-                            style={{
-                                padding: "4px 11px", borderRadius: t.buttonRadius,
-                                border: `1px solid ${os === k ? t.accentPrimary : t.borderPrimary}`,
-                                background: os === k ? t.accentPrimaryMuted : "transparent",
-                                color: os === k ? t.accentPrimary : t.textMuted,
-                                fontSize: "0.74rem", fontWeight: 600, cursor: "pointer",
-                                fontFamily: t.fontFamily,
-                            }}
-                        >
-                            {LABELS[k]}
-                        </button>
-                    ))}
-                </span>
+            </div>
+            <p style={{ marginBottom: 12, color: t.textMuted }}>
+                No checkout needed — the agent downloads itself. Node 20+ is the only prerequisite.
+                Replace <code style={code}>{TOKEN}</code> with the value of{" "}
+                <code style={code}>RELAY_AGENT_TOKEN</code> from the server&rsquo;s{" "}
+                <code style={code}>.env</code>.
+            </p>
+
+            <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
+                {(Object.keys(LABELS) as Shell[]).map(k => (
+                    <button
+                        key={k}
+                        onClick={() => setShell(k)}
+                        style={{
+                            padding: "5px 12px", borderRadius: t.buttonRadius,
+                            border: `1px solid ${shell === k ? t.accentPrimary : t.borderPrimary}`,
+                            background: shell === k ? t.accentPrimaryMuted : "transparent",
+                            color: shell === k ? t.accentPrimary : t.textMuted,
+                            fontSize: "0.74rem", fontWeight: 600, cursor: "pointer",
+                            fontFamily: t.fontFamily,
+                        }}
+                    >
+                        {LABELS[k]}
+                    </button>
+                ))}
             </div>
 
             <div style={{ position: "relative" }}>
@@ -128,14 +172,14 @@ node claude-relay.mjs`,
                     borderRadius: t.buttonRadius,
                     background: t.isLight ? "#f6f8fa" : "#0d1117",
                     border: `1px solid ${t.borderPrimary}`,
-                    fontFamily: t.fontMono, fontSize: "0.76rem", lineHeight: 1.65,
+                    fontFamily: t.fontMono, fontSize: "0.76rem", lineHeight: 1.7,
                     color: t.isLight ? t.textPrimary : "#e6edf3",
                 }}>
-                    <code>{snippets[os]}</code>
+                    <code>{snippets[shell]}</code>
                 </pre>
                 <button
                     onClick={() => {
-                        void navigator.clipboard.writeText(snippets[os]).then(() => {
+                        void navigator.clipboard.writeText(snippets[shell]).then(() => {
                             setCopied(true);
                             setTimeout(() => setCopied(false), 1500);
                         });
@@ -156,14 +200,31 @@ node claude-relay.mjs`,
                 </button>
             </div>
 
-            <p style={{ marginTop: 10 }}>{notes[os]}</p>
+            {(shell === "powershell" || shell === "cmd") && (
+                <p style={{
+                    display: "flex", alignItems: "flex-start", gap: 8,
+                    marginTop: 10, color: t.statusWarning,
+                }}>
+                    <AlertTriangle style={{ width: 13, height: 13, flexShrink: 0, marginTop: 3 }} />
+                    <span>
+                        These two shells are not interchangeable.{" "}
+                        <code style={code}>$env:VAR = &quot;x&quot;</code> only works in PowerShell;{" "}
+                        <code style={code}>set VAR=x</code> only works in cmd.exe. Using the wrong
+                        one fails with &ldquo;The filename, directory name, or volume label syntax
+                        is incorrect&rdquo;, which does not hint at the real cause. Check your prompt:
+                        cmd.exe shows <code style={code}>C:\Users\you&gt;</code>, PowerShell shows{" "}
+                        <code style={code}>PS C:\Users\you&gt;</code>.
+                    </span>
+                </p>
+            )}
+
+            <p style={{ marginTop: 10 }}>{ptyNote[shell]}</p>
 
             <p style={{ marginTop: 10 }}>
-                <strong style={{ color: t.textPrimary }}>Several machines at once:</strong> run an
-                agent on each, giving every one a distinct{" "}
-                <code style={{ fontFamily: t.fontMono }}>RELAY_AGENT_NAME</code>. They appear
-                together above and you switch between them. Reconnecting under a name replaces that
-                entry rather than adding a duplicate.
+                <strong style={{ color: t.textPrimary }}>Several machines:</strong> repeat this on
+                each, giving every one a different <code style={code}>RELAY_AGENT_NAME</code>. They
+                appear side by side above and you switch between them. Reconnecting under a name
+                replaces that entry rather than adding a duplicate.
             </p>
 
             <p style={{
@@ -172,13 +233,14 @@ node claude-relay.mjs`,
             }}>
                 <AlertTriangle style={{ width: 13, height: 13, flexShrink: 0, marginTop: 3 }} />
                 <span>
-                    <strong style={{ color: t.textPrimary }}>If <code style={{ fontFamily: t.fontMono }}>claude</code> is not found:</strong>{" "}
-                    a service or non-login shell has a narrower PATH than your terminal, which is the
-                    usual cause. The agent still connects and says so here rather than dying quietly
-                    — set <code style={{ fontFamily: t.fontMono }}>RELAY_COMMAND</code> to the full
-                    path and restart it. Set{" "}
-                    <code style={{ fontFamily: t.fontMono }}>RELAY_SHELL=1</code> to get a plain
-                    shell instead, which is a quick way to find out what that path is.
+                    <strong style={{ color: t.textPrimary }}>
+                        If <code style={code}>claude</code> is not found:
+                    </strong>{" "}
+                    a service or non-login shell has a narrower PATH than your terminal, which is
+                    the usual cause. The agent connects anyway and reports it here rather than dying
+                    quietly — set <code style={code}>RELAY_COMMAND</code> to the full path and
+                    restart it. <code style={code}>RELAY_SHELL=1</code> gives a plain shell, which
+                    is a quick way to go and find that path.
                 </span>
             </p>
         </div>

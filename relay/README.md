@@ -34,36 +34,64 @@ Then `pm2 restart nrsp-web --update-env`.
 
 ## Running an agent
 
-One per machine. Give each a distinct `RELAY_AGENT_NAME` and they appear
-together in the panel for you to switch between; reconnecting under a name
-replaces that entry rather than adding a duplicate.
+One per machine. Give each a distinct `RELAY_AGENT_NAME`; they appear together
+in the panel for you to switch between, and reconnecting under a name replaces
+that entry rather than adding a duplicate.
+
+**No checkout is needed on the agent machine.** The script downloads itself from
+the server, so Node 20+ is the only prerequisite. Replace
+`PASTE_RELAY_AGENT_TOKEN` with `RELAY_AGENT_TOKEN` from the server's `.env`.
+
+Do not paste comments into these blocks. `#` is a comment in bash and PowerShell
+but not in cmd.exe, where npm reads it as a package name and fails with
+`EINVALIDTAGNAME`.
 
 ### Linux / macOS
 
 ```bash
-cd relay/agent
-npm install
-
-export RELAY_URL=wss://www.notrespond.com/api/relay/agent
-export RELAY_AGENT_TOKEN=...          # same value as the server
-export RELAY_AGENT_NAME=vm-dev        # how it appears in the picker
+mkdir -p ~/claude-relay && cd ~/claude-relay
+npm init -y
+npm install ws
+curl -fsSL -H "Authorization: Bearer PASTE_RELAY_AGENT_TOKEN" "https://www.notrespond.com/api/relay/agent-source" -o claude-relay.mjs
+export RELAY_URL="wss://www.notrespond.com/api/relay/agent"
+export RELAY_AGENT_TOKEN="PASTE_RELAY_AGENT_TOKEN"
+export RELAY_AGENT_NAME="vm-dev"
 node claude-relay.mjs
 ```
 
-### Windows (PowerShell)
+### Windows - PowerShell
 
 ```powershell
-cd relay\agent
-npm install
-
-$env:RELAY_URL         = "wss://www.notrespond.com/api/relay/agent"
-$env:RELAY_AGENT_TOKEN = "..."
-$env:RELAY_AGENT_NAME  = "workstation"
+mkdir claude-relay
+cd claude-relay
+npm init -y
+npm install ws
+Invoke-WebRequest -Uri "https://www.notrespond.com/api/relay/agent-source" -Headers @{ Authorization = "Bearer PASTE_RELAY_AGENT_TOKEN" } -OutFile claude-relay.mjs
+$env:RELAY_URL = "wss://www.notrespond.com/api/relay/agent"
+$env:RELAY_AGENT_TOKEN = "PASTE_RELAY_AGENT_TOKEN"
+$env:RELAY_AGENT_NAME = "workstation"
 node claude-relay.mjs
 ```
 
-`VAR=value command` is bash syntax and does nothing in PowerShell — use
-`$env:VAR = "value"` as above.
+### Windows - cmd.exe
+
+```bat
+mkdir claude-relay
+cd claude-relay
+npm init -y
+npm install ws
+curl -H "Authorization: Bearer PASTE_RELAY_AGENT_TOKEN" "https://www.notrespond.com/api/relay/agent-source" -o claude-relay.mjs
+set RELAY_URL=wss://www.notrespond.com/api/relay/agent
+set RELAY_AGENT_TOKEN=PASTE_RELAY_AGENT_TOKEN
+set RELAY_AGENT_NAME=workstation
+node claude-relay.mjs
+```
+
+**These two Windows shells are not interchangeable.** `$env:VAR = "x"` is
+PowerShell only; `set VAR=x` is cmd.exe only. Using the wrong one fails with
+"The filename, directory name, or volume label syntax is incorrect", which says
+nothing about the real cause. Your prompt tells you which you are in: cmd.exe
+shows `C:\Users\you>`, PowerShell shows `PS C:\Users\you>`.
 
 ## Terminal quality by platform
 
