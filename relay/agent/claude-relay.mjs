@@ -35,11 +35,20 @@
 import { WebSocket } from "ws";
 import { spawn, spawnSync } from "node:child_process";
 import { hostname, platform, release } from "node:os";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { createHmac } from "node:crypto";
+import { join, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import process from "node:process";
 
 const RELAY_URL = process.env.RELAY_URL;
-const TOKEN = process.env.RELAY_AGENT_TOKEN;
+/**
+ * This machine's own secret, issued in Admin -> Claude Code Relay.
+ *
+ * RELAY_AGENT_TOKEN is still read so an older setup keeps working, but it is
+ * now a per-machine value rather than one secret shared by every agent.
+ */
+const SECRET = process.env.RELAY_AGENT_SECRET || process.env.RELAY_AGENT_TOKEN;
 const NAME = (process.env.RELAY_AGENT_NAME || hostname() || "agent").slice(0, 60);
 const IS_WINDOWS = platform() === "win32";
 const WANT_SHELL = process.env.RELAY_SHELL === "1";
@@ -64,12 +73,60 @@ const CWD = process.env.RELAY_CWD || process.env.HOME || process.env.USERPROFILE
 const NEEDS_PTY = !WANT_SHELL && /claude/i.test(COMMAND);
 const ALLOW_NO_PTY = process.env.RELAY_ALLOW_NO_PTY === "1";
 
-if (!RELAY_URL || !TOKEN) {
-    console.error("RELAY_URL and RELAY_AGENT_TOKEN must both be set.");
+if (!RELAY_URL || !SECRET) {
+    console.error("RELAY_URL and RELAY_AGENT_SECRET must both be set.");
     console.error("");
-    console.error("  Linux/macOS:  RELAY_URL=wss://host/api/relay/agent RELAY_AGENT_TOKEN=... node claude-relay.mjs");
-    console.error("  Windows:      $env:RELAY_URL='wss://host/api/relay/agent'; $env:RELAY_AGENT_TOKEN='...'; node claude-relay.mjs");
+    console.error("  Issue a secret for this machine in Admin -> Claude Code Relay.");
+    console.error("  Linux/macOS:  RELAY_URL=wss://host/api/relay/agent RELAY_AGENT_SECRET=... node claude-relay.mjs");
+    console.error("  Windows:      $env:RELAY_URL='wss://host/api/relay/agent'; $env:RELAY_AGENT_SECRET='...'; node claude-relay.mjs");
     process.exit(1);
+}
+
+/* ─── Rolling counter ────────────────────────────────────────────── */
+
+/**
+ * Where this machine remembers how many times it has connected.
+ *
+ * The counter is the anti-replay half of the credential, exactly as on a
+ * rolling-code remote: every connection presents a number strictly higher than
+ * the last the server accepted, so a handshake captured off the wire cannot be
+ * sent again. Losing this file is recoverable — the server tolerates a forward
+ * jump within its resync window — but deleting it repeatedly is not, since the
+ * counter would restart below what the server has already seen.
+ */
+const AGENT_DIR = dirname(fileURLToPath(import.meta.url));
+const COUNTER_FILE = process.env.RELAY_COUNTER_FILE
+    || join(AGENT_DIR, `.relay-counter-${NAME.replace(/[^\w.-]/g, "_")}`);
+
+function nextCounter() {
+    let current = 0;
+    try {
+        const raw = readFileSync(COUNTER_FILE, "utf8").trim();
+        const parsed = Number(raw);
+        if (Number.isSafeInteger(parsed) && parsed > 0) current = parsed;
+    } catch {
+        // First run, or the file was removed. Starting from 0 is fine as long
+        // as the server has not seen a higher number; if it has, it will say
+        // so and the credential needs rotating.
+    }
+
+    const next = current + 1;
+    try {
+        writeFileSync(COUNTER_FILE, String(next), { mode: 0o600 });
+    } catch (err) {
+        console.warn(
+            `[agent] could not persist the rolling counter to ${COUNTER_FILE}: ${err.message}\n` +
+            `        Without it every restart replays counter 1 and the server will refuse.`,
+        );
+    }
+    return next;
+}
+
+/** name.counter.HMAC(secret, "name:counter") — the fob press. */
+function buildCredential() {
+    const counter = nextCounter();
+    const proof = createHmac("sha256", SECRET).update(`${NAME}:${counter}`).digest("hex");
+    return { header: `${NAME}.${counter}.${proof}`, counter };
 }
 
 /* ─── Preflight ──────────────────────────────────────────────────── */
@@ -256,7 +313,9 @@ async function connect() {
         console.log(`[agent] terminal    ${term.kind}${term.resizable ? "" : " (fixed 80x24, no resize)"}`);
     }
 
-    const ws = new WebSocket(RELAY_URL, { headers: { Authorization: `Bearer ${TOKEN}` } });
+    const { header, counter } = buildCredential();
+    console.log(`[agent] rolling code #${counter}`);
+    const ws = new WebSocket(RELAY_URL, { headers: { Authorization: `Bearer ${header}` } });
 
     ws.on("open", () => {
         backoff = 1000;
@@ -371,6 +430,18 @@ async function connect() {
         // Back off to a minute, so a server outage is not a hot loop.
         backoff = Math.min(backoff * 2, 60_000);
     };
+
+    ws.on("unexpected-response", (_req, res) => {
+        if (res.statusCode === 401) {
+            console.error(
+                `[agent] the server refused this credential (401). Likely one of:\n` +
+                `        - the machine "${NAME}" has no credential, or it was revoked\n` +
+                `        - RELAY_AGENT_SECRET does not match, or was rotated\n` +
+                `        - the rolling counter went backwards; delete ${COUNTER_FILE}\n` +
+                `          only after rotating the credential, or the server will still refuse it`,
+            );
+        }
+    });
 
     ws.on("close", (code, reason) => restart(`socket closed (${code} ${reason || ""})`.trim()));
     ws.on("error", err => console.error(`[agent] socket error: ${err.message}`));

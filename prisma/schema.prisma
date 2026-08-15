@@ -521,6 +521,36 @@ model ProvisioningJob {
 /// OPENAI    — reserved; the LOCAL adapter already speaks this wire format,
 ///             but a hosted key has different cost and egress properties and
 ///             deserves its own tier gate rather than masquerading as local.
+/// A machine allowed to run a relay agent.
+///
+/// Replaces the single shared RELAY_AGENT_TOKEN: each machine has its own
+/// credential, so one can be revoked without disturbing the others, and a
+/// stolen one names exactly which box leaked it.
+///
+/// The secret is not stored. It is derived on demand from the server master
+/// secret, the name and the generation — so there is nothing here to steal,
+/// and bumping `generation` retires the old secret permanently.
+model RelayAgent {
+  id         String    @id @default(cuid())
+  /// Announced by the agent and shown in the console picker.
+  name       String    @unique @db.VarChar(60)
+  /// Bump to rotate. The previous secret stops verifying immediately.
+  generation Int       @default(1)
+  /// Highest rolling counter accepted so far.
+  ///
+  /// Key-fob semantics: every connection presents a counter strictly greater
+  /// than the last one seen, so a captured handshake cannot be replayed — the
+  /// counter it carries has already been spent. A forward window tolerates an
+  /// agent that incremented while it could not reach the server.
+  counter    Int       @default(0)
+  revokedAt  DateTime?
+  lastSeenAt DateTime?
+  lastIp     String?   @db.VarChar(64)
+  createdAt  DateTime  @default(now())
+
+  @@index([revokedAt])
+}
+
 enum AiProviderKind {
   LOCAL
   ANTHROPIC
@@ -1112,6 +1142,8 @@ enum AuditAction {
   ADMIN_RELAY_ATTACH
   // Successful TOTP entry at the unlisted vault page.
   ADMIN_VAULT_LOGIN
+  // Relay agent credentials: issue, rotate, revoke.
+  ADMIN_RELAY_AGENT_MODIFY
   // User-authored skills
   AI_SKILL_CREATE
   AI_SKILL_UPDATE

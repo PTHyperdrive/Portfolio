@@ -16,7 +16,8 @@ import { readFileSync } from "node:fs";
 import next from "next";
 import { WebSocketServer } from "ws";
 import pkg from "@next/env";
-import { consumeTicket, verifyAgentToken } from "./lib/relay-ticket.mjs";
+import { consumeTicket } from "./lib/relay-ticket.mjs";
+import { authenticateAgent } from "./lib/relay-agent-auth.mjs";
 import { registerAgent, registerViewer } from "./lib/relay-hub.mjs";
 const { loadEnvConfig } = pkg;
 
@@ -25,7 +26,18 @@ const dev = process.env.NODE_ENV !== "production";
 loadEnvConfig(process.cwd(), dev);
 
 const port = parseInt(process.env.PORT || "3000", 10);
-const hostname = process.env.HOSTNAME || "0.0.0.0";
+/**
+ * Loopback by default.
+ *
+ * nginx terminates TLS on this host and proxies to http://localhost:3000, so
+ * nothing outside needs to reach this port. Bound to 0.0.0.0 it was also
+ * answering directly on the LAN address — plaintext, past nginx, and past
+ * every security header nginx adds. Only the router's forward chain stood
+ * between another VLAN and an unencrypted copy of the whole site.
+ *
+ * Set HOSTNAME explicitly if a reverse proxy ever lives on a different host.
+ */
+const hostname = process.env.HOSTNAME || "127.0.0.1";
 
 // ── TLS options (mirrors src/lib/proxmox.ts buildProxmoxTlsConnect) ──
 function buildTlsOptions() {
@@ -86,14 +98,27 @@ app.prepare().then(() => {
     function handleRelayUpgrade(req, socket, head, pathname, params) {
         if (pathname === "/api/relay/agent") {
             const header = req.headers.authorization || "";
-            const token = header.startsWith("Bearer ") ? header.slice(7) : "";
-            if (!verifyAgentToken(token)) {
-                console.warn("[relay] ✘ agent rejected: bad or missing bearer token");
-                return denyUpgrade(socket, 401, "Unauthorized");
-            }
-            relayWss.handleUpgrade(req, socket, head, ws => {
-                const ok = registerAgent(ws, { onLog: m => console.log(`[relay] ${m}`) });
-                if (!ok) console.warn("[relay] ✘ second agent refused");
+            const credential = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
+            const ip = (req.headers["x-forwarded-for"] || "").split(",")[0].trim()
+                || req.socket.remoteAddress || "";
+
+            // Rolling code: name.counter.HMAC, where the counter must exceed
+            // every counter this machine has used before. Async, so the socket
+            // is held until the database answers.
+            authenticateAgent(credential, ip).then(result => {
+                if (!result.ok) {
+                    console.warn(`[relay] ✘ agent rejected: ${result.reason}`);
+                    return denyUpgrade(socket, 401, "Unauthorized");
+                }
+                relayWss.handleUpgrade(req, socket, head, ws => {
+                    registerAgent(ws, {
+                        expectedName: result.name,
+                        onLog: m => console.log(`[relay] ${m}`),
+                    });
+                });
+            }).catch(err => {
+                console.error(`[relay] agent auth failed: ${err.message}`);
+                denyUpgrade(socket, 503, "Service Unavailable");
             });
             return;
         }

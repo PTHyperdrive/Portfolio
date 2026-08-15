@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Terminal, Copy, Check, AlertTriangle, Eye, Loader2 } from "lucide-react";
+import { Terminal, Copy, Check, AlertTriangle } from "lucide-react";
 import { useThemeTokens } from "@/lib/useThemeTokens";
 
 type Shell = "powershell" | "cmd" | "linux" | "macos";
@@ -37,37 +37,19 @@ export default function RelaySetup({ host }: { host: string }) {
     const t = useThemeTokens();
     const [shell, setShell] = useState<Shell>("powershell");
     const [copied, setCopied] = useState(false);
-    const [token, setToken] = useState<string | null>(null);
-    const [revealing, setRevealing] = useState(false);
-    const [tokenError, setTokenError] = useState<string | null>(null);
 
     const wsUrl = `wss://${host}/api/relay/agent`;
     const srcUrl = `https://${host}/api/relay/agent-source`;
 
     /**
-     * Fetch the real token on request.
+     * There is no single token any more.
      *
-     * A placeholder in the snippet is worse than it looks: copied verbatim it
-     * produces a 401, curl writes the error body into claude-relay.mjs, and
-     * node then reports a syntax error in what appears to be the agent. Three
-     * steps removed from the actual mistake.
+     * Each machine has its own secret, issued in the Machines panel above, so
+     * the snippet carries a placeholder and the operator pastes the one secret
+     * that belongs to the box in front of them. Filling it in automatically
+     * would mean guessing which machine this is for.
      */
-    const reveal = async () => {
-        setRevealing(true);
-        setTokenError(null);
-        try {
-            const res = await fetch("/api/admin/relay/token");
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "Could not read the token");
-            setToken(data.token);
-        } catch (err) {
-            setTokenError(err instanceof Error ? err.message : "Could not read the token");
-        } finally {
-            setRevealing(false);
-        }
-    };
-
-    const TOKEN = token ?? "PASTE_RELAY_AGENT_TOKEN";
+    const TOKEN = "PASTE_THIS_MACHINES_SECRET";
 
     const snippets: Record<Shell, string> = {
         powershell: `mkdir claude-relay
@@ -76,7 +58,7 @@ npm init -y
 npm install ws node-pty
 Invoke-WebRequest -Uri "${srcUrl}" -Headers @{ Authorization = "Bearer ${TOKEN}" } -OutFile claude-relay.mjs
 $env:RELAY_URL = "${wsUrl}"
-$env:RELAY_AGENT_TOKEN = "${TOKEN}"
+$env:RELAY_AGENT_SECRET = "${TOKEN}"
 $env:RELAY_AGENT_NAME = "workstation"
 node claude-relay.mjs`,
 
@@ -86,7 +68,7 @@ npm init -y
 npm install ws node-pty
 curl -f -H "Authorization: Bearer ${TOKEN}" "${srcUrl}" -o claude-relay.mjs
 set RELAY_URL=${wsUrl}
-set RELAY_AGENT_TOKEN=${TOKEN}
+set RELAY_AGENT_SECRET=${TOKEN}
 set RELAY_AGENT_NAME=workstation
 node claude-relay.mjs`,
 
@@ -95,7 +77,7 @@ npm init -y
 npm install ws
 curl -fsSL -H "Authorization: Bearer ${TOKEN}" "${srcUrl}" -o claude-relay.mjs
 export RELAY_URL="${wsUrl}"
-export RELAY_AGENT_TOKEN="${TOKEN}"
+export RELAY_AGENT_SECRET="${TOKEN}"
 export RELAY_AGENT_NAME="vm-dev"
 node claude-relay.mjs`,
 
@@ -104,7 +86,7 @@ npm init -y
 npm install ws
 curl -fsSL -H "Authorization: Bearer ${TOKEN}" "${srcUrl}" -o claude-relay.mjs
 export RELAY_URL="${wsUrl}"
-export RELAY_AGENT_TOKEN="${TOKEN}"
+export RELAY_AGENT_SECRET="${TOKEN}"
 export RELAY_AGENT_NAME="mac-mini"
 node claude-relay.mjs`,
     };
@@ -175,43 +157,9 @@ node claude-relay.mjs`,
             </div>
             <p style={{ marginBottom: 12, color: t.textMuted }}>
                 No checkout needed — the agent downloads itself. Node 20+ is the only prerequisite.{" "}
-                {token
-                    ? "The snippet below is complete: copy it and run it as it stands."
-                    : "Press the button below to drop your token straight into the snippet, rather than substituting it by hand in three places."}
+                Replace <code style={code}>PASTE_THIS_MACHINES_SECRET</code> with the secret for
+                this machine, from the Machines panel above.
             </p>
-
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
-                {!token ? (
-                    <button
-                        onClick={() => void reveal()}
-                        disabled={revealing}
-                        style={{
-                            display: "inline-flex", alignItems: "center", gap: 6,
-                            padding: "6px 13px", borderRadius: t.buttonRadius,
-                            border: `1px solid ${t.accentPrimary}`,
-                            background: t.accentPrimaryMuted, color: t.accentPrimary,
-                            fontSize: "0.76rem", fontWeight: 700, cursor: "pointer",
-                            fontFamily: t.fontFamily,
-                        }}
-                    >
-                        {revealing
-                            ? <Loader2 style={{ width: 12, height: 12, animation: "relaySpin 0.9s linear infinite" }} />
-                            : <Eye style={{ width: 12, height: 12 }} />}
-                        Fill in my token
-                    </button>
-                ) : (
-                    <span style={{
-                        display: "inline-flex", alignItems: "center", gap: 6,
-                        fontSize: "0.75rem", fontWeight: 600, color: t.statusSuccess,
-                    }}>
-                        <Check style={{ width: 12, height: 12 }} />
-                        Token filled in below — copy and run as-is
-                    </span>
-                )}
-                {tokenError && (
-                    <span style={{ fontSize: "0.75rem", color: t.statusError }}>{tokenError}</span>
-                )}
-            </div>
 
             <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
                 {(Object.keys(LABELS) as Shell[]).map(k => (
@@ -298,7 +246,7 @@ node claude-relay.mjs`,
                     the download failed and the error was written into the file instead of the
                     agent. Open <code style={code}>claude-relay.mjs</code> — if it says{" "}
                     <code style={code}>{"{"}&quot;error&quot;:&quot;Unauthorized&quot;{"}"}</code>{" "}
-                    the token was wrong, usually the placeholder above left unreplaced. The{" "}
+                    the secret was wrong, revoked, or the placeholder was left unreplaced. The{" "}
                     <code style={code}>-f</code> on curl makes it fail loudly instead, but a file
                     from an earlier attempt will still be sitting there.
                 </span>

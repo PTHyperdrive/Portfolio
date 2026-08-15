@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { verifyAgentToken } from "../../../../../lib/relay-ticket.mjs";
+import { authenticateAgentSecret } from "../../../../../lib/relay-agent-auth.mjs";
 
 /**
  * GET /api/relay/agent-source
@@ -24,9 +24,13 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
     const header = req.headers.get("authorization") || "";
-    const token = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
+    const secret = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
 
-    if (!verifyAgentToken(token)) {
+    // The machine has no agent yet, so it presents its static per-machine
+    // secret rather than a rolling proof. Revoking that machine closes this
+    // too, which is the point of moving off one shared token.
+    const name = await authenticateAgentSecret(secret);
+    if (!name) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 

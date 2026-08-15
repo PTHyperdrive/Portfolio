@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { Terminal as TerminalIcon, Plug, PlugZap, AlertTriangle, RotateCcw, Users, Monitor } from "lucide-react";
 import RelaySetup from "./RelaySetup";
+import AgentKeys from "./AgentKeys";
 import { useThemeTokens } from "@/lib/useThemeTokens";
 import { useIsMobile } from "@/lib/useIsMobile";
 
@@ -410,8 +411,14 @@ export default function AdminRelayPage() {
                 );
             })()}
 
-            {/* The guide stays visible until a machine is actually attached. */}
-            {!(phase === "attached" && agents.length > 0) && <RelaySetup host={host} />}
+            {/* The guide and credential list stay visible until a machine is
+                actually attached, which is when they stop being what you need. */}
+            {!(phase === "attached" && agents.length > 0) && (
+                <>
+                    <AgentKeys host={host} />
+                    <RelaySetup host={host} />
+                </>
+            )}
 
             <div style={{
                 borderRadius: t.cardRadius,
