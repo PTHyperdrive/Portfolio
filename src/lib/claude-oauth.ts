@@ -2,8 +2,9 @@ import crypto from "crypto";
 
 /** Default Anthropic / Claude Code OAuth client id */
 export const CLAUDE_OAUTH_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
-export const CLAUDE_OAUTH_AUTHORIZE_URL = "https://claude.ai/oauth/authorize";
+export const CLAUDE_OAUTH_AUTHORIZE_URL = "https://claude.com/cai/oauth/authorize";
 export const CLAUDE_OAUTH_TOKEN_URL = "https://api.anthropic.com/v1/oauth/tokens";
+export const CLAUDE_OAUTH_REDIRECT_URI = "https://platform.claude.com/oauth/code/callback";
 
 export interface PKCEPair {
     codeVerifier: string;
@@ -50,23 +51,52 @@ export function generatePKCE(): PKCEPair {
 }
 
 export function buildClaudeAuthUrl(params: {
-    redirectUri: string;
+    redirectUri?: string;
     codeChallenge: string;
     state: string;
 }): string {
     const url = new URL(CLAUDE_OAUTH_AUTHORIZE_URL);
+    url.searchParams.set("code", "true");
     url.searchParams.set("client_id", CLAUDE_OAUTH_CLIENT_ID);
     url.searchParams.set("response_type", "code");
-    url.searchParams.set("redirect_uri", params.redirectUri);
-    url.searchParams.set("scope", "user:inference");
+    url.searchParams.set("redirect_uri", params.redirectUri || CLAUDE_OAUTH_REDIRECT_URI);
+    url.searchParams.set(
+        "scope",
+        "org:create_api_key user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload"
+    );
     url.searchParams.set("code_challenge", params.codeChallenge);
     url.searchParams.set("code_challenge_method", "S256");
     url.searchParams.set("state", params.state);
     return url.toString();
 }
 
+function findTokenInObj(obj: unknown): string | null {
+    if (!obj) return null;
+    if (typeof obj === "string" && (obj.startsWith("sk-ant-oat") || obj.startsWith("sk-ant-sid"))) {
+        return obj;
+    }
+    if (typeof obj === "object") {
+        const record = obj as Record<string, unknown>;
+        if (typeof record.accessToken === "string" && record.accessToken.startsWith("sk-ant-")) {
+            return record.accessToken;
+        }
+        if (typeof record.access_token === "string" && record.access_token.startsWith("sk-ant-")) {
+            return record.access_token;
+        }
+        if (typeof record.session_key === "string" && record.session_key.startsWith("sk-ant-")) {
+            return record.session_key;
+        }
+
+        for (const key of Object.keys(record)) {
+            const val = findTokenInObj(record[key]);
+            if (val) return val;
+        }
+    }
+    return null;
+}
+
 /**
- * Extract authorization code from raw string, full URL, or URL fragment.
+ * Extract authorization code or token from raw string, JSON object, full URL, or URL fragment.
  */
 export function extractAuthCode(input: string): string {
     const trimmed = input.trim();
@@ -75,6 +105,15 @@ export function extractAuthCode(input: string): string {
     // Direct token string passed
     if (trimmed.startsWith("sk-ant-oat") || trimmed.startsWith("sk-ant-sid")) {
         return trimmed;
+    }
+
+    // JSON object passed
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+        try {
+            const parsedJson = JSON.parse(trimmed);
+            const extracted = findTokenInObj(parsedJson);
+            if (extracted) return extracted;
+        } catch {}
     }
 
     try {
@@ -86,6 +125,10 @@ export function extractAuthCode(input: string): string {
         // Search regex pattern for code parameter
         const match = /[?&#]code=([A-Za-z0-9._-]+)/.exec(trimmed);
         if (match) return match[1];
+
+        // Regex search for sk-ant-oat/sid token inside pasted text/JSON
+        const tokenMatch = /(sk-ant-(?:oat|sid)[A-Za-z0-9_-]+)/.exec(trimmed);
+        if (tokenMatch) return tokenMatch[1];
     }
 
     return trimmed;
