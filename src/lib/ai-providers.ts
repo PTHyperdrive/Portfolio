@@ -207,18 +207,36 @@ export function requireKey(node: AiNode): string {
     const key = decryptNodeKey(node.apiKey);
     if (!key) {
         throw new Error(
-            `${vendorFor(node.provider)} node "${node.displayName}" has no usable API key. ` +
+            `${vendorFor(node.provider)} node "${node.displayName}" has no usable subscription token or API key. ` +
             `Add one in Admin → AI Nodes.`,
         );
     }
     return key;
 }
 
-/** Clients are stateless and cheap; construct per request rather than caching
- *  a client whose key may have been rotated in the admin panel since. */
+/**
+ * Clients are stateless and cheap; construct per request rather than caching
+ * a client whose key may have been rotated in the admin panel since.
+ * Supports both Claude Subscriptions (authToken / Bearer token) and standard API keys (apiKey).
+ */
 export function anthropicClient(node: AiNode): Anthropic {
+    const rawKey = requireKey(node);
+    const key = rawKey.trim();
+
+    // Claude Subscriptions (OAuth, setup tokens, session keys) use Bearer authentication (`authToken`),
+    // whereas pay-per-token API keys use `x-api-key` header (`apiKey`).
+    const isSubscriptionToken =
+        key.startsWith("sk-ant-oat") ||
+        key.startsWith("sk-ant-sid") ||
+        key.toLowerCase().startsWith("bearer:") ||
+        key.startsWith("eyJ"); // JWT subscription tokens
+
+    const cleanToken = key.replace(/^bearer:\s*/i, "").trim();
+
     return new Anthropic({
-        apiKey: requireKey(node),
+        ...(isSubscriptionToken
+            ? { authToken: cleanToken }
+            : { apiKey: cleanToken }),
         ...(node.baseUrl ? { baseURL: node.baseUrl } : {}),
     });
 }

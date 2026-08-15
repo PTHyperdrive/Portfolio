@@ -2,7 +2,9 @@
  * ANTHROPIC adapter — Claude via the official SDK
  *
  * Uses `@anthropic-ai/sdk` rather than raw HTTP: the SDK owns retries, timeout
- * scaling for large `max_tokens`, and the streaming event shapes.
+ * scaling for large `max_tokens`, and streaming event shapes. Supports both
+ * Claude Subscriptions (OAuth/setup/session tokens `sk-ant-oat...` via Bearer auth)
+ * and standard Anthropic API keys (`sk-ant-api...`).
  *
  * ── The sandbox ───────────────────────────────────────────────────
  *

@@ -18,7 +18,7 @@ const createSchema = z.object({
      * is then an override for a proxy or a region-specific host.
      */
     baseUrl: z.string().trim().url().max(200).optional().or(z.literal("")),
-    apiKey: z.string().trim().max(200).optional(),
+    apiKey: z.string().trim().max(2000).optional(),
     modelId: z.string().trim().min(1).max(160),
     contextLen: z.number().int().min(512).max(2_000_000).default(8192),
     maxTokens: z.number().int().min(64).max(128_000).default(2048),
@@ -30,7 +30,7 @@ const createSchema = z.object({
     message: "A local node needs a base URL — the OpenAI-compatible endpoint, e.g. http://10.10.0.100:1234/v1",
     path: ["baseUrl"],
 }).refine(v => v.provider === "LOCAL" || Boolean(v.apiKey), {
-    message: "A hosted provider needs an API key.",
+    message: "A hosted provider needs a Claude Subscription Token or API key.",
     path: ["apiKey"],
 });
 

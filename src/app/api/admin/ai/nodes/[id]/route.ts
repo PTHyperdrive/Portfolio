@@ -13,7 +13,7 @@ const patchSchema = z.object({
     /** "" clears the override so a hosted provider uses its own default. */
     baseUrl: z.string().trim().url().max(200).optional().or(z.literal("")),
     /** "" clears the stored key; omit to leave it untouched. */
-    apiKey: z.string().trim().max(200).nullable().optional(),
+    apiKey: z.string().trim().max(2000).nullable().optional(),
     modelId: z.string().trim().min(1).max(160).optional(),
     contextLen: z.number().int().min(512).max(2_000_000).optional(),
     maxTokens: z.number().int().min(64).max(128_000).optional(),

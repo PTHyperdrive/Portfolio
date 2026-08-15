@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
     Bot, Plus, RefreshCw, Trash2, Circle, Lock, Users,
-    AlertTriangle, Check, X, Server, Cloud,
+    AlertTriangle, Check, X, Server, Cloud, ExternalLink, Sparkles,
 } from "lucide-react";
 import { useThemeTokens } from "@/lib/useThemeTokens";
 
@@ -125,6 +125,84 @@ export default function AdminAiNodesPage() {
     const [probing, setProbing] = useState<string | null>(null);
     const [probes, setProbes] = useState<Record<string, ProbeResult>>({});
     const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+
+    const [oauthLoading, setOauthLoading] = useState(false);
+    const [oauthModal, setOauthModal] = useState(false);
+    const [oauthData, setOauthData] = useState<{ codeVerifier: string; redirectUri: string } | null>(null);
+    const [pastedCode, setPastedCode] = useState("");
+    const [oauthSuccess, setOauthSuccess] = useState<string | null>(null);
+    const [oauthError, setOauthError] = useState<string | null>(null);
+
+    const exchangeClaudeCode = useCallback(async (code: string, verifier?: string, redirectUri?: string) => {
+        setOauthLoading(true);
+        setOauthError(null);
+        try {
+            const res = await fetch("/api/admin/ai/claude-oauth/exchange", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    code,
+                    codeVerifier: verifier || oauthData?.codeVerifier,
+                    redirectUri: redirectUri || oauthData?.redirectUri,
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Failed to exchange code");
+
+            setForm(f => ({ ...f, apiKey: data.accessToken }));
+            setOauthSuccess("Claude Subscription Token extracted and applied!");
+            setTimeout(() => {
+                setOauthModal(false);
+                setOauthSuccess(null);
+            }, 1600);
+        } catch (err) {
+            setOauthError(err instanceof Error ? err.message : "Extraction failed");
+        } finally {
+            setOauthLoading(false);
+        }
+    }, [oauthData]);
+
+    useEffect(() => {
+        const handleMessage = (e: MessageEvent) => {
+            if (e.data?.type === "CLAUDE_OAUTH_RESPONSE") {
+                if (e.data.code) {
+                    exchangeClaudeCode(e.data.code);
+                } else if (e.data.error) {
+                    setOauthError(e.data.error);
+                }
+            }
+        };
+        window.addEventListener("message", handleMessage);
+        return () => window.removeEventListener("message", handleMessage);
+    }, [exchangeClaudeCode]);
+
+    const startClaudeOAuth = async () => {
+        setOauthLoading(true);
+        setOauthError(null);
+        setPastedCode("");
+        try {
+            const res = await fetch("/api/admin/ai/claude-oauth/start", { method: "POST" });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Failed to initialize login");
+
+            setOauthData({ codeVerifier: data.codeVerifier, redirectUri: data.redirectUri });
+            setOauthModal(true);
+
+            const width = 600;
+            const height = 700;
+            const left = window.screenX + (window.innerWidth - width) / 2;
+            const top = window.screenY + (window.innerHeight - height) / 2;
+            window.open(
+                data.authUrl,
+                "ClaudeSubscriptionLogin",
+                `width=${width},height=${height},top=${top},left=${left},status=no,resizable=yes`,
+            );
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to open Claude login");
+        } finally {
+            setOauthLoading(false);
+        }
+    };
 
     const load = useCallback(async () => {
         try {
@@ -369,11 +447,33 @@ export default function AdminAiNodesPage() {
                         </div>
                         <div>
                             <label style={label}>
-                                API key {isLocal ? "(optional)" : "(required)"}
+                                {form.provider === "ANTHROPIC" ? "Subscription Token / API key" : "API key"} {isLocal ? "(optional)" : "(required)"}
                             </label>
                             <input style={field} type="password" value={form.apiKey}
-                                placeholder={isLocal ? "usually blank" : "sk-ant-… / AIza…"}
+                                placeholder={isLocal ? "usually blank" : form.provider === "ANTHROPIC" ? "sk-ant-oat… / sk-ant-sid… / sk-ant-api…" : "AIza…"}
                                 onChange={e => setForm(f => ({ ...f, apiKey: e.target.value }))} />
+
+                            {form.provider === "ANTHROPIC" && (
+                                <div style={{ marginTop: 8 }}>
+                                    <button
+                                        type="button"
+                                        onClick={startClaudeOAuth}
+                                        disabled={oauthLoading}
+                                        style={{
+                                            display: "inline-flex", alignItems: "center", gap: 7,
+                                            padding: "6px 12px", borderRadius: t.buttonRadius,
+                                            border: `1px solid ${t.accentPrimary}`,
+                                            background: t.accentPrimaryMuted,
+                                            color: t.accentPrimary,
+                                            fontSize: "0.76rem", fontWeight: 700, cursor: "pointer",
+                                            fontFamily: t.fontFamily, transition: "all 0.15s",
+                                        }}
+                                    >
+                                        {oauthLoading ? <RefreshCw style={{ width: 13, height: 13, animation: "adminSpin 1s linear infinite" }} /> : <Sparkles style={{ width: 13, height: 13 }} />}
+                                        Login to Claude & Extract Subscription Key
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
 
@@ -475,13 +575,10 @@ export default function AdminAiNodesPage() {
                             background: t.bgTertiary,
                             fontSize: "0.76rem", lineHeight: 1.55, color: t.textMuted,
                         }}>
-                            The key is encrypted at rest and only ever decrypted server-side —
-                            it is never returned by any route and never reaches a browser.
-                            Creating the node spends one token verifying that the key, the model
-                            id and the network path all agree; a reachability check alone would
-                            go green on an invalid key.
-                            {" "}Retrieval stays local either way: the knowledge base is embedded
-                            on your own hardware and is never sent to a hosted embedding API.
+                            The key or subscription token is encrypted at rest and decrypted only server-side.
+                            {form.provider === "ANTHROPIC" && " For Claude, you can use either a Claude Subscription token (OAuth / setup token starting with sk-ant-oat… or sk-ant-sid…, sent via Bearer auth) or an Anthropic API key (sk-ant-api…). "}
+                            Creating the node spends one token verifying that the credential, the model
+                            id and the network path all agree. Retrieval stays local either way.
                         </p>
                     )}
 
@@ -663,6 +760,124 @@ export default function AdminAiNodesPage() {
                             </div>
                         );
                     })}
+                </div>
+            )}
+
+            {/* OAuth Login & Token Extraction Modal */}
+            {oauthModal && (
+                <div style={{
+                    position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+                    zIndex: 1000, background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)",
+                    display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+                }}>
+                    <div style={{
+                        ...card, maxWidth: 500, width: "100%", padding: "24px 28px",
+                        position: "relative", animation: "aiFadeIn 0.2s ease",
+                    }}>
+                        <button
+                            onClick={() => setOauthModal(false)}
+                            style={{
+                                position: "absolute", top: 18, right: 18,
+                                background: "none", border: "none", color: t.textMuted,
+                                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                            }}
+                        >
+                            <X style={{ width: 18, height: 18 }} />
+                        </button>
+
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+                            <div style={{
+                                width: 38, height: 38, borderRadius: t.cardRadius,
+                                background: t.accentPrimaryMuted, color: t.accentPrimary,
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                            }}>
+                                <Sparkles style={{ width: 20, height: 20 }} />
+                            </div>
+                            <div>
+                                <h3 style={{ fontSize: "1.1rem", fontWeight: 700, color: t.textPrimary }}>
+                                    Connect Claude Subscription
+                                </h3>
+                                <p style={{ fontSize: "0.78rem", color: t.textMuted }}>
+                                    Log in to Claude to automatically extract your subscription token.
+                                </p>
+                            </div>
+                        </div>
+
+                        {oauthSuccess ? (
+                            <div style={{
+                                padding: "14px 16px", borderRadius: t.cardRadius,
+                                background: t.statusSuccessBg, border: `1px solid ${t.statusSuccess}40`,
+                                color: t.statusSuccess, fontSize: "0.85rem", fontWeight: 600,
+                                display: "flex", alignItems: "center", gap: 10,
+                            }}>
+                                <Check style={{ width: 18, height: 18, flexShrink: 0 }} />
+                                {oauthSuccess}
+                            </div>
+                        ) : (
+                            <>
+                                <div style={{
+                                    padding: "14px 16px", borderRadius: t.cardRadius,
+                                    background: t.bgTertiary, border: `1px solid ${t.borderPrimary}`,
+                                    marginBottom: 18, fontSize: "0.8rem", color: t.textSecondary, lineHeight: 1.55,
+                                }}>
+                                    <p style={{ fontWeight: 600, color: t.textPrimary, marginBottom: 6, display: "flex", alignItems: "center", gap: 6 }}>
+                                        <ExternalLink style={{ width: 14, height: 14, color: t.accentPrimary }} />
+                                        Option 1: Complete login in the popup window
+                                    </p>
+                                    <p style={{ color: t.textMuted, marginBottom: 10 }}>
+                                        No Client ID setup is required — the system uses Anthropic&rsquo;s standard OAuth flow. Sign in to your Claude Pro/Team account in the popup. Once approved, your subscription token (<code style={{ fontFamily: t.fontMono, color: t.accentPrimary }}>sk-ant-oat…</code>) auto-populates.
+                                    </p>
+
+                                    <p style={{ fontWeight: 600, color: t.textPrimary, marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
+                                        <Sparkles style={{ width: 14, height: 14, color: t.accentPrimary }} />
+                                        Option 2: Extract via Terminal / CLI
+                                    </p>
+                                    <p style={{ color: t.textMuted }}>
+                                        Run <code style={{ fontFamily: t.fontMono, background: t.bgSecondary, padding: "2px 6px", borderRadius: 4, color: t.accentPrimary }}>npx @anthropic-ai/claude-code setup-token</code> in your terminal, then paste the generated <code style={{ fontFamily: t.fontMono, color: t.accentPrimary }}>sk-ant-oat…</code> token below.
+                                    </p>
+                                </div>
+
+                                {oauthError && (
+                                    <div style={{
+                                        padding: "10px 14px", borderRadius: t.cardRadius, marginBottom: 16,
+                                        background: t.statusErrorBg, border: `1px solid ${t.statusError}40`,
+                                        color: t.statusError, fontSize: "0.78rem", display: "flex", alignItems: "center", gap: 8,
+                                    }}>
+                                        <AlertTriangle style={{ width: 14, height: 14, flexShrink: 0 }} />
+                                        {oauthError}
+                                    </div>
+                                )}
+
+                                <div>
+                                    <label style={label}>
+                                        Manual Fallback: Paste Authorization Code or Redirect URL
+                                    </label>
+                                    <div style={{ display: "flex", gap: 8 }}>
+                                        <input
+                                            style={field}
+                                            value={pastedCode}
+                                            placeholder="Paste http://... callback URL or code here"
+                                            onChange={e => setPastedCode(e.target.value)}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => exchangeClaudeCode(pastedCode)}
+                                            disabled={oauthLoading || !pastedCode.trim()}
+                                            style={{
+                                                padding: "8px 14px", borderRadius: t.buttonRadius,
+                                                border: "none", background: t.accentPrimary, color: t.textInverse,
+                                                fontSize: "0.8rem", fontWeight: 700, cursor: oauthLoading ? "wait" : "pointer",
+                                                opacity: pastedCode.trim() ? 1 : 0.5, flexShrink: 0,
+                                                fontFamily: t.fontFamily,
+                                            }}
+                                        >
+                                            {oauthLoading ? "Extracting…" : "Extract"}
+                                        </button>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                    </div>
                 </div>
             )}
 
