@@ -104,6 +104,50 @@ function parseDataUrl(url: string): ChatImage | null {
     return match ? { mediaType: match[1], data: match[2] } : null;
 }
 
+/** True when the runtime refused to load the model rather than failing to answer. */
+function isModelLoadFailure(err: unknown): boolean {
+    return err instanceof Error && /failed to load model/i.test(err.message);
+}
+
+/**
+ * Turn whatever went wrong into a sentence worth showing.
+ *
+ * Two failures here reached the browser as a blank assistant bubble. One was an
+ * error carrying an empty message — the panel rendered "" and the log said
+ * `failed:` with nothing after it. The other was an upstream 400 whose body was
+ * raw OpenAI error JSON, pasted into the UI braces and all.
+ *
+ * So: never return an empty string, and unwrap the provider's JSON to the one
+ * sentence inside it that says what to do.
+ */
+function describeChatFailure(err: unknown, nodeName: string): string {
+    const raw = err instanceof Error ? err.message : String(err ?? "");
+
+    // Upstream bodies arrive appended to our own text; find the JSON in them.
+    const brace = raw.indexOf("{");
+    if (brace !== -1) {
+        try {
+            const body = JSON.parse(raw.slice(brace));
+            const inner = body?.error?.message ?? body?.message;
+            if (typeof inner === "string" && inner) {
+                return /failed to load model/i.test(inner)
+                    ? `${inner} This usually means the model does not fit in the GPU memory ` +
+                      `available on ${nodeName}. Pick a smaller model, or unload another one first.`
+                    : inner;
+            }
+        } catch { /* not JSON after all — fall through */ }
+    }
+
+    if (raw.trim()) return raw;
+
+    // Empty message: say what is actually known rather than showing nothing.
+    if (err instanceof Error && err.name === "AbortError") {
+        return "The request was cancelled before the model replied.";
+    }
+    return `${nodeName} closed the connection without answering. ` +
+        `It may have run out of memory loading the model, or been restarted mid-request.`;
+}
+
 export async function POST(req: Request) {
     const { userId, error } = await requireUser();
     if (error) return error;
@@ -460,27 +504,41 @@ export async function POST(req: Request) {
             } catch (err) {
                 // Client disconnects and upstream failures both land here.
                 // Keep whatever was generated rather than discarding it.
-                const message = err instanceof Error ? err.message : "Stream interrupted";
-                console.error(`[api/ai/chat] ${node.name} (${node.provider}) failed:`, message);
+                const message = describeChatFailure(err, node.displayName);
+
+                // Log the name and stack, not just the message. An error whose
+                // message was empty reached the panel as a blank bubble and
+                // there was nothing in the log to identify it by either.
+                console.error(
+                    `[api/ai/chat] ${node.name} (${node.provider}) failed:`,
+                    err instanceof Error ? `${err.name}: ${err.message || "(empty message)"}` : String(err),
+                    err instanceof Error && err.stack ? `\n${err.stack}` : "",
+                );
 
                 await prisma.aiMessage.update({
                     where: { id: assistant.id },
                     data: { content: answer, failed: answer.length === 0 },
                 }).catch(() => { /* row may be gone if the thread was deleted mid-stream */ });
 
-                // Only a transport failure means the node is down. An aborted
-                // request is the user closing a tab, and marking a healthy node
-                // offline for that would take it out of rotation for everyone.
-                if (answer.length === 0 && !req.signal.aborted) {
+                // Only a transport failure means the node is down. A model that
+                // will not load is a capacity problem on one model, not an
+                // unreachable host — taking the node out of rotation for that
+                // would strand every other model it serves.
+                if (answer.length === 0 && !req.signal.aborted && !isModelLoadFailure(err)) {
                     await prisma.aiNode.update({
                         where: { id: node.id },
                         data: { online: false, lastError: message.slice(0, 500), lastCheckAt: new Date() },
                     }).catch(() => { /* best effort */ });
                 }
 
-                controller.enqueue(sseEvent("error", { message }));
+                // The controller is already closed when the browser hung up
+                // first, and enqueueing then throws — which previously replaced
+                // a real failure with a second, more confusing one.
+                try {
+                    controller.enqueue(sseEvent("error", { message }));
+                } catch { /* client is gone; the row above records what happened */ }
             } finally {
-                controller.close();
+                try { controller.close(); } catch { /* already closed */ }
             }
         },
     });

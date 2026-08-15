@@ -168,6 +168,6 @@ export const anthropicAdapter: ProviderAdapter = {
     async listModels(node) {
         const client = await anthropicClient(node);
         const page = await client.models.list({ limit: 50 });
-        return page.data.map(m => m.id);
+        return page.data.map(m => ({ id: m.id }));
     },
 };

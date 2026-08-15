@@ -15,7 +15,7 @@
 
 import type { AiNode } from "@/generated/prisma";
 import { decryptNodeKey } from "@/lib/ai-node-crypto";
-import type { ChatEvent, ProviderAdapter } from "@/lib/ai-providers";
+import type { ChatEvent, ModelInfo, ProviderAdapter } from "@/lib/ai-providers";
 import { buildTranscript } from "@/lib/ai-providers";
 
 type Part =
@@ -225,6 +225,14 @@ export const localAdapter: ProviderAdapter = {
     },
 
     async listModels(node) {
+        // LM Studio's own API reports load state and a real type field, which
+        // the OpenAI-compatible /models cannot. Worth asking for first: whether
+        // a model is resident decides between an instant reply and a minute of
+        // loading, and `type` classifies embeddings properly rather than by
+        // guessing from the name.
+        const native = await fetchNativeCatalog(node);
+        if (native) return native;
+
         const res = await fetch(endpoint(node, "/models"), {
             headers: authHeaders(node),
             signal: AbortSignal.timeout(12_000),
@@ -233,6 +241,41 @@ export const localAdapter: ProviderAdapter = {
         const body = await res.json();
         return (body?.data ?? [])
             .map((m: { id?: string }) => m.id)
-            .filter((v: unknown): v is string => typeof v === "string");
+            .filter((v: unknown): v is string => typeof v === "string")
+            .map((id: string) => ({ id }));
     },
 };
+
+/**
+ * Ask LM Studio's native catalogue, at /api/v0/models alongside the OpenAI
+ * routes. Returns null for any runtime that does not serve it — vLLM and
+ * Ollama do not — so the caller falls back rather than failing.
+ */
+async function fetchNativeCatalog(node: AiNode): Promise<ModelInfo[] | null> {
+    if (!node.baseUrl) return null;
+    // The base URL points at /v1; the native API is a sibling of it.
+    const root = node.baseUrl.replace(/\/+$/, "").replace(/\/v1$/, "");
+
+    try {
+        const res = await fetch(`${root}/api/v0/models`, {
+            headers: authHeaders(node),
+            signal: AbortSignal.timeout(8000),
+        });
+        if (!res.ok) return null;
+
+        const body = await res.json();
+        const rows = body?.data;
+        if (!Array.isArray(rows)) return null;
+
+        return rows
+            .filter((m: { id?: unknown }) => typeof m.id === "string")
+            .map((m: { id: string; state?: string; type?: string; max_context_length?: number }) => ({
+                id: m.id,
+                loaded: m.state === "loaded",
+                type: m.type,
+                maxContext: m.max_context_length,
+            }));
+    } catch {
+        return null; // not LM Studio, or unreachable — the caller retries the standard route
+    }
+}

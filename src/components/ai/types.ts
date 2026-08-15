@@ -24,10 +24,21 @@ export interface AiNodeSummary {
     lastCheckAt: string | null;
 }
 
-/** A model a node is serving right now, discovered rather than configured. */
+/** One model a node can run, as reported by the runtime. */
+export interface ModelInfo {
+    id: string;
+    /** Undefined where the provider cannot say whether it is resident. */
+    loaded?: boolean;
+    type?: string;
+    maxContext?: number;
+}
+
+/** A node's model catalogue, discovered rather than configured. */
 export interface NodeModels {
-    models: string[];
+    models: ModelInfo[];
     defaultModelId: string;
+    /** False when the runtime does not report residency, so the UI stays quiet. */
+    reportsLoadState: boolean;
     loading: boolean;
     error?: string;
 }

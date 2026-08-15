@@ -115,16 +115,40 @@ export interface ProviderAdapter {
      * operator loading a second model into LM Studio should not also have to
      * remember to tell the platform about it.
      */
-    listModels(node: AiNode): Promise<string[]>;
+    listModels(node: AiNode): Promise<ModelInfo[]>;
+}
+
+/**
+ * A model a node can run.
+ *
+ * `loaded` matters more than it looks: asking LM Studio for a model that is not
+ * resident makes it load one, which measured 66 seconds on the RTX pair — long
+ * enough that the request gave up first and aborted the load, surfacing as a
+ * blank reply. Knowing this up front lets the picker warn instead.
+ *
+ * Fields are optional because only some providers report them; a hosted API
+ * has no concept of a model being loaded.
+ */
+export interface ModelInfo {
+    id: string;
+    /** True/false where the runtime says; undefined where it cannot. */
+    loaded?: boolean;
+    /** "llm" | "vlm" | "embeddings" — the runtime's own classification. */
+    type?: string;
+    maxContext?: number;
 }
 
 /**
  * Embedding models cannot hold a conversation, and offering one in a chat
- * picker only produces a confusing failure. Filtered by name because no
- * provider marks them in a machine-readable way.
+ * picker only produces a confusing failure several seconds later.
+ *
+ * Prefers the runtime's own classification, falling back to the name only when
+ * it does not say — a heuristic on the id would misjudge anything unluckily
+ * named, and LM Studio reports the type outright.
  */
-export function isChatModel(id: string): boolean {
-    return !/embed|embedding/i.test(id);
+export function isChatModel(model: ModelInfo): boolean {
+    if (model.type) return model.type !== "embeddings";
+    return !/embed|embedding/i.test(model.id);
 }
 
 /* ─── Shared transcript construction ─────────────────────────────── */

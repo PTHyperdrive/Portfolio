@@ -54,7 +54,10 @@ export default function ModelPicker({
     const loadModels = useCallback(async (nodeId: string) => {
         setCatalog(prev => {
             if (prev[nodeId] && !prev[nodeId].error) return prev;
-            return { ...prev, [nodeId]: { models: [], defaultModelId: "", loading: true } };
+            return {
+                ...prev,
+                [nodeId]: { models: [], defaultModelId: "", reportsLoadState: false, loading: true },
+            };
         });
         try {
             const res = await fetch(`/api/ai/nodes/${nodeId}/models`);
@@ -62,13 +65,18 @@ export default function ModelPicker({
             if (!res.ok) throw new Error(data.error || "Could not list models");
             setCatalog(prev => ({
                 ...prev,
-                [nodeId]: { models: data.models, defaultModelId: data.defaultModelId, loading: false },
+                [nodeId]: {
+                    models: data.models,
+                    defaultModelId: data.defaultModelId,
+                    reportsLoadState: Boolean(data.reportsLoadState),
+                    loading: false,
+                },
             }));
         } catch (err) {
             setCatalog(prev => ({
                 ...prev,
                 [nodeId]: {
-                    models: [], defaultModelId: "", loading: false,
+                    models: [], defaultModelId: "", reportsLoadState: false, loading: false,
                     error: err instanceof Error ? err.message : "Could not list models",
                 },
             }));
@@ -251,12 +259,19 @@ export default function ModelPicker({
 
                                                 {entry?.models.map(model => {
                                                     const chosen = activeNode
-                                                        && (selectedModelId ? selectedModelId === model : entry.defaultModelId === model);
+                                                        && (selectedModelId ? selectedModelId === model.id : entry.defaultModelId === model.id);
+                                                    // Cold models take a minute to load, and the load
+                                                    // aborts if the request gives up first — measured at
+                                                    // 66s on the RTX pair. Say so before it is picked.
+                                                    const cold = entry.reportsLoadState && model.loaded === false;
                                                     return (
                                                         <button
-                                                            key={model}
+                                                            key={model.id}
+                                                            title={cold
+                                                                ? "Not loaded — the host loads it first, which can take a minute"
+                                                                : undefined}
                                                             onClick={() => {
-                                                                onSelect(node.id, model);
+                                                                onSelect(node.id, model.id);
                                                                 setOpen(false);
                                                             }}
                                                             style={{
@@ -279,9 +294,20 @@ export default function ModelPicker({
                                                                 flex: 1, minWidth: 0, overflow: "hidden",
                                                                 textOverflow: "ellipsis", whiteSpace: "nowrap",
                                                             }}>
-                                                                {short(model)}
+                                                                {short(model.id)}
                                                             </span>
-                                                            {model === entry.defaultModelId && (
+                                                            {entry.reportsLoadState && (
+                                                                <span style={{
+                                                                    display: "inline-flex", alignItems: "center", gap: 4, flexShrink: 0,
+                                                                    fontSize: "0.6rem", fontWeight: 700, letterSpacing: "0.04em",
+                                                                    padding: "1px 6px", borderRadius: 20,
+                                                                    background: cold ? t.bgTertiary : t.statusSuccessBg,
+                                                                    color: cold ? t.textMuted : t.statusSuccess,
+                                                                }}>
+                                                                    {cold ? "COLD ~1min" : "READY"}
+                                                                </span>
+                                                            )}
+                                                            {model.id === entry.defaultModelId && (
                                                                 <span style={{
                                                                     fontSize: "0.6rem", fontWeight: 700, letterSpacing: "0.05em",
                                                                     padding: "1px 6px", borderRadius: 20, flexShrink: 0,
@@ -308,7 +334,9 @@ export default function ModelPicker({
                             background: t.bgSecondary,
                             fontSize: "0.7rem", lineHeight: 1.5, color: t.textMuted,
                         }}>
-                            Models are read from each host live. Switching mid-conversation keeps the
+                            Models are read from each host live. A model marked COLD is not
+                            resident: the host loads it on first use, which can take a minute.
+                            Switching mid-conversation keeps the
                             thread — each model sees the others&rsquo; replies, labelled with who wrote them.
                         </p>
                     )}

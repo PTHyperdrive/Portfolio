@@ -340,6 +340,8 @@ export default function AiChatView({
             const reader = res.body.getReader();
             const decoder = new TextDecoder();
             let buffer = "";
+            /** Whether any answer token arrived. Reasoning alone does not count. */
+            let sawContent = false;
 
             for (;;) {
                 const { done, value } = await reader.read();
@@ -390,6 +392,7 @@ export default function AiChatView({
                             : m));
                     } else if (event === "delta") {
                         setPhase("streaming");
+                        sawContent = true;
                         const chunk = payload.text as string;
                         setMessages(prev => prev.map(m => m.id === replyId
                             ? { ...m, content: m.content + chunk } : m));
@@ -403,10 +406,24 @@ export default function AiChatView({
                             }
                             : m));
                     } else if (event === "error") {
+                        sawContent = true; // the server explained itself; do not double-report
                         throw new Error((payload.message as string) || "Generation failed");
                     }
                 }
             }
+            // A stream can end without ever delivering an error event — the
+            // server's controller is already closed when the browser hung up
+            // first, so the failure never reaches us. Ending with no text is
+            // itself the signal; without this the turn renders as an empty
+            // bubble with no explanation anywhere.
+            if (!sawContent && !controller.signal.aborted) {
+                throw new Error(
+                    "The model returned nothing. It may have run out of memory loading the "
+                    + "model, or spent its whole token budget reasoning — try a smaller model, "
+                    + "or raise Max output tokens for this node.",
+                );
+            }
+
             onConversationsChanged();
         } catch (err) {
             if (err instanceof Error && err.name === "AbortError") {

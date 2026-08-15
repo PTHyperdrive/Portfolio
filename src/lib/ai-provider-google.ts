@@ -115,11 +115,11 @@ export const googleAdapter: ProviderAdapter = {
 
     async listModels(node) {
         const client = googleClient(node);
-        const out: string[] = [];
+        const out: { id: string }[] = [];
         // The SDK paginates; a handful of pages is plenty for a picker.
         for await (const m of await client.models.list()) {
             // Names come back as "models/gemini-…"; the request wants the bare id.
-            if (m.name) out.push(m.name.replace(/^models\//, ""));
+            if (m.name) out.push({ id: m.name.replace(/^models\//, "") });
             if (out.length >= 100) break;
         }
         return out;

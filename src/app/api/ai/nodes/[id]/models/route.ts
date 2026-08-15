@@ -42,6 +42,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
         return NextResponse.json({
             models,
+            /**
+             * Whether this runtime reports load state at all. Without it the UI
+             * must not imply every model is cold — it simply does not know.
+             */
+            reportsLoadState: models.some(m => typeof m.loaded === "boolean"),
             // The configured default, so the picker can mark it even when the
             // host has since been loaded with others.
             defaultModelId: node.modelId,
