@@ -43,7 +43,7 @@ export const anthropicAdapter: ProviderAdapter = {
     nativeDocuments: true,
 
     async *stream(node, req, signal): AsyncGenerator<ChatEvent> {
-        const client = anthropicClient(node);
+        const client = await anthropicClient(node);
         const turns = buildTranscript(req.turns, node.provider);
 
         const messages: Anthropic.MessageParam[] = turns.map(t => ({
@@ -151,7 +151,7 @@ export const anthropicAdapter: ProviderAdapter = {
 
     async probe(node) {
         try {
-            const client = anthropicClient(node);
+            const client = await anthropicClient(node);
             // One-token round trip is the cheapest proof that the key, the
             // model id, and the network path all work together.
             const res = await client.messages.create({

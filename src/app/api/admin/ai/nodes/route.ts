@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/api-auth";
 import { encryptNodeKey, nodeKeyEncryptionAvailable, NO_ENCRYPTION_KEY } from "@/lib/ai-nodes";
 import { adapterFor } from "@/lib/ai-providers";
+import { REFRESH_COOKIE, clearOptions } from "@/lib/claude-oauth-flow";
 import { audit } from "@/lib/audit";
 
 const createSchema = z.object({
@@ -49,9 +51,13 @@ export async function GET() {
     });
 
     return NextResponse.json({
-        nodes: nodes.map(({ apiKey, _count, ...rest }) => ({
+        // refreshToken is destructured out and never returned. It mints new
+        // access tokens indefinitely, so it stays server-side even for an
+        // admin — only whether one exists is reported.
+        nodes: nodes.map(({ apiKey, refreshToken, _count, ...rest }) => ({
             ...rest,
             hasApiKey: Boolean(apiKey),
+            canRefresh: Boolean(refreshToken),
             conversationCount: _count.conversations,
         })),
     });
@@ -81,6 +87,11 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "A node with that name already exists" }, { status: 409 });
     }
 
+    // Pick up the refresh token the OAuth exchange stashed in an httpOnly
+    // cookie, so a subscription node can renew itself later. Absent for API
+    // keys and hand-pasted tokens, which is why it is optional here.
+    const grant = await readRefreshGrant();
+
     const node = await prisma.aiNode.create({
         data: {
             ...data,
@@ -89,6 +100,10 @@ export async function POST(req: Request) {
             // a relative path and fail confusingly.
             baseUrl: baseUrl || null,
             apiKey: apiKey ? encryptNodeKey(apiKey) : null,
+            ...(grant?.refreshToken
+                ? { refreshToken: encryptNodeKey(grant.refreshToken) }
+                : {}),
+            ...(grant?.expiresAt ? { tokenExpiresAt: new Date(grant.expiresAt) } : {}),
         },
     });
 
@@ -112,5 +127,39 @@ export async function POST(req: Request) {
         data: { online: ok, lastError: ok ? null : detail, lastCheckAt: new Date() },
     });
 
-    return NextResponse.json({ node: { ...fresh, apiKey: undefined, hasApiKey: Boolean(apiKey) } }, { status: 201 });
+    const res = NextResponse.json(
+        {
+            node: {
+                ...fresh,
+                apiKey: undefined,
+                refreshToken: undefined,
+                hasApiKey: Boolean(apiKey),
+                canRefresh: Boolean(fresh.refreshToken),
+            },
+        },
+        { status: 201 },
+    );
+
+    // The grant has been persisted against the node; the cookie has no further
+    // purpose and should not linger to be attached to a later node.
+    if (grant) {
+        res.cookies.set(
+            REFRESH_COOKIE, "",
+            clearOptions((req.headers.get("x-forwarded-proto") || "http") === "https"),
+        );
+    }
+
+    return res;
+}
+
+/** Read and parse the refresh grant the OAuth exchange left in a cookie. */
+async function readRefreshGrant(): Promise<{ refreshToken: string; expiresAt: number | null } | null> {
+    const raw = (await cookies()).get(REFRESH_COOKIE)?.value;
+    if (!raw) return null;
+    try {
+        const parsed = JSON.parse(raw);
+        return typeof parsed?.refreshToken === "string" ? parsed : null;
+    } catch {
+        return null;
+    }
 }

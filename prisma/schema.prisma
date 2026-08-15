@@ -550,6 +550,14 @@ model AiNode {
   /// a proxy or a region-specific endpoint.
   baseUrl          String?
   apiKey           String?        @db.Text // AES-256-GCM encrypted; LM Studio usually needs none
+  /// Encrypted OAuth refresh token, set only when the node authenticates with
+  /// a Claude subscription. Never returned by any route — not even to an admin,
+  /// who already holds the access token the browser needed.
+  refreshToken     String?        @db.Text
+  /// Expiry of the current subscription access token. Null for API keys, which
+  /// do not expire. Without this a subscription node goes green, works for a
+  /// few hours, then starts failing 401 with nothing explaining why.
+  tokenExpiresAt   DateTime?
   modelId          String // "qwen2.5-14b" | "claude-opus-5" | "gemini-2.5-pro"
   /// Let the provider run code in its own hosted sandbox when a task needs it.
   /// ANTHROPIC only today (code_execution server tool). Off by default: it is

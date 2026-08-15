@@ -1,14 +1,36 @@
 import crypto from "crypto";
 
-/** Anthropic / Claude Code OAuth client id — configurable via process.env.CLAUDE_OAUTH_CLIENT_ID */
-export const CLAUDE_OAUTH_CLIENT_ID =
-    process.env.CLAUDE_OAUTH_CLIENT_ID || "9d146985-0553-4882-a7f2-63234509e530";
+/** Default Anthropic / Claude Code OAuth client id */
+export const CLAUDE_OAUTH_CLIENT_ID = "9d1c250a-e61b-44d9-88ed-5944d1962f5e";
 export const CLAUDE_OAUTH_AUTHORIZE_URL = "https://claude.ai/oauth/authorize";
 export const CLAUDE_OAUTH_TOKEN_URL = "https://api.anthropic.com/v1/oauth/tokens";
 
 export interface PKCEPair {
     codeVerifier: string;
     codeChallenge: string;
+}
+
+/**
+ * Whether a stored credential is a subscription token rather than an API key.
+ *
+ * The two authenticate differently — subscription tokens go out as
+ * `Authorization: Bearer`, API keys as `x-api-key` — so this decides which
+ * header the SDK is configured to send. Defined here so the adapter and the
+ * refresh path cannot drift apart on what counts as a subscription.
+ */
+export function isSubscriptionToken(key: string): boolean {
+    const k = key.trim();
+    return (
+        k.startsWith("sk-ant-oat") ||
+        k.startsWith("sk-ant-sid") ||
+        k.toLowerCase().startsWith("bearer:") ||
+        k.startsWith("eyJ") // JWT
+    );
+}
+
+/** Strip an optional "bearer:" prefix from a pasted credential. */
+export function normaliseToken(key: string): string {
+    return key.trim().replace(/^bearer:\s*/i, "").trim();
 }
 
 function base64UrlEncode(buffer: Buffer): string {
@@ -69,17 +91,45 @@ export function extractAuthCode(input: string): string {
     return trimmed;
 }
 
+export interface ClaudeTokens {
+    accessToken: string;
+    tokenType?: string;
+    /** Epoch milliseconds, when the provider told us how long the token lasts. */
+    expiresAt?: number;
+    /** Present only on a real OAuth grant, not on a hand-pasted token. */
+    refreshToken?: string;
+}
+
+/** Shape the token endpoint's JSON into our own, whichever field names it used. */
+function readTokenResponse(data: Record<string, unknown>): ClaudeTokens {
+    const accessToken = (data.access_token || data.token || data.session_key) as string | undefined;
+    if (!accessToken) {
+        throw new Error("No access token returned by Anthropic OAuth service.");
+    }
+    return {
+        accessToken,
+        tokenType: data.token_type as string | undefined,
+        expiresAt: typeof data.expires_in === "number"
+            ? Date.now() + data.expires_in * 1000
+            : undefined,
+        refreshToken: data.refresh_token as string | undefined,
+    };
+}
+
 /**
- * Exchange an OAuth authorization code for a Claude Subscription Token (sk-ant-oat...).
+ * Exchange an OAuth authorization code for a Claude subscription token.
+ *
+ * A hand-pasted `sk-ant-oat…` is returned as-is with no expiry and no refresh
+ * token — there is nothing to exchange. Such a node cannot self-renew, and the
+ * admin panel says so rather than pretending it will keep working.
  */
 export async function exchangeClaudeCode(params: {
     code: string;
     codeVerifier: string;
     redirectUri: string;
-}): Promise<{ accessToken: string; tokenType?: string; expiresAt?: number }> {
+}): Promise<ClaudeTokens> {
     const code = extractAuthCode(params.code);
 
-    // If user already pasted a valid subscription token, return it directly
     if (code.startsWith("sk-ant-oat") || code.startsWith("sk-ant-sid")) {
         return { accessToken: code };
     }
@@ -107,14 +157,40 @@ export async function exchangeClaudeCode(params: {
         );
     }
 
-    const accessToken = data.access_token || data.token || data.session_key;
-    if (!accessToken) {
-        throw new Error("No access token returned by Anthropic OAuth service.");
+    return readTokenResponse(data);
+}
+
+/**
+ * Trade a refresh token for a fresh access token.
+ *
+ * Many OAuth servers rotate the refresh token on use, so the caller must
+ * persist whatever comes back here rather than assuming the old one still
+ * works — see ensureAnthropicToken in ai-providers.
+ */
+export async function refreshClaudeToken(refreshToken: string): Promise<ClaudeTokens> {
+    const res = await fetch(CLAUDE_OAUTH_TOKEN_URL, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            Accept: "application/json",
+        },
+        body: new URLSearchParams({
+            grant_type: "refresh_token",
+            client_id: CLAUDE_OAUTH_CLIENT_ID,
+            refresh_token: refreshToken,
+        }).toString(),
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+        throw new Error(
+            data.error_description || data.error || `Token refresh failed with HTTP ${res.status}`,
+        );
     }
 
-    return {
-        accessToken,
-        tokenType: data.token_type,
-        expiresAt: data.expires_in ? Date.now() + data.expires_in * 1000 : undefined,
-    };
+    const tokens = readTokenResponse(data);
+    // Carry the old refresh token forward when the server did not rotate it,
+    // so a non-rotating provider does not lose the ability to refresh again.
+    return { ...tokens, refreshToken: tokens.refreshToken ?? refreshToken };
 }

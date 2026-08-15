@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/api-auth";
 import { encryptNodeKey, nodeKeyEncryptionAvailable, NO_ENCRYPTION_KEY } from "@/lib/ai-nodes";
+import { REFRESH_COOKIE, clearOptions } from "@/lib/claude-oauth-flow";
 import { audit } from "@/lib/audit";
 
 const patchSchema = z.object({
@@ -58,6 +60,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         );
     }
 
+    // A re-authentication leaves a fresh grant in an httpOnly cookie; pick it
+    // up so the renewed node can keep renewing itself.
+    const grant = apiKey ? await readRefreshGrant() : null;
+
     const updated = await prisma.aiNode.update({
         where: { id },
         data: {
@@ -66,6 +72,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
             ...(apiKey === undefined
                 ? {}
                 : { apiKey: apiKey ? encryptNodeKey(apiKey) : null }),
+            // Replacing the credential invalidates whatever refresh grant and
+            // expiry belonged to the old one. Clear them unless this update
+            // brings a new grant of its own, or a stale refresh token would be
+            // used against a credential it no longer matches.
+            ...(apiKey === undefined
+                ? {}
+                : {
+                    refreshToken: grant?.refreshToken ? encryptNodeKey(grant.refreshToken) : null,
+                    tokenExpiresAt: grant?.expiresAt ? new Date(grant.expiresAt) : null,
+                }),
             // A changed endpoint, provider or key invalidates the last health
             // result — leaving a stale green light is worse than "unknown".
             ...(nextBaseUrl !== node.baseUrl || nextProvider !== node.provider || apiKey !== undefined
@@ -83,7 +99,35 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         req,
     });
 
-    return NextResponse.json({ node: { ...updated, apiKey: undefined } });
+    const res = NextResponse.json({
+        node: {
+            ...updated,
+            apiKey: undefined,
+            refreshToken: undefined,
+            canRefresh: Boolean(updated.refreshToken),
+        },
+    });
+
+    if (grant) {
+        res.cookies.set(
+            REFRESH_COOKIE, "",
+            clearOptions((req.headers.get("x-forwarded-proto") || "http") === "https"),
+        );
+    }
+
+    return res;
+}
+
+/** Read and parse the refresh grant the OAuth exchange left in a cookie. */
+async function readRefreshGrant(): Promise<{ refreshToken: string; expiresAt: number | null } | null> {
+    const raw = (await cookies()).get(REFRESH_COOKIE)?.value;
+    if (!raw) return null;
+    try {
+        const parsed = JSON.parse(raw);
+        return typeof parsed?.refreshToken === "string" ? parsed : null;
+    } catch {
+        return null;
+    }
 }
 
 /**

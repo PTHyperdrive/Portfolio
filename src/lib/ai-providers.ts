@@ -30,7 +30,9 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
 import type { AiNode, AiProviderKind } from "@/generated/prisma";
-import { decryptNodeKey } from "@/lib/ai-node-crypto";
+import { prisma } from "@/lib/db";
+import { decryptNodeKey, encryptNodeKey } from "@/lib/ai-node-crypto";
+import { isSubscriptionToken, normaliseToken, refreshClaudeToken } from "@/lib/claude-oauth";
 
 /* ─── Normalised request / stream shapes ─────────────────────────── */
 
@@ -215,28 +217,107 @@ export function requireKey(node: AiNode): string {
 }
 
 /**
+ * How long before expiry a subscription token is renewed early.
+ *
+ * A token that expires mid-stream fails the whole turn, so it is replaced
+ * while there is still comfortable margin rather than at the last moment.
+ */
+const REFRESH_SKEW_MS = 5 * 60 * 1000;
+
+/**
+ * In-flight refreshes, keyed by node id.
+ *
+ * Refresh tokens are usually single-use: two concurrent chats noticing the
+ * same expiry would each spend the token, and whichever landed second would
+ * invalidate the first. Sharing one promise per node makes that impossible
+ * within this process, which is all a single pm2 fork needs.
+ */
+const refreshing = new Map<string, Promise<string>>();
+
+/**
+ * Return a usable Anthropic credential, renewing it first if it is about to
+ * expire.
+ *
+ * API keys pass straight through — they do not expire. Subscription tokens do,
+ * and a node authenticated with one goes green, works for a few hours, then
+ * fails 401 forever unless something renews it. That something is here.
+ */
+export async function ensureAnthropicToken(node: AiNode): Promise<string> {
+    const key = normaliseToken(requireKey(node));
+
+    if (!isSubscriptionToken(key)) return key;
+
+    const expiresAt = node.tokenExpiresAt?.getTime();
+    if (!expiresAt || expiresAt - REFRESH_SKEW_MS > Date.now()) return key;
+
+    const refreshToken = decryptNodeKey(node.refreshToken);
+    if (!refreshToken) {
+        // A hand-pasted token has no refresh half. Say exactly what to do
+        // rather than letting the vendor return an opaque 401.
+        throw new Error(
+            `The Claude subscription token for "${node.displayName}" has expired and cannot ` +
+            `renew itself, because it was entered by hand rather than obtained through the ` +
+            `login flow. Re-authenticate in Admin → AI Nodes.`,
+        );
+    }
+
+    const existing = refreshing.get(node.id);
+    if (existing) return existing;
+
+    const task = (async () => {
+        try {
+            const fresh = await refreshClaudeToken(refreshToken);
+            await prisma.aiNode.update({
+                where: { id: node.id },
+                data: {
+                    apiKey: encryptNodeKey(fresh.accessToken),
+                    // Persist whatever came back: a rotating server issues a new
+                    // refresh token each time, and keeping the old one would
+                    // break the next renewal.
+                    ...(fresh.refreshToken
+                        ? { refreshToken: encryptNodeKey(fresh.refreshToken) }
+                        : {}),
+                    tokenExpiresAt: fresh.expiresAt ? new Date(fresh.expiresAt) : null,
+                    online: true,
+                    lastError: null,
+                },
+            });
+            return normaliseToken(fresh.accessToken);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : "token refresh failed";
+            await prisma.aiNode.update({
+                where: { id: node.id },
+                data: {
+                    online: false,
+                    lastError: `Subscription token expired and could not be renewed: ${message}`,
+                    lastCheckAt: new Date(),
+                },
+            }).catch(() => { /* the throw below is what matters */ });
+            throw new Error(
+                `Could not renew the Claude subscription for "${node.displayName}": ${message}. ` +
+                `Re-authenticate in Admin → AI Nodes.`,
+            );
+        } finally {
+            refreshing.delete(node.id);
+        }
+    })();
+
+    refreshing.set(node.id, task);
+    return task;
+}
+
+/**
  * Clients are stateless and cheap; construct per request rather than caching
  * a client whose key may have been rotated in the admin panel since.
- * Supports both Claude Subscriptions (authToken / Bearer token) and standard API keys (apiKey).
+ *
+ * Subscription tokens authenticate as `Authorization: Bearer` (the SDK's
+ * `authToken`), pay-per-token API keys as `x-api-key` (`apiKey`).
  */
-export function anthropicClient(node: AiNode): Anthropic {
-    const rawKey = requireKey(node);
-    const key = rawKey.trim();
-
-    // Claude Subscriptions (OAuth, setup tokens, session keys) use Bearer authentication (`authToken`),
-    // whereas pay-per-token API keys use `x-api-key` header (`apiKey`).
-    const isSubscriptionToken =
-        key.startsWith("sk-ant-oat") ||
-        key.startsWith("sk-ant-sid") ||
-        key.toLowerCase().startsWith("bearer:") ||
-        key.startsWith("eyJ"); // JWT subscription tokens
-
-    const cleanToken = key.replace(/^bearer:\s*/i, "").trim();
+export async function anthropicClient(node: AiNode): Promise<Anthropic> {
+    const token = await ensureAnthropicToken(node);
 
     return new Anthropic({
-        ...(isSubscriptionToken
-            ? { authToken: cleanToken }
-            : { apiKey: cleanToken }),
+        ...(isSubscriptionToken(token) ? { authToken: token } : { apiKey: token }),
         ...(node.baseUrl ? { baseURL: node.baseUrl } : {}),
     });
 }

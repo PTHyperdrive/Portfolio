@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import {
     Bot, Plus, RefreshCw, Trash2, Circle, Lock, Users,
-    AlertTriangle, Check, X, Server, Cloud, ExternalLink, Sparkles,
+    AlertTriangle, Check, X, Server, Cloud, ExternalLink, Sparkles, Clock,
 } from "lucide-react";
 import { useThemeTokens } from "@/lib/useThemeTokens";
 
@@ -30,6 +30,10 @@ interface AdminNode {
     lastError: string | null;
     lastCheckAt: string | null;
     hasApiKey: boolean;
+    /** True when a refresh token is stored, so the node can renew itself. */
+    canRefresh: boolean;
+    /** Expiry of a subscription token. Null for API keys, which do not expire. */
+    tokenExpiresAt: string | null;
     conversationCount: number;
 }
 
@@ -128,48 +132,58 @@ export default function AdminAiNodesPage() {
 
     const [oauthLoading, setOauthLoading] = useState(false);
     const [oauthModal, setOauthModal] = useState(false);
-    const [oauthData, setOauthData] = useState<{ codeVerifier: string; redirectUri: string } | null>(null);
     const [pastedCode, setPastedCode] = useState("");
     const [oauthSuccess, setOauthSuccess] = useState<string | null>(null);
     const [oauthError, setOauthError] = useState<string | null>(null);
 
-    const exchangeClaudeCode = useCallback(async (code: string, verifier?: string, redirectUri?: string) => {
+    /**
+     * Swap the authorization code for a token.
+     *
+     * The PKCE verifier and redirect URI are no longer sent from here — the
+     * server keeps them in an httpOnly cookie from the moment the login starts,
+     * so a code that did not originate in this browser has nothing to pair with.
+     */
+    const exchangeClaudeCode = useCallback(async (code: string, state?: string) => {
         setOauthLoading(true);
         setOauthError(null);
         try {
             const res = await fetch("/api/admin/ai/claude-oauth/exchange", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    code,
-                    codeVerifier: verifier || oauthData?.codeVerifier,
-                    redirectUri: redirectUri || oauthData?.redirectUri,
-                }),
+                body: JSON.stringify({ code, state }),
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Failed to exchange code");
 
             setForm(f => ({ ...f, apiKey: data.accessToken }));
-            setOauthSuccess("Claude Subscription Token extracted and applied!");
+            setOauthSuccess(
+                data.canRefresh
+                    ? "Subscription token applied. It will renew itself automatically."
+                    : "Token applied. It cannot renew itself — you will have to re-authenticate when it expires.",
+            );
             setTimeout(() => {
                 setOauthModal(false);
                 setOauthSuccess(null);
-            }, 1600);
+            }, 2400);
         } catch (err) {
             setOauthError(err instanceof Error ? err.message : "Extraction failed");
         } finally {
             setOauthLoading(false);
         }
-    }, [oauthData]);
+    }, []);
 
     useEffect(() => {
         const handleMessage = (e: MessageEvent) => {
-            if (e.data?.type === "CLAUDE_OAUTH_RESPONSE") {
-                if (e.data.code) {
-                    exchangeClaudeCode(e.data.code);
-                } else if (e.data.error) {
-                    setOauthError(e.data.error);
-                }
+            // Only this deployment's own callback page may drive the exchange.
+            // Without this check any page able to postMessage at this tab could
+            // feed in a code of its choosing and have the browser redeem it.
+            if (e.origin !== window.location.origin) return;
+            if (e.data?.type !== "CLAUDE_OAUTH_RESPONSE") return;
+
+            if (e.data.code) {
+                void exchangeClaudeCode(e.data.code, e.data.state ?? undefined);
+            } else if (e.data.error) {
+                setOauthError(String(e.data.error));
             }
         };
         window.addEventListener("message", handleMessage);
@@ -185,7 +199,6 @@ export default function AdminAiNodesPage() {
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Failed to initialize login");
 
-            setOauthData({ codeVerifier: data.codeVerifier, redirectUri: data.redirectUri });
             setOauthModal(true);
 
             const width = 600;
@@ -673,6 +686,30 @@ export default function AdminAiNodesPage() {
                                             {node.serverSandbox && " · sandbox"}
                                             {node.serverWebAccess && " · web"}
                                         </p>
+
+                                        {/* Subscription tokens expire. Say when, and whether this
+                                            node can renew itself, rather than letting it go dark. */}
+                                        {node.tokenExpiresAt && (() => {
+                                            const ms = new Date(node.tokenExpiresAt).getTime() - Date.now();
+                                            const expired = ms <= 0;
+                                            const hours = Math.floor(Math.abs(ms) / 3_600_000);
+                                            const mins = Math.floor((Math.abs(ms) % 3_600_000) / 60_000);
+                                            const when = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+                                            const tone = expired && !node.canRefresh ? t.statusError
+                                                : expired ? t.statusWarning : t.textMuted;
+                                            return (
+                                                <p style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.75rem", color: tone, marginTop: 8 }}>
+                                                    <Clock style={{ width: 12, height: 12, flexShrink: 0 }} />
+                                                    {expired
+                                                        ? node.canRefresh
+                                                            ? `Subscription token expired ${when} ago — renews on next use`
+                                                            : `Subscription token expired ${when} ago — re-authenticate, it cannot renew itself`
+                                                        : node.canRefresh
+                                                            ? `Subscription token valid for ${when}, renews automatically`
+                                                            : `Subscription token valid for ${when} — cannot renew itself`}
+                                                </p>
+                                            );
+                                        })()}
 
                                         <p style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.75rem", color: t.textMuted, marginTop: 8 }}>
                                             <Users style={{ width: 12, height: 12 }} />
