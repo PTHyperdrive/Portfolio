@@ -1,13 +1,19 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/api-auth";
-import { probeNode, decryptNodeKey } from "@/lib/ai-nodes";
+import { adapterFor } from "@/lib/ai-providers";
 
 /**
  * POST /api/admin/ai/nodes/[id]/probe
  *
- * Health-check one host and report the models LM Studio currently has loaded,
- * so an admin can confirm the configured modelId matches reality.
+ * Health-check one node through its own provider adapter and record the
+ * result. Each adapter probes in the way that actually proves the node works:
+ * LOCAL lists loaded models (and warns when the configured id is not among
+ * them); hosted providers make a one-token round trip, which is the cheapest
+ * proof that the key, the model id, and the network path all agree.
+ *
+ * Probing a hosted provider therefore costs a token or two. That is deliberate
+ * — a probe that only checked reachability would go green with an invalid key.
  */
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
     const { error } = await requireAdmin();
@@ -17,37 +23,29 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     const node = await prisma.aiNode.findUnique({ where: { id } });
     if (!node) return NextResponse.json({ error: "Node not found" }, { status: 404 });
 
-    const online = await probeNode(node);
-
-    let loadedModels: string[] = [];
-    if (online) {
-        try {
-            const apiKey = decryptNodeKey(node.apiKey);
-            const res = await fetch(`${node.baseUrl.replace(/\/$/, "")}/models`, {
-                headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
-                signal: AbortSignal.timeout(4000),
-            });
-            if (res.ok) {
-                const body = await res.json();
-                loadedModels = (body?.data ?? [])
-                    .map((m: { id?: string }) => m.id)
-                    .filter((v: unknown): v is string => typeof v === "string");
-            }
-        } catch {
-            // Reachable but model listing failed — report online with no list.
-        }
+    let ok = false;
+    let detail: string;
+    try {
+        ({ ok, detail } = await adapterFor(node.provider).probe(node));
+    } catch (err) {
+        // A missing API key or unconfigured baseUrl throws rather than
+        // returning — report it as a failed probe, not a 500.
+        detail = err instanceof Error ? err.message : "probe failed";
     }
 
-    const fresh = await prisma.aiNode.findUnique({
+    await prisma.aiNode.update({
         where: { id },
-        select: { online: true, lastError: true, lastCheckAt: true },
+        data: {
+            online: ok,
+            lastError: ok ? null : detail,
+            lastCheckAt: new Date(),
+        },
     });
 
     return NextResponse.json({
-        online,
-        loadedModels,
-        modelMatches: loadedModels.length === 0 || loadedModels.includes(node.modelId),
-        lastError: fresh?.lastError ?? null,
-        lastCheckAt: fresh?.lastCheckAt ?? null,
+        online: ok,
+        provider: node.provider,
+        detail,
+        lastCheckAt: new Date().toISOString(),
     });
 }

@@ -83,7 +83,10 @@ export function chunkDocument(content: string): string[] {
 /** The node that serves embeddings, if one is configured. */
 export async function embeddingNode(): Promise<AiNode | null> {
     return prisma.aiNode.findFirst({
-        where: { active: true, embedModelId: { not: null } },
+        // LOCAL only, and by design: sending the knowledge corpus to a hosted
+        // embedding API would put internal documentation on someone else's
+        // infrastructure. Keep retrieval on the operator's own hardware.
+        where: { active: true, provider: "LOCAL", embedModelId: { not: null } },
         orderBy: { tier: "desc" },
     });
 }
@@ -95,7 +98,9 @@ export async function embeddingNode(): Promise<AiNode | null> {
  */
 export async function embed(texts: string[], node?: AiNode | null): Promise<number[][] | null> {
     const target = node ?? await embeddingNode();
-    if (!target?.embedModelId) return null;
+    // Embeddings run on the operator's own hardware, so the corpus never
+    // leaves the LAN — a hosted node has no baseUrl and is not a candidate.
+    if (!target?.embedModelId || !target.baseUrl) return null;
 
     const apiKey = decryptNodeKey(target.apiKey);
 

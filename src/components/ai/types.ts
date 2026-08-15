@@ -1,5 +1,7 @@
 export type AiTier = "STANDARD" | "PREMIUM";
 
+export type AiProviderKind = "LOCAL" | "ANTHROPIC" | "GOOGLE" | "OPENAI";
+
 /** "off" is only meaningful on nodes whose runtime honours it. */
 export type ReasoningEffort = "off" | "low" | "medium" | "high";
 
@@ -7,12 +9,17 @@ export interface AiNodeSummary {
     id: string;
     displayName: string;
     gpuLabel: string;
+    provider: AiProviderKind;
+    /** "Local" | "Claude" | "Gemini" — how the picker groups models. */
+    vendor: string;
     tier: AiTier;
     modelId: string;
     contextLen: number;
     maxTokens: number;
     /** False when reasoning_effort is ignored by this runtime. */
     reasoningControl: boolean;
+    /** True when the model reads PDFs directly. */
+    acceptsDocuments: boolean;
     online: boolean;
     lastCheckAt: string | null;
 }
@@ -31,6 +38,12 @@ export interface ChatMessage {
     content: string;
     modelId?: string | null;
     gpuLabel?: string | null;
+    /**
+     * Which model wrote this turn. Present on multi-model threads and absent on
+     * rows written before they existed — the UI falls back to "Assistant".
+     */
+    provider?: AiProviderKind | null;
+    speaker?: string | null;
     latencyMs?: number | null;
     outputTokens?: number | null;
     failed?: boolean;
@@ -41,6 +54,34 @@ export interface ChatMessage {
     reasoning?: string;
     /** Scratchpad length even when the text itself is withheld. */
     reasoningChars?: number;
+    /** Provider-side tools this turn ran (code execution, web search). */
+    tools?: string[];
+}
+
+/**
+ * An attachment that has been through /api/ai/files and is ready to send.
+ *
+ * Text files carry their extracted `text`; PDFs and images carry base64 `data`.
+ * The distinction decides which providers can take the message, so it is kept
+ * explicit rather than inferred from the MIME type at send time.
+ */
+export interface Attachment {
+    filename: string;
+    mediaType: string;
+    bytes: number;
+    text?: string;
+    data?: string;
+}
+
+export interface SkillSummary {
+    id: string;
+    name: string;
+    description: string | null;
+    shared: boolean;
+    /** False for a shared skill published by someone else — read-only here. */
+    owned: boolean;
+    fileCount: number;
+    updatedAt: string;
 }
 
 /**
@@ -60,4 +101,5 @@ export interface QueuedMessage {
     content: string;
     /** Attachments travel with the queued turn, not the composer. */
     images?: string[];
+    files?: Attachment[];
 }

@@ -4,13 +4,17 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import {
     Send, Square, Copy, Check, Bot, User as UserIcon,
     AlertTriangle, Sparkles, History, Brain, X, RotateCcw, Clock, ImagePlus,
+    Paperclip, FileText, Terminal, Globe, Loader2,
 } from "lucide-react";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import { useThemeTokens } from "@/lib/useThemeTokens";
 import { useIsMobile } from "@/lib/useIsMobile";
 import ModelPicker from "./ModelPicker";
+import SkillPicker from "./SkillPicker";
+import SkillManager from "./SkillManager";
 import type {
-    AiNodeSummary, ChatMessage, ChatPhase, QueuedMessage, ReasoningEffort,
+    AiNodeSummary, Attachment, ChatMessage, ChatPhase, QueuedMessage,
+    ReasoningEffort, SkillSummary,
 } from "./types";
 
 const SUGGESTIONS = [
@@ -49,12 +53,20 @@ export default function AiChatView({
     const [loadingThread, setLoadingThread] = useState(false);
     const [showReasoning, setShowReasoning] = useState(true);
     const [effort, setEffort] = useState<ReasoningEffort>("medium");
-    /** Pending attachments as data URLs, cleared once the turn is sent. */
+    /** Pending images as data URLs, cleared once the turn is sent. */
     const [attachments, setAttachments] = useState<string[]>([]);
+    /** Pending non-image files, already ingested by /api/ai/files. */
+    const [files, setFiles] = useState<Attachment[]>([]);
+    const [uploading, setUploading] = useState(false);
+    const [skills, setSkills] = useState<SkillSummary[]>([]);
+    const [skillIds, setSkillIds] = useState<string[]>([]);
+    const [showSkills, setShowSkills] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(false);
 
     const abortRef = useRef<AbortController | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const imageRef = useRef<HTMLInputElement>(null);
     const fileRef = useRef<HTMLInputElement>(null);
     const pinnedToBottom = useRef(true);
     /** Queue mirror — the streaming loop reads it without stale closures. */
@@ -62,7 +74,9 @@ export default function AiChatView({
     /** Thread id that survives creation mid-queue. */
     const threadRef = useRef<string | null>(activeId);
     const lastPromptRef = useRef<string | null>(null);
-    const runTurnRef = useRef<((text: string, images?: string[]) => Promise<void>) | null>(null);
+    const runTurnRef = useRef<
+        ((text: string, images?: string[], files?: Attachment[]) => Promise<void>) | null
+    >(null);
     /**
      * Synchronous busy latch. `phase` is state, so two Enter presses in the
      * same tick would both read "idle" and start duplicate turns — this is
@@ -84,6 +98,7 @@ export default function AiChatView({
                 const data = await res.json();
                 if (cancelled) return;
                 setNodes(data.nodes);
+                setIsAdmin(Boolean(data.isAdmin));
                 setNodeId(prev =>
                     prev ?? data.nodes.find((n: AiNodeSummary) => n.online)?.id ?? data.nodes[0]?.id ?? null);
             } catch {
@@ -92,6 +107,20 @@ export default function AiChatView({
         })();
         return () => { cancelled = true; };
     }, []);
+
+    /* ── Skills the user may attach ────────────────────────────── */
+    const loadSkills = useCallback(async () => {
+        try {
+            const res = await fetch("/api/ai/skills");
+            if (!res.ok) return;
+            const data = await res.json();
+            setSkills(data.skills);
+        } catch {
+            // Skills are optional — a failure here must not block chatting.
+        }
+    }, []);
+
+    useEffect(() => { void loadSkills(); }, [loadSkills]);
 
     /**
      * Replace the panel with the server's transcript for a thread.
@@ -112,6 +141,7 @@ export default function AiChatView({
             if (data.conversation.nodeId) setNodeId(data.conversation.nodeId);
             setShowReasoning(data.conversation.showReasoning ?? true);
             if (data.conversation.reasoningEffort) setEffort(data.conversation.reasoningEffort);
+            setSkillIds(data.conversation.skillIds ?? []);
             hydratedRef.current = id;
         } catch {
             if (threadRef.current === id) setError("Could not load that conversation.");
@@ -138,6 +168,11 @@ export default function AiChatView({
             // Clear immediately so the previous thread's messages are not
             // left on screen under the new thread's header while it loads.
             setMessages([]);
+            setAttachments([]);
+            setFiles([]);
+            // Skills belong to the thread, so a new thread starts with none
+            // until its own set arrives from the server.
+            setSkillIds([]);
         }
 
         if (!activeId) { hydratedRef.current = null; return; }
@@ -174,6 +209,25 @@ export default function AiChatView({
         el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
     }, [input]);
 
+    /**
+     * Attach or detach skills.
+     *
+     * Applied locally first so the picker responds immediately, then persisted
+     * if a thread exists. On a brand-new chat there is nothing to persist to
+     * yet — runTurn writes the selection immediately after it creates the
+     * thread, before the first message is sent.
+     */
+    const changeSkills = useCallback((ids: string[]) => {
+        setSkillIds(ids);
+        const thread = threadRef.current;
+        if (!thread) return;
+        void fetch(`/api/ai/conversations/${thread}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ skillIds: ids }),
+        }).catch(() => { /* the next send carries the selection anyway */ });
+    }, []);
+
     /** Stop the current turn and drop anything waiting behind it. */
     const stop = useCallback(() => {
         abortRef.current?.abort();
@@ -186,7 +240,11 @@ export default function AiChatView({
     }, []);
 
     /* ── One turn: send, stream, persist, then pull from queue ──── */
-    const runTurn = useCallback(async (content: string, images: string[] = []) => {
+    const runTurn = useCallback(async (
+        content: string,
+        images: string[] = [],
+        docs: Attachment[] = [],
+    ) => {
         setError(null);
         pinnedToBottom.current = true;
         lastPromptRef.current = content;
@@ -212,6 +270,17 @@ export default function AiChatView({
                 // state for this brand-new thread, and re-reading it from the
                 // server would only discard the optimistic turn.
                 hydratedRef.current = data.conversation.id;
+
+                // Attach the skills the user picked before sending, so the
+                // very first message is answered with them already applied.
+                if (skillIds.length) {
+                    await fetch(`/api/ai/conversations/${data.conversation.id}`, {
+                        method: "PATCH",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ skillIds }),
+                    }).catch(() => { /* the thread still works, just unskilled */ });
+                }
+
                 onActiveChange(data.conversation.id);
                 onConversationsChanged();
             } catch (err) {
@@ -225,14 +294,16 @@ export default function AiChatView({
         const localId = `local-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
         const replyId = `${localId}-a`;
 
+        // Same wording the server persists, so the text does not shift when
+        // this thread is later reloaded. Mirrors attachmentNote() in ai-files.
+        const noteParts: string[] = [];
+        if (docs.length) noteParts.push(docs.map(f => f.filename).join(", "));
+        if (images.length) noteParts.push(`${images.length} image(s)`);
+        const note = noteParts.length ? `\n\n[attached ${noteParts.join(" + ")}]` : "";
+
         setMessages(prev => [
             ...prev,
-            {
-                id: localId, role: "user",
-                // Same wording the server persists, so the text does not shift
-                // when this thread is later reloaded.
-                content: content + (images.length ? `\n\n[attached ${images.length} image(s)]` : ""),
-            },
+            { id: localId, role: "user", content: content + note },
             { id: replyId, role: "assistant", content: "", streaming: true },
         ]);
         setPhase("connecting");
@@ -251,6 +322,7 @@ export default function AiChatView({
                     showReasoning,
                     reasoningEffort: effort,
                     ...(images.length ? { images } : {}),
+                    ...(docs.length ? { files: docs } : {}),
                 }),
                 signal: controller.signal,
             });
@@ -285,7 +357,20 @@ export default function AiChatView({
 
                     if (event === "meta") {
                         setMessages(prev => prev.map(m => m.id === replyId
-                            ? { ...m, gpuLabel: payload.gpuLabel as string, modelId: payload.model as string }
+                            ? {
+                                ...m,
+                                gpuLabel: payload.gpuLabel as string,
+                                modelId: payload.model as string,
+                                provider: payload.provider as ChatMessage["provider"],
+                                speaker: payload.model as string,
+                            }
+                            : m));
+                    } else if (event === "tool") {
+                        // Provider-side tool use — code execution or web search
+                        // running on their infrastructure, not ours.
+                        const name = payload.name as string;
+                        setMessages(prev => prev.map(m => m.id === replyId
+                            ? { ...m, tools: [...(m.tools ?? []), name] }
                             : m));
                     } else if (event === "reasoning") {
                         setPhase(p => (p === "streaming" ? p : "thinking"));
@@ -336,13 +421,13 @@ export default function AiChatView({
             const next = queueRef.current.shift();
             setQueue([...queueRef.current]);
             if (next) {
-                void runTurnRef.current?.(next.content, next.images ?? []);
+                void runTurnRef.current?.(next.content, next.images ?? [], next.files ?? []);
             } else {
                 busyRef.current = false;
                 setPhase("idle");
             }
         }
-    }, [nodeId, showReasoning, effort, onActiveChange, onConversationsChanged]);
+    }, [nodeId, showReasoning, effort, skillIds, onActiveChange, onConversationsChanged]);
 
     useEffect(() => { runTurnRef.current = runTurn; }, [runTurn]);
 
@@ -354,14 +439,17 @@ export default function AiChatView({
         // Attachments belong to this turn, so detach them from the composer
         // now — otherwise a queued turn and the next one share the same set.
         const images = attachments;
+        const docs = files;
         setInput("");
         setAttachments([]);
+        setFiles([]);
 
         if (busyRef.current) {
             const item = {
                 id: `q-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
                 content,
                 images,
+                files: docs,
             };
             queueRef.current = [...queueRef.current, item];
             setQueue([...queueRef.current]);
@@ -369,16 +457,16 @@ export default function AiChatView({
             return;
         }
         busyRef.current = true;
-        void runTurn(content, images);
-    }, [runTurn, attachments]);
+        void runTurn(content, images, docs);
+    }, [runTurn, attachments, files]);
 
-    /** Read picked files as data URLs, enforcing the same limits as the API. */
-    const attachFiles = useCallback(async (files: FileList | null) => {
-        if (!files?.length) return;
+    /** Read picked images as data URLs, enforcing the same limits as the API. */
+    const attachImages = useCallback(async (picked: FileList | null) => {
+        if (!picked?.length) return;
         const allowed = /^image\/(png|jpeg|jpg|webp|gif)$/;
-        const picked: string[] = [];
+        const out: string[] = [];
 
-        for (const file of Array.from(files).slice(0, 4)) {
+        for (const file of Array.from(picked).slice(0, 4)) {
             if (!allowed.test(file.type)) {
                 setError(`${file.name} is not a supported image type.`);
                 continue;
@@ -387,7 +475,7 @@ export default function AiChatView({
                 setError(`${file.name} is larger than 8 MB.`);
                 continue;
             }
-            picked.push(await new Promise<string>((resolve, reject) => {
+            out.push(await new Promise<string>((resolve, reject) => {
                 const reader = new FileReader();
                 reader.onload = () => resolve(String(reader.result));
                 reader.onerror = reject;
@@ -395,8 +483,42 @@ export default function AiChatView({
             }));
         }
 
-        if (picked.length) {
-            setAttachments(prev => [...prev, ...picked].slice(0, 4));
+        if (out.length) setAttachments(prev => [...prev, ...out].slice(0, 4));
+    }, []);
+
+    /**
+     * Upload documents for extraction.
+     *
+     * Extraction happens server-side rather than here so that a file reads the
+     * same whether it came through the composer or a tool call, and so that
+     * "is this actually text?" is decided by one implementation. Errors come
+     * back per file: eight good files and two bad ones is a normal result.
+     */
+    const attachDocuments = useCallback(async (picked: FileList | null) => {
+        if (!picked?.length) return;
+        setUploading(true);
+        setError(null);
+
+        try {
+            const form = new FormData();
+            for (const file of Array.from(picked).slice(0, 10)) form.append("files", file);
+
+            const res = await fetch("/api/ai/files", { method: "POST", body: form });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error ?? "Upload failed.");
+
+            if (data.errors?.length) {
+                setError(data.errors
+                    .map((e: { filename: string; reason: string }) => `${e.filename} ${e.reason}`)
+                    .join(" · "));
+            }
+            if (data.files?.length) {
+                setFiles(prev => [...prev, ...data.files].slice(0, 10));
+            }
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Upload failed.");
+        } finally {
+            setUploading(false);
         }
     }, []);
 
@@ -419,6 +541,9 @@ export default function AiChatView({
 
     const selectedNode = nodes.find(n => n.id === nodeId) ?? null;
     const showWelcome = messages.length === 0 && queue.length === 0 && !loadingThread;
+    /** A PDF queued against a model that cannot read one. */
+    const blockedByPdf = files.some(f => !f.text) && !!selectedNode && !selectedNode.acceptsDocuments;
+    const canSend = !!selectedNode && !!input.trim() && !blockedByPdf;
 
     const PHASE_LABEL: Record<ChatPhase, string> = {
         idle: "Ready",
@@ -567,9 +692,12 @@ export default function AiChatView({
                                 </div>
 
                                 <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5 }}>
+                                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 5, flexWrap: "wrap" }}>
                                         <span style={{ fontSize: "0.82rem", fontWeight: 700, color: t.textPrimary }}>
-                                            {mine ? "You" : "Assistant"}
+                                            {/* Name the model that actually wrote the turn. On a
+                                                mixed thread "Assistant" would make several
+                                                different models look like one voice. */}
+                                            {mine ? "You" : (msg.speaker || "Assistant")}
                                         </span>
                                         {!mine && msg.gpuLabel && (
                                             <span style={{
@@ -578,6 +706,19 @@ export default function AiChatView({
                                                 background: t.bgTertiary, color: t.textMuted,
                                             }}>
                                                 {msg.gpuLabel}
+                                            </span>
+                                        )}
+                                        {!mine && msg.tools?.length && (
+                                            <span style={{
+                                                display: "inline-flex", alignItems: "center", gap: 4,
+                                                fontSize: "0.63rem", fontWeight: 700, letterSpacing: "0.03em",
+                                                padding: "1px 7px", borderRadius: 20,
+                                                background: t.accentPrimaryMuted, color: t.accentPrimary,
+                                            }}>
+                                                {msg.tools.some(x => x.includes("search") || x.includes("fetch"))
+                                                    ? <Globe style={{ width: 9, height: 9 }} />
+                                                    : <Terminal style={{ width: 9, height: 9 }} />}
+                                                {[...new Set(msg.tools)].join(", ")}
                                             </span>
                                         )}
                                         {!mine && !msg.streaming && msg.latencyMs != null && (
@@ -803,7 +944,70 @@ export default function AiChatView({
                             Effort control not supported by this model
                         </span>
                     )}
+
+                    <span style={{ marginLeft: "auto" }}>
+                        <SkillPicker
+                            skills={skills}
+                            selected={skillIds}
+                            onChange={changeSkills}
+                            onManage={() => setShowSkills(true)}
+                        />
+                    </span>
                 </div>
+
+                {/* Pending documents */}
+                {files.length > 0 && (
+                    <div style={{
+                        maxWidth: 820, margin: "0 auto 8px",
+                        display: "flex", gap: 7, flexWrap: "wrap",
+                    }}>
+                        {files.map((f, i) => (
+                            <span key={`${f.filename}-${i}`} style={{
+                                display: "inline-flex", alignItems: "center", gap: 7,
+                                maxWidth: 260, padding: "5px 9px",
+                                borderRadius: t.buttonRadius,
+                                border: `1px solid ${t.borderPrimary}`,
+                                background: t.bgCard,
+                                fontSize: "0.75rem", color: t.textSecondary,
+                            }}>
+                                <FileText style={{ width: 12, height: 12, flexShrink: 0, color: t.textMuted }} />
+                                <span style={{
+                                    flex: 1, minWidth: 0, overflow: "hidden",
+                                    textOverflow: "ellipsis", whiteSpace: "nowrap",
+                                }}>
+                                    {f.filename}
+                                </span>
+                                <span style={{ fontSize: "0.68rem", color: t.textMuted, flexShrink: 0 }}>
+                                    {f.text ? `${(f.text.length / 1024).toFixed(0)}k chars` : "PDF"}
+                                </span>
+                                <button
+                                    onClick={() => setFiles(prev => prev.filter((_, j) => j !== i))}
+                                    aria-label={`Remove ${f.filename}`}
+                                    style={{
+                                        display: "flex", alignItems: "center", justifyContent: "center",
+                                        width: 16, height: 16, flexShrink: 0, padding: 0,
+                                        border: "none", background: "transparent",
+                                        color: t.textMuted, cursor: "pointer",
+                                    }}
+                                >
+                                    <X style={{ width: 11, height: 11 }} />
+                                </button>
+                            </span>
+                        ))}
+                    </div>
+                )}
+
+                {/* A PDF on a local node cannot be read at all — say so before
+                    the send is rejected, not after. */}
+                {files.some(f => !f.text) && selectedNode && !selectedNode.acceptsDocuments && (
+                    <p style={{
+                        maxWidth: 820, margin: "0 auto 8px",
+                        fontSize: "0.73rem", lineHeight: 1.5, color: t.statusWarning,
+                    }}>
+                        {selectedNode.displayName} cannot read PDFs. Switch to a Claude or Gemini
+                        model to send this message.
+                    </p>
+                )}
 
                 {/* Pending attachments */}
                 {attachments.length > 0 && (
@@ -875,16 +1079,16 @@ export default function AiChatView({
                     />
 
                     <input
-                        ref={fileRef}
+                        ref={imageRef}
                         type="file"
                         accept="image/png,image/jpeg,image/webp,image/gif"
                         multiple
-                        onChange={e => { void attachFiles(e.target.files); e.target.value = ""; }}
+                        onChange={e => { void attachImages(e.target.files); e.target.value = ""; }}
                         style={{ display: "none" }}
                     />
                     <button
-                        id="ai-attach"
-                        onClick={() => fileRef.current?.click()}
+                        id="ai-attach-image"
+                        onClick={() => imageRef.current?.click()}
                         disabled={!selectedNode || attachments.length >= 4}
                         aria-label="Attach image"
                         title={attachments.length >= 4 ? "Four images maximum" : "Attach an image"}
@@ -899,6 +1103,36 @@ export default function AiChatView({
                         }}
                     >
                         <ImagePlus style={{ width: 15, height: 15 }} />
+                    </button>
+
+                    <input
+                        ref={fileRef}
+                        type="file"
+                        multiple
+                        onChange={e => { void attachDocuments(e.target.files); e.target.value = ""; }}
+                        style={{ display: "none" }}
+                    />
+                    <button
+                        id="ai-attach-file"
+                        onClick={() => fileRef.current?.click()}
+                        disabled={!selectedNode || uploading || files.length >= 10}
+                        aria-label="Attach files"
+                        title={files.length >= 10
+                            ? "Ten files maximum"
+                            : "Attach files — text, code, config, CSV, JSON, Markdown or PDF"}
+                        style={{
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            width: 34, height: 34, flexShrink: 0,
+                            borderRadius: t.buttonRadius,
+                            border: `1px solid ${t.borderPrimary}`,
+                            background: "transparent", color: t.textSecondary,
+                            cursor: (!selectedNode || uploading || files.length >= 10) ? "not-allowed" : "pointer",
+                            opacity: (!selectedNode || uploading || files.length >= 10) ? 0.45 : 1,
+                        }}
+                    >
+                        {uploading
+                            ? <Loader2 style={{ width: 15, height: 15, animation: "aiSpin 0.9s linear infinite" }} />
+                            : <Paperclip style={{ width: 15, height: 15 }} />}
                     </button>
 
                     {/* Queue-ahead send stays available while streaming. */}
@@ -923,7 +1157,7 @@ export default function AiChatView({
                     <button
                         id="ai-send"
                         onClick={() => (busy ? stop() : send(input))}
-                        disabled={!selectedNode || (!busy && !input.trim())}
+                        disabled={!busy && !canSend}
                         aria-label={busy ? "Stop generating" : "Send message"}
                         style={{
                             display: "flex", alignItems: "center", justifyContent: "center",
@@ -931,8 +1165,8 @@ export default function AiChatView({
                             borderRadius: t.buttonRadius, border: "none",
                             background: busy ? t.statusErrorBg : t.accentPrimary,
                             color: busy ? t.statusError : t.textInverse,
-                            cursor: (!selectedNode || (!busy && !input.trim())) ? "not-allowed" : "pointer",
-                            opacity: (!selectedNode || (!busy && !input.trim())) ? 0.45 : 1,
+                            cursor: (!busy && !canSend) ? "not-allowed" : "pointer",
+                            opacity: (!busy && !canSend) ? 0.45 : 1,
                             transition: "transform 0.15s, opacity 0.15s",
                         }}
                         onMouseDown={e => { e.currentTarget.style.transform = "scale(0.94)"; }}
@@ -951,15 +1185,26 @@ export default function AiChatView({
                     {selectedNode
                         ? busy
                             ? "Stop also clears the queue · Enter queues the next message"
-                            : `${selectedNode.displayName} · ${selectedNode.gpuLabel} · Enter to send, Shift+Enter for a new line`
+                            : `${selectedNode.displayName} · ${selectedNode.gpuLabel}`
+                              + `${skillIds.length ? ` · ${skillIds.length} skill${skillIds.length > 1 ? "s" : ""}` : ""}`
+                              + " · Enter to send, Shift+Enter for a new line"
                         : "Ask an administrator to bring an inference node online."}
                 </p>
             </div>
+
+            {showSkills && (
+                <SkillManager
+                    isAdmin={isAdmin}
+                    onClose={() => setShowSkills(false)}
+                    onChanged={() => { void loadSkills(); }}
+                />
+            )}
 
             <style>{`
                 @keyframes aiBlink { 0%,100% { opacity: 1 } 50% { opacity: 0 } }
                 @keyframes aiFadeIn { from { opacity: 0; transform: translateY(-4px) } to { opacity: 1; transform: translateY(0) } }
                 @keyframes aiPulse { 0%,100% { opacity: 1 } 50% { opacity: 0.35 } }
+                @keyframes aiSpin { to { transform: rotate(360deg) } }
             `}</style>
         </div>
     );

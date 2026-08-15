@@ -8,14 +8,18 @@ import { audit } from "@/lib/audit";
 const patchSchema = z.object({
     displayName: z.string().trim().min(1).max(80).optional(),
     gpuLabel: z.string().trim().min(1).max(40).optional(),
+    provider: z.enum(["LOCAL", "ANTHROPIC", "GOOGLE", "OPENAI"]).optional(),
     tier: z.enum(["STANDARD", "PREMIUM"]).optional(),
-    baseUrl: z.string().trim().url().max(200).optional(),
+    /** "" clears the override so a hosted provider uses its own default. */
+    baseUrl: z.string().trim().url().max(200).optional().or(z.literal("")),
     /** "" clears the stored key; omit to leave it untouched. */
     apiKey: z.string().trim().max(200).nullable().optional(),
     modelId: z.string().trim().min(1).max(160).optional(),
-    contextLen: z.number().int().min(512).max(1_000_000).optional(),
-    maxTokens: z.number().int().min(64).max(32_000).optional(),
+    contextLen: z.number().int().min(512).max(2_000_000).optional(),
+    maxTokens: z.number().int().min(64).max(128_000).optional(),
     reasoningControl: z.boolean().optional(),
+    serverSandbox: z.boolean().optional(),
+    serverWebAccess: z.boolean().optional(),
     active: z.boolean().optional(),
 });
 
@@ -36,21 +40,35 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         );
     }
 
-    const { apiKey, ...rest } = parsed.data;
+    const { apiKey, baseUrl, ...rest } = parsed.data;
 
     if (apiKey && !nodeKeyEncryptionAvailable()) {
         return NextResponse.json({ error: NO_ENCRYPTION_KEY }, { status: 400 });
+    }
+
+    const nextProvider = rest.provider ?? node.provider;
+    const nextBaseUrl = baseUrl === undefined ? node.baseUrl : (baseUrl || null);
+
+    // A local node with no endpoint cannot be reached at all, so refuse the
+    // edit rather than saving a node that will fail on its next message.
+    if (nextProvider === "LOCAL" && !nextBaseUrl) {
+        return NextResponse.json(
+            { error: "A local node needs a base URL." },
+            { status: 400 },
+        );
     }
 
     const updated = await prisma.aiNode.update({
         where: { id },
         data: {
             ...rest,
+            ...(baseUrl === undefined ? {} : { baseUrl: nextBaseUrl }),
             ...(apiKey === undefined
                 ? {}
                 : { apiKey: apiKey ? encryptNodeKey(apiKey) : null }),
-            // A changed endpoint invalidates the last health result.
-            ...(rest.baseUrl && rest.baseUrl !== node.baseUrl
+            // A changed endpoint, provider or key invalidates the last health
+            // result — leaving a stale green light is worse than "unknown".
+            ...(nextBaseUrl !== node.baseUrl || nextProvider !== node.provider || apiKey !== undefined
                 ? { online: false, lastError: null, lastCheckAt: null }
                 : {}),
         },

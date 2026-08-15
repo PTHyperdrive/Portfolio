@@ -8,6 +8,8 @@ import { audit } from "@/lib/audit";
 const patchSchema = z.object({
     title: z.string().trim().min(1).max(200).optional(),
     nodeId: z.string().min(1).max(64).nullable().optional(),
+    /** Full replacement set of attached skills. Absent means "leave as is". */
+    skillIds: z.array(z.string().min(1).max(64)).max(12).optional(),
 });
 
 /** Ownership check — a thread is only ever visible to the user who opened it. */
@@ -44,9 +46,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
                 select: {
                     id: true, role: true, content: true, modelId: true,
                     gpuLabel: true, latencyMs: true, outputTokens: true,
+                    // Attribution, so a replayed thread shows which model wrote
+                    // which turn — a mixed conversation is unreadable without it.
+                    provider: true, speaker: true,
                     failed: true, createdAt: true,
                 },
             },
+            skills: { select: { skillId: true } },
         },
     });
 
@@ -54,7 +60,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
         return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ conversation });
+    return NextResponse.json({
+        conversation: {
+            ...conversation,
+            skills: undefined,
+            skillIds: conversation.skills.map(s => s.skillId),
+        },
+    });
 }
 
 /** PATCH /api/ai/conversations/[id] — rename, or switch the backing model. */
@@ -72,7 +84,26 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
         return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
 
-    const { title, nodeId } = parsed.data;
+    const { title, nodeId, skillIds } = parsed.data;
+
+    if (skillIds) {
+        // Filter to skills this user may actually attach before writing the
+        // join rows. Silently dropping an id they do not own beats a 403 that
+        // tells a prober which skill ids exist.
+        const allowed = await prisma.aiSkill.findMany({
+            where: { id: { in: skillIds }, enabled: true, OR: [{ userId }, { shared: true }] },
+            select: { id: true },
+        });
+
+        await prisma.$transaction([
+            prisma.aiConversationSkill.deleteMany({ where: { conversationId: id } }),
+            ...(allowed.length
+                ? [prisma.aiConversationSkill.createMany({
+                    data: allowed.map(s => ({ conversationId: id, skillId: s.id })),
+                })]
+                : []),
+        ]);
+    }
 
     if (nodeId) {
         const { error: nodeErr } = await resolveNodeForUser(userId, nodeId);

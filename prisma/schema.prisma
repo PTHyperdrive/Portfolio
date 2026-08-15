@@ -10,66 +10,67 @@ datasource db {
 // ─── Auth Models ────────────────────────────────────────────────
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  email         String    @unique
-  emailVerified DateTime?
-  passwordHash  String?
-  image         String?
-  role          Role      @default(USER)
-  credits       Int       @default(0)
-  hasUsedTrial  Boolean   @default(false)
-  twoFactorEnabled Boolean @default(false)
-  twoFactorSecret  String?
-  emailTwoFactorEnabled Boolean @default(false) // email-code 2FA at login
+  id                       String    @id @default(cuid())
+  name                     String?
+  email                    String    @unique
+  emailVerified            DateTime?
+  passwordHash             String?
+  image                    String?
+  role                     Role      @default(USER)
+  credits                  Int       @default(0)
+  hasUsedTrial             Boolean   @default(false)
+  twoFactorEnabled         Boolean   @default(false)
+  twoFactorSecret          String?
+  emailTwoFactorEnabled    Boolean   @default(false) // email-code 2FA at login
   // ── Backup recovery codes (last-line 2FA) ──────────────────────
   // Lifetime guard: every backup-code submission at login (right OR wrong)
   // increments recoveryAttempts. At 10 the method is locked forever
   // (recoveryLockedAt) and the user must fall back to another method or a
   // support ticket. Generating a fresh set (authenticated) resets the counter.
-  recoveryAttempts         Int       @default(0)  // lifetime backup-code submissions
-  recoveryLockedAt         DateTime?              // set when the 10-attempt cap is hit
-  recoveryCodesGeneratedAt DateTime?              // when the current set was issued
-  canInvite     Boolean   @default(false) // Admin toggle: allows user to generate invite codes
-  maxVpcs       Int       @default(3)    // Max VPCs per user (3 default, up to 5 via admin)
-  trialExpiresAt DateTime?
-  activePlan    String?
-  planActivatedAt DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  recoveryAttempts         Int       @default(0) // lifetime backup-code submissions
+  recoveryLockedAt         DateTime? // set when the 10-attempt cap is hit
+  recoveryCodesGeneratedAt DateTime? // when the current set was issued
+  canInvite                Boolean   @default(false) // Admin toggle: allows user to generate invite codes
+  maxVpcs                  Int       @default(3) // Max VPCs per user (3 default, up to 5 via admin)
+  trialExpiresAt           DateTime?
+  activePlan               String?
+  planActivatedAt          DateTime?
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
 
-  accounts          Account[]
-  sessions          Session[]
-  orders            Order[]
-  vpnConfigs        VpnConfig[]
-  proxyAccounts     ProxyAccount[]
-  emailAccounts     EmailAccount[]
-  cmsPosts         CmsPost[]
-  vpsInstances      VpsInstance[]
-  transactions      Transaction[]
-  auditLogs         AuditLog[]
-  creditTxns        CreditTransaction[]
-  appliedPromos     AppliedPromoCode[]
-  deploymentTickets DeploymentTicket[]
-  deviceSessions    DeviceSession[]
-  emailOtpCodes     EmailOtpCode[]
-  recoveryCodes     RecoveryCode[]
-  sshKeys              SshKey[]
-  nextcloudStorage     UserNextcloudStorage?
-  supportChats         SupportChat[]
-  tickets              Ticket[]
-  ticketNotifications  TicketNotification[]
-  cryptoTopups         CryptoTopup[]
-  invitationCodes      InvitationCode[]     @relation("InviteCreator")
-  uploads              FileUpload[]
-  wgPeers              WgPeer[]
-  vpcs                 Vpc[]
-  smsRentals           SmsRental[]
-  notifications        Notification[]
-  vmAlertRules         VmAlertRule[]
-  aiConversations      AiConversation[]
-  provisioningJobs     ProvisioningJob[]
-  mailbox              MailMailbox?
+  accounts            Account[]
+  sessions            Session[]
+  orders              Order[]
+  vpnConfigs          VpnConfig[]
+  proxyAccounts       ProxyAccount[]
+  emailAccounts       EmailAccount[]
+  cmsPosts            CmsPost[]
+  vpsInstances        VpsInstance[]
+  transactions        Transaction[]
+  auditLogs           AuditLog[]
+  creditTxns          CreditTransaction[]
+  appliedPromos       AppliedPromoCode[]
+  deploymentTickets   DeploymentTicket[]
+  deviceSessions      DeviceSession[]
+  emailOtpCodes       EmailOtpCode[]
+  recoveryCodes       RecoveryCode[]
+  sshKeys             SshKey[]
+  nextcloudStorage    UserNextcloudStorage?
+  supportChats        SupportChat[]
+  tickets             Ticket[]
+  ticketNotifications TicketNotification[]
+  cryptoTopups        CryptoTopup[]
+  invitationCodes     InvitationCode[]      @relation("InviteCreator")
+  uploads             FileUpload[]
+  wgPeers             WgPeer[]
+  vpcs                Vpc[]
+  smsRentals          SmsRental[]
+  notifications       Notification[]
+  vmAlertRules        VmAlertRule[]
+  aiConversations     AiConversation[]
+  aiSkills            AiSkill[]
+  provisioningJobs    ProvisioningJob[]
+  mailbox             MailMailbox?
 
   /// When the user accepted the AI support-chat terms. Null = never consented;
   /// SUPPORT conversations cannot be created until this is set.
@@ -78,11 +79,11 @@ model User {
   /// Per-user vanity subdomain label (e.g. "cmabcd12" → cmabcd12.notrespond.com).
   /// First 8 chars of the cuid, extended on the (astronomically rare) prefix
   /// collision. Kept even when Cloudflare fails so a retry is deterministic.
-  subdomain        String?   @unique @db.VarChar(63)
+  subdomain       String? @unique @db.VarChar(63)
   /// "PENDING" | "ACTIVE" | "FAILED" — the DNS sweep retries non-ACTIVE rows.
-  subdomainStatus  String?   @db.VarChar(10)
+  subdomainStatus String? @db.VarChar(10)
   /// Cloudflare DNS record id, for cleanup on account deletion.
-  cfDnsRecordId    String?
+  cfDnsRecordId   String?
 }
 
 model Account {
@@ -136,9 +137,9 @@ model DeviceSession {
 model EmailOtpCode {
   id         String    @id @default(cuid())
   userId     String
-  codeHash   String                     // bcrypt hash of the 6-digit code
-  purpose    String                     // "login" | "setup"
-  attempts   Int       @default(0)      // wrong-guess counter (cap then invalidate)
+  codeHash   String // bcrypt hash of the 6-digit code
+  purpose    String // "login" | "setup"
+  attempts   Int       @default(0) // wrong-guess counter (cap then invalidate)
   expiresAt  DateTime
   consumedAt DateTime?
   createdAt  DateTime  @default(now())
@@ -154,7 +155,7 @@ model EmailOtpCode {
 model RecoveryCode {
   id        String    @id @default(cuid())
   userId    String
-  codeHash  String                      // sha256(normalized code)
+  codeHash  String // sha256(normalized code)
   usedAt    DateTime?
   createdAt DateTime  @default(now())
 
@@ -170,7 +171,7 @@ model RecoveryCode {
 model SshKey {
   id        String   @id @default(cuid())
   userId    String
-  name      String   // e.g. "MacBook Pro", "ePass2003 YubiKey"
+  name      String // e.g. "MacBook Pro", "ePass2003 YubiKey"
   publicKey String   @db.Text // full "ssh-ed25519 AAAA..." string
   isDefault Boolean  @default(false) // injected first during provisioning
   createdAt DateTime @default(now())
@@ -179,7 +180,6 @@ model SshKey {
 
   @@index([userId])
 }
-
 
 enum Role {
   USER
@@ -246,7 +246,7 @@ model VpnConfig {
   id             String   @id @default(cuid())
   userId         String
   orderId        String
-  protocol       String   // wireguard, openvpn, ikev2
+  protocol       String // wireguard, openvpn, ikev2
   serverLocation String
   configData     String   @db.LongText // encrypted config file content
   expiresAt      DateTime
@@ -260,16 +260,16 @@ model VpnConfig {
 }
 
 model ProxyAccount {
-  id       String  @id @default(cuid())
-  userId   String
-  orderId  String
-  protocol String  // http, socks5, residential
-  location String  // country code
-  host     String
-  port     Int
-  username String
-  password String
-  active   Boolean @default(true)
+  id        String   @id @default(cuid())
+  userId    String
+  orderId   String
+  protocol  String // http, socks5, residential
+  location  String // country code
+  host      String
+  port      Int
+  username  String
+  password  String
+  active    Boolean  @default(true)
   createdAt DateTime @default(now())
   expiresAt DateTime
 
@@ -286,7 +286,7 @@ model EmailAccount {
   orderId      String
   domain       String
   emailAddress String
-  serverType   String   // postfix, exchange
+  serverType   String // postfix, exchange
   status       String   @default("active")
   createdAt    DateTime @default(now())
 
@@ -299,29 +299,29 @@ model EmailAccount {
 // ─── VPS Instance (Proxmox VM Assignment) ───────────────────────
 
 model VpsInstance {
-  id             String    @id @default(cuid())
-  userId         String
-  orderId        String
-  vmId           String    // Proxmox VM ID (e.g., "104")
-  node           String    // Proxmox node name (e.g., "pve-01")
-  name           String    // Display name (e.g., "My Windows VPS")
-  os             String    // OS label (e.g., "Windows 11 23H2")
-  status         String    @default("stopped") // running, stopped, provisioning
-  displayType    String    @default("novnc")   // novnc | spice
-  specs          Json?     // {vcpu, ram_gb, disk_gb, gpu}
-  ciUsername     String?   // cloud-init login user (shown on the VM Overview)
-  ciPassword     String?   @db.Text // cloud-init password, AES-256-GCM encrypted at rest
-  ipAddress      String?
-  expiresAt      DateTime?
-  ticketId       String?   @unique  // Links to DeploymentTicket
-  gpuNodeId      String?            // Links to GpuNode (null = no GPU)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id          String    @id @default(cuid())
+  userId      String
+  orderId     String
+  vmId        String // Proxmox VM ID (e.g., "104")
+  node        String // Proxmox node name (e.g., "pve-01")
+  name        String // Display name (e.g., "My Windows VPS")
+  os          String // OS label (e.g., "Windows 11 23H2")
+  status      String    @default("stopped") // running, stopped, provisioning
+  displayType String    @default("novnc") // novnc | spice
+  specs       Json? // {vcpu, ram_gb, disk_gb, gpu}
+  ciUsername  String? // cloud-init login user (shown on the VM Overview)
+  ciPassword  String?   @db.Text // cloud-init password, AES-256-GCM encrypted at rest
+  ipAddress   String?
+  expiresAt   DateTime?
+  ticketId    String?   @unique // Links to DeploymentTicket
+  gpuNodeId   String? // Links to GpuNode (null = no GPU)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
-  user    User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  order   Order             @relation(fields: [orderId], references: [id])
-  ticket        DeploymentTicket?  @relation(fields: [ticketId], references: [id])
-  gpuNode       GpuNode?           @relation(fields: [gpuNodeId], references: [id], onDelete: Restrict)
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order         Order                 @relation(fields: [orderId], references: [id])
+  ticket        DeploymentTicket?     @relation(fields: [ticketId], references: [id])
+  gpuNode       GpuNode?              @relation(fields: [gpuNodeId], references: [id], onDelete: Restrict)
   blockStorage  VmBlockStorageAddon[]
   vpcAssignment VpcAssignment?
 
@@ -336,15 +336,15 @@ model VpsInstance {
 /// usedVram is incremented/decremented atomically via Prisma transactions
 /// to prevent over-provisioning across concurrent requests.
 model GpuNode {
-  id         String      @id @default(cuid())
-  pciAddress String      @unique // e.g. "0000:03:00.0" or "0000:81:00.0"
-  label      String?              // human-readable name e.g. "TU106-GPU1-6GB"
-  totalVram  Int                  // allocatable VRAM in GB
-  usedVram   Int         @default(0)
-  maxVms     Int                  // hard cap (e.g. 1 for 6GB GPU, 3 for 12GB)
-  active     Boolean     @default(true)  // set false to drain without deleting
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  id         String   @id @default(cuid())
+  pciAddress String   @unique // e.g. "0000:03:00.0" or "0000:81:00.0"
+  label      String? // human-readable name e.g. "TU106-GPU1-6GB"
+  totalVram  Int // allocatable VRAM in GB
+  usedVram   Int      @default(0)
+  maxVms     Int // hard cap (e.g. 1 for 6GB GPU, 3 for 12GB)
+  active     Boolean  @default(true) // set false to drain without deleting
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   vms VpsInstance[]
 
@@ -384,19 +384,19 @@ enum MailboxKind {
 }
 
 model MailDomain {
-  id        String   @id @default(cuid())
-  domain    String   @unique
-  active    Boolean  @default(true)
+  id           String   @id @default(cuid())
+  domain       String   @unique
+  active       Boolean  @default(true)
   /// When true, only admins may create mailboxes here. notrespond.com is
   /// admin-only; mail.notrespond.com is where users self-serve.
-  adminOnly Boolean  @default(false)
+  adminOnly    Boolean  @default(false)
   /// Accept unknown recipients into the catch-all rather than rejecting at
   /// RCPT TO. Turning this off makes the domain bounce unknown addresses.
-  catchAll  Boolean  @default(true)
+  catchAll     Boolean  @default(true)
   /// DKIM selector; the private key lives only on the mail VM.
-  dkimSelector String @default("nrsp")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  dkimSelector String   @default("nrsp")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   mailboxes MailMailbox[]
   aliases   MailAlias[]
@@ -404,23 +404,23 @@ model MailDomain {
 }
 
 model MailMailbox {
-  id        String      @id @default(cuid())
+  id           String      @id @default(cuid())
   /// Null for SYSTEM/CATCHALL boxes. Unique so a user can hold at most one
   /// mailbox — MySQL permits many NULLs under a unique index, which is
   /// exactly the "one per user, unlimited system boxes" rule we want.
-  userId    String?     @unique
-  domainId  String
-  localPart String      @db.VarChar(64)
+  userId       String?     @unique
+  domainId     String
+  localPart    String      @db.VarChar(64)
   /// Denormalised "localPart@domain" — Postfix looks up this single column.
-  address   String      @unique @db.VarChar(255)
+  address      String      @unique @db.VarChar(255)
   /// bcrypt hash, read by Dovecot as BLF-CRYPT (same scheme as User.passwordHash).
-  passwordHash String   @db.Text
-  quotaMb   Int         @default(1024)
-  active    Boolean     @default(true)
-  kind      MailboxKind @default(USER)
-  createdAt DateTime    @default(now())
-  updatedAt DateTime    @updatedAt
-  lastLoginAt DateTime?
+  passwordHash String      @db.Text
+  quotaMb      Int         @default(1024)
+  active       Boolean     @default(true)
+  kind         MailboxKind @default(USER)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  lastLoginAt  DateTime?
 
   user   User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
   domain MailDomain @relation(fields: [domainId], references: [id], onDelete: Cascade)
@@ -446,17 +446,17 @@ model MailAlias {
 /// catch-all reporter on the mail VM; drives the admin's "create an inbox
 /// for this address?" prompt.
 model MailUnrouted {
-  id         String   @id @default(cuid())
-  domainId   String
-  recipient  String   @db.VarChar(255)
-  lastSender String?  @db.VarChar(255)
-  lastSubject String? @db.VarChar(255)
-  messageCount Int    @default(1)
-  firstSeenAt DateTime @default(now())
-  lastSeenAt  DateTime @default(now())
+  id           String    @id @default(cuid())
+  domainId     String
+  recipient    String    @db.VarChar(255)
+  lastSender   String?   @db.VarChar(255)
+  lastSubject  String?   @db.VarChar(255)
+  messageCount Int       @default(1)
+  firstSeenAt  DateTime  @default(now())
+  lastSeenAt   DateTime  @default(now())
   /// Set once an admin creates the mailbox or dismisses the prompt.
-  resolved   Boolean  @default(false)
-  resolvedAt DateTime?
+  resolved     Boolean   @default(false)
+  resolvedAt   DateTime?
 
   domain MailDomain @relation(fields: [domainId], references: [id], onDelete: Cascade)
 
@@ -511,35 +511,68 @@ model ProvisioningJob {
   @@index([status, updatedAt]) // timeout sweep
 }
 
-/// One LM Studio server, each fronting a single GPU + loaded model.
-/// baseUrl points at the OpenAI-compatible endpoint LM Studio exposes,
-/// e.g. "http://10.0.1.50:1234/v1". These hosts sit on the private LAN
-/// and are never reachable from the browser — all traffic is proxied
-/// through /api/ai/chat so the tier gate cannot be bypassed.
+/// Which wire protocol a node speaks. The chat route selects an adapter from
+/// this rather than sniffing baseUrl, so adding a provider is a new adapter
+/// plus a new enum value — never a branch inside the transport.
+///
+/// LOCAL     — OpenAI-compatible HTTP (LM Studio, vLLM, Ollama). Private LAN.
+/// ANTHROPIC — Claude via the official SDK. Server-side sandbox available.
+/// GOOGLE    — Gemini via @google/genai.
+/// OPENAI    — reserved; the LOCAL adapter already speaks this wire format,
+///             but a hosted key has different cost and egress properties and
+///             deserves its own tier gate rather than masquerading as local.
+enum AiProviderKind {
+  LOCAL
+  ANTHROPIC
+  GOOGLE
+  OPENAI
+}
+
+/// One addressable model endpoint.
+///
+/// Originally an LM Studio host; now any provider. LOCAL nodes sit on the
+/// private LAN and are never reachable from the browser. Hosted providers
+/// (ANTHROPIC/GOOGLE/OPENAI) bill per token against the operator's key, so
+/// they default to PREMIUM — an unmetered public model would be a bill, not
+/// a feature. All traffic is proxied through /api/ai/chat either way, so the
+/// tier gate cannot be bypassed and keys never reach the client.
 model AiNode {
-  id          String    @id @default(cuid())
-  name        String    @unique // "lm-rx580-01"
-  displayName String            // "Qwen2.5 14B — RX 580 #1"
-  gpuLabel    String            // "RX 580 8GB"
-  tier        AiTier    @default(STANDARD)
-  baseUrl     String            // "http://10.0.1.50:1234/v1"
-  apiKey      String?   @db.Text // AES-256-GCM encrypted; LM Studio usually needs none
-  modelId     String            // model identifier as loaded in LM Studio
-  contextLen  Int       @default(8192)
-  maxTokens   Int       @default(2048)
+  id               String         @id @default(cuid())
+  name             String         @unique // "lm-rx580-01"
+  displayName      String // "Qwen2.5 14B — RX 580 #1"
+  /// Hardware label for LOCAL nodes ("RX 580 8GB"); for hosted providers this
+  /// carries the vendor name so the UI has one field to show either way.
+  gpuLabel         String
+  provider         AiProviderKind @default(LOCAL)
+  tier             AiTier         @default(STANDARD)
+  /// Required for LOCAL (the OpenAI-compatible endpoint). Optional for hosted
+  /// providers, where the SDK knows its own default — set it only to point at
+  /// a proxy or a region-specific endpoint.
+  baseUrl          String?
+  apiKey           String?        @db.Text // AES-256-GCM encrypted; LM Studio usually needs none
+  modelId          String // "qwen2.5-14b" | "claude-opus-5" | "gemini-2.5-pro"
+  /// Let the provider run code in its own hosted sandbox when a task needs it.
+  /// ANTHROPIC only today (code_execution server tool). Off by default: it is
+  /// billed compute and an execution surface, so it is opt-in per node.
+  serverSandbox    Boolean        @default(false)
+  /// Allow the provider's hosted web search / fetch tools. Egress on the
+  /// provider's side, not ours — separate switch from the sandbox.
+  serverWebAccess  Boolean        @default(false)
+  contextLen       Int            @default(8192)
+  maxTokens        Int            @default(2048)
   /// True when the runtime actually honours reasoning_effort. Verified per
   /// node — LM Studio silently ignores it for some models (gemma-4 QAT), and
   /// shipping a control that does nothing is worse than not offering it.
-  reasoningControl Boolean @default(false)
+  reasoningControl Boolean        @default(false)
   /// Embedding model loaded on this host, if any. Retrieval uses the node the
   /// user is already entitled to, so embedding never crosses a tier boundary.
-  embedModelId String?
-  active      Boolean   @default(true)
-  online      Boolean   @default(false)
-  lastError   String?   @db.Text
-  lastCheckAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  embedModelId     String?
+  active           Boolean        @default(true)
+  online           Boolean        @default(false)
+  lastError        String?        @db.Text
+  lastCheckAt      DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
   conversations AiConversation[]
 
@@ -556,23 +589,24 @@ enum ConversationKind {
 }
 
 model AiConversation {
-  id        String   @id @default(cuid())
-  userId    String
-  nodeId    String?
-  kind      ConversationKind @default(STUDIO)
-  title     String   @default("New chat") @db.VarChar(200)
+  id              String           @id @default(cuid())
+  userId          String
+  nodeId          String?
+  kind            ConversationKind @default(STUDIO)
+  title           String           @default("New chat") @db.VarChar(200)
   /// Display preference for a reasoning model's scratchpad. Always effective,
   /// because it is applied on our side rather than asked of the runtime.
-  showReasoning   Boolean @default(true)
+  showReasoning   Boolean          @default(true)
   /// "off" | "low" | "medium" | "high". Only sent upstream when the node's
   /// reasoningControl is true; otherwise recorded but not acted on.
-  reasoningEffort String? @db.VarChar(8)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  reasoningEffort String?          @db.VarChar(8)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
-  user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  node     AiNode?     @relation(fields: [nodeId], references: [id], onDelete: SetNull)
+  user     User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  node     AiNode?               @relation(fields: [nodeId], references: [id], onDelete: SetNull)
   messages AiMessage[]
+  skills   AiConversationSkill[]
 
   @@index([userId, updatedAt])
   @@index([nodeId])
@@ -629,18 +663,90 @@ model AiKnowledgeChunk {
   @@index([docId, ordinal])
 }
 
-model AiMessage {
-  id             String   @id @default(cuid())
+// ─── User-defined skills ──────────────────────────────────────────
+
+/// A named instruction block the user can switch on for a conversation.
+///
+/// Deliberately provider-neutral: a skill is text (plus optional reference
+/// files) that gets composed into the system prompt, so it behaves identically
+/// on a local model, Claude, and Gemini. Anthropic's own Skills format is
+/// richer but Claude-only, which would make the same skill act differently
+/// depending on which model the user picked.
+///
+/// Skill text is authored by the owning user and is NOT privileged: it is
+/// composed into the system prompt but can never grant a tool or raise a tier.
+/// Treat it as user input that the model reads, not as operator instruction.
+model AiSkill {
+  id           String   @id @default(cuid())
+  userId       String
+  name         String   @db.VarChar(80)
+  description  String?  @db.VarChar(300)
+  /// The instruction text composed into the system prompt when enabled.
+  instructions String   @db.LongText
+  /// Shared skills are visible to every user; only an admin may publish one.
+  shared       Boolean  @default(false)
+  enabled      Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user  User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  files AiSkillFile[]
+  uses  AiConversationSkill[]
+
+  @@unique([userId, name])
+  @@index([shared, enabled])
+}
+
+/// A reference file attached to a skill. Content is stored inline rather than
+/// on disk so a skill is a single portable row-set, and because these are
+/// prompt fragments (documentation, schemas, style guides) rather than blobs.
+model AiSkillFile {
+  id        String   @id @default(cuid())
+  skillId   String
+  filename  String   @db.VarChar(200)
+  mimeType  String   @db.VarChar(100)
+  /// Extracted text. Binary uploads are converted at ingest; anything that
+  /// cannot be represented as text is rejected rather than stored unusable.
+  content   String   @db.LongText
+  bytes     Int
+  createdAt DateTime @default(now())
+
+  skill AiSkill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@index([skillId])
+}
+
+/// Join row — which skills are active for a conversation.
+model AiConversationSkill {
   conversationId String
-  role           String   // "user" | "assistant" | "system"
-  content        String   @db.LongText
-  modelId        String?  // snapshot — the node may be re-pointed later
+  skillId        String
+  createdAt      DateTime @default(now())
+
+  conversation AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  skill        AiSkill        @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@id([conversationId, skillId])
+  @@index([skillId])
+}
+
+model AiMessage {
+  id             String          @id @default(cuid())
+  conversationId String
+  role           String // "user" | "assistant" | "system"
+  content        String          @db.LongText
+  modelId        String? // snapshot — the node may be re-pointed later
   gpuLabel       String?
+  /// Which provider produced this turn. Null on user turns and on rows written
+  /// before multi-model conversations existed.
+  provider       AiProviderKind?
+  /// Human name of the model that produced it ("Claude Opus 5"), snapshotted so
+  /// the transcript stays readable after a node is renamed or deleted.
+  speaker        String?         @db.VarChar(80)
   promptTokens   Int?
   outputTokens   Int?
   latencyMs      Int?
-  failed         Boolean  @default(false)
-  createdAt      DateTime @default(now())
+  failed         Boolean         @default(false)
+  createdAt      DateTime        @default(now())
 
   conversation AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
 
@@ -655,12 +761,12 @@ model AiMessage {
 model VmBlockStorageAddon {
   id            String   @id @default(cuid())
   vpsInstanceId String
-  storagePool   String   // Proxmox pool name e.g. "SSD-NVME-2TB", "local-zfs"
-  storageType   String   // "nvme" | "sata" | "hdd" (tier classification)
-  diskSlot      String   // e.g. "sata1", "scsi1" (bus:index assigned)
-  sizeGb        Int      // GB attached in this transaction
-  pricePerGb    Int      // VND/GB snapshot at purchase time
-  totalCost     Int      // sizeGb × pricePerGb
+  storagePool   String // Proxmox pool name e.g. "SSD-NVME-2TB", "local-zfs"
+  storageType   String // "nvme" | "sata" | "hdd" (tier classification)
+  diskSlot      String // e.g. "sata1", "scsi1" (bus:index assigned)
+  sizeGb        Int // GB attached in this transaction
+  pricePerGb    Int // VND/GB snapshot at purchase time
+  totalCost     Int // sizeGb × pricePerGb
   active        Boolean  @default(true)
   purchasedAt   DateTime @default(now())
 
@@ -676,24 +782,24 @@ model VmBlockStorageAddon {
 /// /28 subnets provide 14 usable IPs per customer.
 /// Users can self-provision up to maxVpcs (default 3, max 5).
 model Vpc {
-  id              String      @id @default(cuid())
-  userId          String?     // Owner — null for legacy admin-created VPCs
-  name            String      // User-chosen display name
-  vlanId          Int         @unique  // Per-user 802.1Q VLAN tag (1001-2000)
-  networkId       String?     // 8-hex hash label of the owner id (per /28)
-  networkIndex    Int?        @unique  // /28 block index in 10.50.0.0/16 (0-4095)
-  vnetName        String      @unique  // Proxmox SDN VNet name (e.g. "vc1001")
-  zoneName        String      @default("NRSPVC")  // Proxmox SDN Zone (VLAN type)
-  mikrotikVlanIf  String?     // MikroTik per-user VLAN interface (e.g. "vlan1001-cust")
-  subnet          String      @unique  // "10.50.3.16/28" — one /28 per VPC
-  gateway         String      // "10.50.3.17"
-  dhcpStart       String?     // "10.50.3.18"
-  dhcpEnd         String?     // "10.50.3.30"
-  isolate         Boolean     @default(true)  // Proxmox "Isolate Ports"
-  status          String      @default("ACTIVE")  // ACTIVE | DISABLED
-  description     String?     @db.Text
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  id             String   @id @default(cuid())
+  userId         String? // Owner — null for legacy admin-created VPCs
+  name           String // User-chosen display name
+  vlanId         Int      @unique // Per-user 802.1Q VLAN tag (1001-2000)
+  networkId      String? // 8-hex hash label of the owner id (per /28)
+  networkIndex   Int?     @unique // /28 block index in 10.50.0.0/16 (0-4095)
+  vnetName       String   @unique // Proxmox SDN VNet name (e.g. "vc1001")
+  zoneName       String   @default("NRSPVC") // Proxmox SDN Zone (VLAN type)
+  mikrotikVlanIf String? // MikroTik per-user VLAN interface (e.g. "vlan1001-cust")
+  subnet         String   @unique // "10.50.3.16/28" — one /28 per VPC
+  gateway        String // "10.50.3.17"
+  dhcpStart      String? // "10.50.3.18"
+  dhcpEnd        String? // "10.50.3.30"
+  isolate        Boolean  @default(true) // Proxmox "Isolate Ports"
+  status         String   @default("ACTIVE") // ACTIVE | DISABLED
+  description    String?  @db.Text
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   user        User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
   assignments VpcAssignment[]
@@ -707,16 +813,16 @@ model Vpc {
 /// Links a VPS instance to a VPC. 1:1 relationship — each VM
 /// belongs to at most one VPC at a time.
 model VpcAssignment {
-  id             String      @id @default(cuid())
-  vpcId          String
-  vpsInstanceId  String      @unique  // 1:1 — one VM per VPC assignment
-  bridgeName     String      // Proxmox bridge assigned (e.g. "vc001")
-  ipAddress      String?     // Resolved IP within the /28 (auto or manual)
-  dhcp           Boolean     @default(true)  // true = auto-assign, false = manual static
-  assignedAt     DateTime    @default(now())
+  id            String   @id @default(cuid())
+  vpcId         String
+  vpsInstanceId String   @unique // 1:1 — one VM per VPC assignment
+  bridgeName    String // Proxmox bridge assigned (e.g. "vc001")
+  ipAddress     String? // Resolved IP within the /28 (auto or manual)
+  dhcp          Boolean  @default(true) // true = auto-assign, false = manual static
+  assignedAt    DateTime @default(now())
 
   vpc         Vpc         @relation(fields: [vpcId], references: [id], onDelete: Cascade)
-  vpsInstance VpsInstance  @relation(fields: [vpsInstanceId], references: [id], onDelete: Cascade)
+  vpsInstance VpsInstance @relation(fields: [vpsInstanceId], references: [id], onDelete: Cascade)
 
   @@index([vpcId])
 }
@@ -728,17 +834,17 @@ model VpcAssignment {
 /// Each user can have up to 3 active peers (phone, laptop, desktop).
 /// Remote-WG1 is never managed by the website.
 model WgPeer {
-  id              String    @id @default(cuid())
-  userId          String
-  name            String                   // "My Laptop", "iPhone"
-  publicKey       String    @unique        // Client WG public key
-  presharedKey    String?   @db.Text       // Optional PSK
-  assignedIp      String    @unique        // 10.98.0.x
-  allowedSubnets  String    @db.Text       // JSON: ["10.50.1.0/28"]
-  mikrotikPeerId  String?                  // MikroTik .id for deletion
-  active          Boolean   @default(true)
-  createdAt       DateTime  @default(now())
-  revokedAt       DateTime?
+  id             String    @id @default(cuid())
+  userId         String
+  name           String // "My Laptop", "iPhone"
+  publicKey      String    @unique // Client WG public key
+  presharedKey   String?   @db.Text // Optional PSK
+  assignedIp     String    @unique // 10.98.0.x
+  allowedSubnets String    @db.Text // JSON: ["10.50.1.0/28"]
+  mikrotikPeerId String? // MikroTik .id for deletion
+  active         Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  revokedAt      DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -757,9 +863,9 @@ model UserNextcloudStorage {
   id            String   @id @default(cuid())
   userId        String   @unique
   ncUsername    String   @unique // NC account name; convention: "user-<userId[0..7]>"
-  freeGb        Int      @default(5)  // base free tier
-  paidGb        Int      @default(0)  // total paid expansion GB
-  totalGb       Int      @default(5)  // freeGb + paidGb (denormalised for fast reads)
+  freeGb        Int      @default(5) // base free tier
+  paidGb        Int      @default(0) // total paid expansion GB
+  totalGb       Int      @default(5) // freeGb + paidGb (denormalised for fast reads)
   active        Boolean  @default(true)
   provisionedAt DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -820,26 +926,26 @@ model ManualChapter {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  sections  ManualSection[]
+  sections ManualSection[]
 
   @@index([published, sortOrder])
 }
 
 model ManualSection {
-  id         String   @id @default(cuid())
-  chapterId  String
-  parentId   String?
-  title      String
-  slug       String
-  content    String   @db.LongText
-  sortOrder  Int      @default(0)
-  published  Boolean  @default(false)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id        String   @id @default(cuid())
+  chapterId String
+  parentId  String?
+  title     String
+  slug      String
+  content   String   @db.LongText
+  sortOrder Int      @default(0)
+  published Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  chapter    ManualChapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
-  parent     ManualSection? @relation("SectionTree", fields: [parentId], references: [id], onDelete: Cascade)
-  children   ManualSection[] @relation("SectionTree")
+  chapter  ManualChapter   @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  parent   ManualSection?  @relation("SectionTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children ManualSection[] @relation("SectionTree")
 
   @@unique([chapterId, slug])
   @@index([chapterId, sortOrder])
@@ -883,7 +989,7 @@ model Transaction {
   amount    Decimal  @db.Decimal(10, 2)
   currency  String   @default("USD")
   method    String   @default("dev_bypass") // btc, eth, dev_bypass
-  status    String   @default("paid")       // paid, pending, failed
+  status    String   @default("paid") // paid, pending, failed
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -986,6 +1092,10 @@ enum AuditAction {
   AI_TOOL_DENIED
   AI_KNOWLEDGE_SEARCH
   ADMIN_AI_DOC_MODIFY
+  // User-authored skills
+  AI_SKILL_CREATE
+  AI_SKILL_UPDATE
+  AI_SKILL_DELETE
   // AI support bubble
   SUPPORT_CHAT_CONSENT
   // Per-user subdomains
@@ -1000,16 +1110,16 @@ enum AuditAction {
 }
 
 model AuditLog {
-  id             String      @id @default(cuid())
-  userId         String
-  action         AuditAction
-  resourceType   String      // "VirtualMachine", "UserAccount", "Network", "Billing"
-  resourceId     String?     // ID of the target resource (vmId, orderId, etc.)
-  ipAddress      String?
-  userAgent      String?
-  metadata       Json?       // Payload diffs, extra context
-  outcome        String      @default("SUCCESS") // "SUCCESS" | "FAILED" | "DENIED"
-  createdAt      DateTime    @default(now())
+  id           String      @id @default(cuid())
+  userId       String
+  action       AuditAction
+  resourceType String // "VirtualMachine", "UserAccount", "Network", "Billing"
+  resourceId   String? // ID of the target resource (vmId, orderId, etc.)
+  ipAddress    String?
+  userAgent    String?
+  metadata     Json? // Payload diffs, extra context
+  outcome      String      @default("SUCCESS") // "SUCCESS" | "FAILED" | "DENIED"
+  createdAt    DateTime    @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Restrict)
 
@@ -1024,9 +1134,9 @@ model AuditLog {
 model CreditTransaction {
   id        String   @id @default(cuid())
   userId    String
-  type      String   // "Top-up", "VM_Deduction", "Promo_Redeem"
-  amount    Int      // positive = credit, negative = deduction
-  details   String?  // e.g. "VM#101 Deduction", "Promo: LAUNCH25"
+  type      String // "Top-up", "VM_Deduction", "Promo_Redeem"
+  amount    Int // positive = credit, negative = deduction
+  details   String? // e.g. "VM#101 Deduction", "Promo: LAUNCH25"
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1035,13 +1145,13 @@ model CreditTransaction {
 }
 
 model PromoCode {
-  id           String    @id @default(cuid())
-  code         String    @unique
-  creditValue  Int
-  maxUses      Int       @default(1)
-  currentUses  Int       @default(0)
-  expiresAt    DateTime?
-  createdAt    DateTime  @default(now())
+  id          String    @id @default(cuid())
+  code        String    @unique
+  creditValue Int
+  maxUses     Int       @default(1)
+  currentUses Int       @default(0)
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
 
   appliedToUsers AppliedPromoCode[]
 }
@@ -1062,12 +1172,12 @@ model AppliedPromoCode {
 // ─── Deployment Ticket System ─────────────────────────────────────
 
 model DeploymentTicket {
-  id         String    @id @default(cuid())
+  id         String   @id @default(cuid())
   userId     String
-  planId     String    // e.g., "Dev-Standard", "Perform-NVMe"
-  status     String    @default("AVAILABLE") // "AVAILABLE" | "IN_USE"
+  planId     String // e.g., "Dev-Standard", "Perform-NVMe"
+  status     String   @default("AVAILABLE") // "AVAILABLE" | "IN_USE"
   validUntil DateTime
-  createdAt  DateTime  @default(now())
+  createdAt  DateTime @default(now())
 
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   vpsInstance VpsInstance? // populated when status = "IN_USE"
@@ -1082,12 +1192,12 @@ model DeploymentTicket {
 /// `schema` stores pipe-delimited field names that define each item's structure.
 model MmoProductCategory {
   id           String   @id @default(cuid())
-  slug         String   @unique          // URL-safe: "netflix-premium"
-  name         String                    // Display: "Netflix Premium Accounts"
+  slug         String   @unique // URL-safe: "netflix-premium"
+  name         String // Display: "Netflix Premium Accounts"
   description  String?  @db.Text
-  imageUrl     String?                   // Product card image URL
-  schema       String   @db.Text         // "email|password|recovery|2fa"
-  pricePerUnit Int                       // price in Credits per unit
+  imageUrl     String? // Product card image URL
+  schema       String   @db.Text // "email|password|recovery|2fa"
+  pricePerUnit Int // price in Credits per unit
   active       Boolean  @default(true)
   sortOrder    Int      @default(0)
   createdAt    DateTime @default(now())
@@ -1104,11 +1214,11 @@ model MmoProductCategory {
 model MmoInventoryItem {
   id         String    @id @default(cuid())
   categoryId String
-  data       String    @db.Text         // "user@ex.com|Pass123!|recov@x.com|TOTP"
+  data       String    @db.Text // "user@ex.com|Pass123!|recov@x.com|TOTP"
   sold       Boolean   @default(false)
   soldAt     DateTime?
-  soldToId   String?                    // userId of buyer (null = unsold)
-  expiresAt  DateTime?                  // soldAt + 30 days; null = unsold
+  soldToId   String? // userId of buyer (null = unsold)
+  expiresAt  DateTime? // soldAt + 30 days; null = unsold
   createdAt  DateTime  @default(now())
 
   category MmoProductCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
@@ -1127,21 +1237,21 @@ model MmoInventoryItem {
 /// Private keys are stored encrypted with their respective PINs.
 /// PINs are local UI locks only — NOT the message encryption key.
 model SupportChat {
-  id              String    @id @default(cuid())
-  userId          String
-  userPubKey      String    @db.Text    // User's ECDH public key (JWK JSON)
-  userEncPrivKey  String    @db.Text    // User's private key encrypted with user PIN (base64)
-  userKeyIv       String                // IV used to encrypt user's private key (base64)
-  pinHash         String                // bcrypt hash of user-chosen PIN
-  closed          Boolean   @default(false)
-  closedAt        DateTime?             // Timestamp when permanently closed
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id             String    @id @default(cuid())
+  userId         String
+  userPubKey     String    @db.Text // User's ECDH public key (JWK JSON)
+  userEncPrivKey String    @db.Text // User's private key encrypted with user PIN (base64)
+  userKeyIv      String // IV used to encrypt user's private key (base64)
+  pinHash        String // bcrypt hash of user-chosen PIN
+  closed         Boolean   @default(false)
+  closedAt       DateTime? // Timestamp when permanently closed
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages SupportMessage[]
 
-  @@unique([userId])                    // one active chat per user
+  @@unique([userId]) // one active chat per user
   @@index([userId])
 }
 
@@ -1152,9 +1262,9 @@ model SupportChat {
 model SupportMessage {
   id         String   @id @default(cuid())
   chatId     String
-  senderType String                    // "USER" | "ADMIN"
-  ciphertext String   @db.Text        // AES-GCM encrypted message (base64)
-  iv         String                    // AES-GCM IV (base64)
+  senderType String // "USER" | "ADMIN"
+  ciphertext String   @db.Text // AES-GCM encrypted message (base64)
+  iv         String // AES-GCM IV (base64)
   createdAt  DateTime @default(now())
 
   chat SupportChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
@@ -1177,8 +1287,8 @@ model Ticket {
   id          String       @id @default(cuid())
   userId      String
   title       String       @db.VarChar(200)
-  description String       @db.Text           // Markdown body
-  imageUrls   String?      @db.Text           // JSON array of upload paths
+  description String       @db.Text // Markdown body
+  imageUrls   String?      @db.Text // JSON array of upload paths
   status      TicketStatus @default(PENDING)
   priority    String       @default("medium") // low | medium | high | critical
   createdAt   DateTime     @default(now())
@@ -1196,7 +1306,7 @@ model Ticket {
 model TicketNotification {
   id        String   @id @default(cuid())
   ticketId  String
-  userId    String   // The ticket creator who receives the notification
+  userId    String // The ticket creator who receives the notification
   message   String
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
@@ -1225,14 +1335,14 @@ model CryptoTopup {
   id              String    @id @default(cuid())
   userId          String
   amountUsdt      Decimal   @db.Decimal(12, 6)
-  creditAmount    Int       // Calculated credits to mint (amountUsdt * exchange rate)
-  chain           String    // "TRC20" | "ERC20"
-  depositAddress  String    // Unique HD-derived address for this top-up
-  derivationIndex Int       // HD wallet derivation path index
-  txHash          String?   // Blockchain transaction hash (set on confirmation)
+  creditAmount    Int // Calculated credits to mint (amountUsdt * exchange rate)
+  chain           String // "TRC20" | "ERC20"
+  depositAddress  String // Unique HD-derived address for this top-up
+  derivationIndex Int // HD wallet derivation path index
+  txHash          String? // Blockchain transaction hash (set on confirmation)
   confirmations   Int       @default(0)
   status          String    @default("PENDING") // PENDING | CONFIRMING | COMPLETED | EXPIRED
-  expiresAt       DateTime  // Address validity window (e.g., 30 minutes)
+  expiresAt       DateTime // Address validity window (e.g., 30 minutes)
   completedAt     DateTime?
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -1250,16 +1360,16 @@ model CryptoTopup {
 /// Only users with canInvite = true can generate codes.
 /// Each code supports up to maxUses redemptions (default 10).
 model InvitationCode {
-  id          String    @id @default(cuid())
-  code        String    @unique            // Format: "NRSP-XXXX-XXXX"
-  creatorId   String                       // User who generated the code
-  maxUses     Int       @default(10)       // Max redemptions per code
-  usedCount   Int       @default(0)        // Current redemption count
-  expiresAt   DateTime?                    // Optional expiry
-  active      Boolean   @default(true)
-  createdAt   DateTime  @default(now())
+  id        String    @id @default(cuid())
+  code      String    @unique // Format: "NRSP-XXXX-XXXX"
+  creatorId String // User who generated the code
+  maxUses   Int       @default(10) // Max redemptions per code
+  usedCount Int       @default(0) // Current redemption count
+  expiresAt DateTime? // Optional expiry
+  active    Boolean   @default(true)
+  createdAt DateTime  @default(now())
 
-  creator     User      @relation("InviteCreator", fields: [creatorId], references: [id], onDelete: Cascade)
+  creator     User                   @relation("InviteCreator", fields: [creatorId], references: [id], onDelete: Cascade)
   redemptions InvitationRedemption[]
 
   @@index([code])
@@ -1270,24 +1380,24 @@ model InvitationCode {
 model InvitationRedemption {
   id               String   @id @default(cuid())
   invitationCodeId String
-  userId           String                  // User who redeemed the code
+  userId           String // User who redeemed the code
   redeemedAt       DateTime @default(now())
   context          String   @default("REGISTRATION") // "REGISTRATION" | "CHECKOUT"
 
-  invitationCode   InvitationCode @relation(fields: [invitationCodeId], references: [id], onDelete: Cascade)
+  invitationCode InvitationCode @relation(fields: [invitationCodeId], references: [id], onDelete: Cascade)
 
-  @@unique([invitationCodeId, userId])    // One redemption per user per code
+  @@unique([invitationCodeId, userId]) // One redemption per user per code
   @@index([userId])
 }
 
 // ─── TimoSMS — Temporary SMS-Receive Rental ──────────────────────
 
 enum SmsRentalStatus {
-  WAITING    // number issued, awaiting an inbound SMS
-  RECEIVED   // a valid code was delivered AND charged
-  CANCELLED  // user cancelled before any code
-  EXPIRED    // TTL elapsed with no code (never charged)
-  ERROR      // provider/allocation failure
+  WAITING // number issued, awaiting an inbound SMS
+  RECEIVED // a valid code was delivered AND charged
+  CANCELLED // user cancelled before any code
+  EXPIRED // TTL elapsed with no code (never charged)
+  ERROR // provider/allocation failure
 }
 
 /// A rentable target service (e.g. Google, Telegram) for a given country.
@@ -1295,11 +1405,11 @@ enum SmsRentalStatus {
 /// `providerServiceCode` maps to the Telecom API's own service identifier.
 model SmsService {
   id                  String   @id @default(cuid())
-  code                String                    // slug, e.g. "google"
-  name                String                    // display, e.g. "Google / Gmail"
-  country             String   @default("VN")   // ISO country of the numbers
-  priceCredits        Int                       // charged once a code is received
-  providerServiceCode String?                   // Telecom API service id
+  code                String // slug, e.g. "google"
+  name                String // display, e.g. "Google / Gmail"
+  country             String   @default("VN") // ISO country of the numbers
+  priceCredits        Int // charged once a code is received
+  providerServiceCode String? // Telecom API service id
   iconUrl             String?
   active              Boolean  @default(true)
   sortOrder           Int      @default(0)
@@ -1319,15 +1429,15 @@ model SmsRental {
   id               String          @id @default(cuid())
   userId           String
   serviceId        String
-  providerRentalId String?                          // Telecom API rental/activation id
+  providerRentalId String? // Telecom API rental/activation id
   phoneNumber      String?
   country          String
   status           SmsRentalStatus @default(WAITING)
-  priceCredits     Int                              // snapshot of service price at rent time
-  code             String?                          // revealed only when charged
+  priceCredits     Int // snapshot of service price at rent time
+  code             String? // revealed only when charged
   charged          Boolean         @default(false)
   createdAt        DateTime        @default(now())
-  expiresAt        DateTime                         // TTL — auto-expires if no code
+  expiresAt        DateTime // TTL — auto-expires if no code
   completedAt      DateTime?
   cancelledAt      DateTime?
 
@@ -1365,7 +1475,7 @@ model Notification {
   type      String   @default("system") // "alert" | "system"
   title     String
   body      String   @db.Text
-  link      String?                      // optional in-app deep link
+  link      String? // optional in-app deep link
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
 
@@ -1382,13 +1492,13 @@ model Notification {
 model VmAlertRule {
   id          String    @id @default(cuid())
   userId      String
-  vmId        String                       // Proxmox VMID
+  vmId        String // Proxmox VMID
   node        String
-  metric      String                       // "cpu" | "mem" | "disk" | "bandwidth"
-  comparison  String    @default("gt")      // "gt" | "lt"
-  threshold   Float                         // percent (cpu/mem/disk) or Mbps (bandwidth)
+  metric      String // "cpu" | "mem" | "disk" | "bandwidth"
+  comparison  String    @default("gt") // "gt" | "lt"
+  threshold   Float // percent (cpu/mem/disk) or Mbps (bandwidth)
   enabled     Boolean   @default(true)
-  lastValue   Float?                        // prior sample (bandwidth: cumulative bytes)
+  lastValue   Float? // prior sample (bandwidth: cumulative bytes)
   lastValueAt DateTime?
   lastFiredAt DateTime?
   createdAt   DateTime  @default(now())

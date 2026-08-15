@@ -3,21 +3,28 @@
 import { useState, useEffect, useCallback } from "react";
 import {
     Bot, Plus, RefreshCw, Trash2, Circle, Lock, Users,
-    AlertTriangle, Check, X,
+    AlertTriangle, Check, X, Server, Cloud,
 } from "lucide-react";
 import { useThemeTokens } from "@/lib/useThemeTokens";
+
+type Provider = "LOCAL" | "ANTHROPIC" | "GOOGLE" | "OPENAI";
+type Tier = "STANDARD" | "PREMIUM";
 
 interface AdminNode {
     id: string;
     name: string;
     displayName: string;
     gpuLabel: string;
-    tier: "STANDARD" | "PREMIUM";
-    baseUrl: string;
+    provider: Provider;
+    tier: Tier;
+    /** Null on hosted providers using the vendor's own endpoint. */
+    baseUrl: string | null;
     modelId: string;
     contextLen: number;
     maxTokens: number;
     reasoningControl: boolean;
+    serverSandbox: boolean;
+    serverWebAccess: boolean;
     active: boolean;
     online: boolean;
     lastError: string | null;
@@ -26,24 +33,84 @@ interface AdminNode {
     conversationCount: number;
 }
 
+/** What the probe route returns — one line of truth per provider. */
 interface ProbeResult {
     online: boolean;
-    loadedModels: string[];
-    modelMatches: boolean;
-    lastError: string | null;
+    provider: Provider;
+    detail: string;
 }
 
-const BLANK = {
+interface NodeForm {
+    name: string;
+    displayName: string;
+    gpuLabel: string;
+    provider: Provider;
+    tier: Tier;
+    baseUrl: string;
+    apiKey: string;
+    modelId: string;
+    contextLen: number;
+    maxTokens: number;
+    reasoningControl: boolean;
+    serverSandbox: boolean;
+    serverWebAccess: boolean;
+}
+
+const BLANK: NodeForm = {
     name: "",
     displayName: "",
     gpuLabel: "",
-    tier: "STANDARD" as "STANDARD" | "PREMIUM",
+    provider: "LOCAL",
+    tier: "STANDARD",
     baseUrl: "",
     apiKey: "",
     modelId: "",
     contextLen: 8192,
     maxTokens: 2048,
     reasoningControl: false,
+    serverSandbox: false,
+    serverWebAccess: false,
+};
+
+/**
+ * Sensible starting points per provider.
+ *
+ * Hosted providers default to PREMIUM: they bill per token against the
+ * operator's own account, so opening one to every signed-in user should be a
+ * deliberate act, not the default that comes with picking Claude in a dropdown.
+ *
+ * The model ids are prefilled rather than left blank because the probe verifies
+ * them with a one-token round trip the moment the node is created — a wrong id
+ * is reported in seconds, which beats an empty field the admin has to go and
+ * look up.
+ */
+const PRESETS: Record<Provider, Partial<NodeForm>> = {
+    LOCAL: {
+        gpuLabel: "", tier: "STANDARD", contextLen: 8192, maxTokens: 2048,
+        reasoningControl: false, serverSandbox: false, serverWebAccess: false,
+    },
+    ANTHROPIC: {
+        gpuLabel: "Anthropic", tier: "PREMIUM",
+        displayName: "Claude Opus 5", modelId: "claude-opus-5",
+        contextLen: 200_000, maxTokens: 16_000, reasoningControl: true,
+    },
+    GOOGLE: {
+        gpuLabel: "Google", tier: "PREMIUM",
+        displayName: "Gemini 2.5 Pro", modelId: "gemini-2.5-pro",
+        contextLen: 200_000, maxTokens: 16_000, reasoningControl: false,
+    },
+    OPENAI: {
+        gpuLabel: "OpenAI", tier: "PREMIUM",
+        displayName: "GPT", modelId: "",
+        contextLen: 128_000, maxTokens: 8_000, reasoningControl: true,
+    },
+};
+
+const PROVIDER_LABEL: Record<Provider, string> = {
+    LOCAL: "Local — LM Studio / vLLM / Ollama",
+    ANTHROPIC: "Anthropic — Claude",
+    GOOGLE: "Google — Gemini",
+    OPENAI: "OpenAI-compatible",
 };
 
 export default function AdminAiNodesPage() {
@@ -74,6 +141,11 @@ export default function AdminAiNodesPage() {
 
     useEffect(() => { load(); }, [load]);
 
+    /** Switching provider re-seeds the fields that are provider-specific. */
+    const pickProvider = (provider: Provider) => {
+        setForm(f => ({ ...f, provider, ...PRESETS[provider] }));
+    };
+
     const save = async () => {
         setSaving(true);
         setError(null);
@@ -81,7 +153,11 @@ export default function AdminAiNodesPage() {
             const res = await fetch("/api/admin/ai/nodes", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ...form, apiKey: form.apiKey || undefined }),
+                body: JSON.stringify({
+                    ...form,
+                    apiKey: form.apiKey || undefined,
+                    baseUrl: form.baseUrl || undefined,
+                }),
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error ?? "Failed to create node");
@@ -145,6 +221,14 @@ export default function AdminAiNodesPage() {
         letterSpacing: "0.04em", textTransform: "uppercase",
     };
 
+    const isLocal = form.provider === "LOCAL";
+    // A local node is unreachable without an endpoint; a hosted one is
+    // unusable without a key. Mirrors the refinements on the API schema.
+    const canCreate = Boolean(
+        form.name && form.displayName && form.gpuLabel && form.modelId
+        && (isLocal ? form.baseUrl : form.apiKey),
+    );
+
     return (
         <div style={{ padding: "32px 36px", minHeight: "100vh", background: t.bgPrimary, fontFamily: t.fontFamily }}>
             {/* Header */}
@@ -160,7 +244,8 @@ export default function AdminAiNodesPage() {
                     <div>
                         <h1 style={{ fontSize: "1.6rem", fontWeight: 800, color: t.textPrimary }}>AI Nodes</h1>
                         <p style={{ fontSize: "0.83rem", color: t.textMuted }}>
-                            LM Studio hosts, one per GPU pair. STANDARD is open to all users; PREMIUM is admin-only.
+                            Local LM Studio hosts and hosted providers, side by side. STANDARD is open
+                            to all users; PREMIUM is admin-only. Users can mix them in one conversation.
                         </p>
                     </div>
                 </div>
@@ -201,13 +286,41 @@ export default function AdminAiNodesPage() {
             {showForm && (
                 <div style={{ ...card, padding: "22px 26px", marginBottom: 24 }}>
                     <h2 style={{ fontSize: "1rem", fontWeight: 700, color: t.textPrimary, marginBottom: 18 }}>
-                        Register inference host
+                        Register model
                     </h2>
+
+                    {/* Provider first — it decides which of the fields below matter. */}
+                    <div style={{ marginBottom: 18 }}>
+                        <label style={label}>Provider</label>
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                            {(Object.keys(PROVIDER_LABEL) as Provider[]).map(p => (
+                                <button
+                                    key={p}
+                                    onClick={() => pickProvider(p)}
+                                    style={{
+                                        display: "inline-flex", alignItems: "center", gap: 7,
+                                        padding: "8px 14px", borderRadius: t.buttonRadius,
+                                        border: `1px solid ${form.provider === p ? t.accentPrimary : t.borderPrimary}`,
+                                        background: form.provider === p ? t.accentPrimaryMuted : "transparent",
+                                        color: form.provider === p ? t.accentPrimary : t.textSecondary,
+                                        fontSize: "0.8rem", fontWeight: 600, cursor: "pointer",
+                                        fontFamily: t.fontFamily,
+                                    }}
+                                >
+                                    {p === "LOCAL"
+                                        ? <Server style={{ width: 13, height: 13 }} />
+                                        : <Cloud style={{ width: 13, height: 13 }} />}
+                                    {PROVIDER_LABEL[p]}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
 
                     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
                         <div>
                             <label style={label}>Node name</label>
-                            <input style={field} value={form.name} placeholder="lm-rx580-pair"
+                            <input style={field} value={form.name}
+                                placeholder={isLocal ? "lm-rx580-pair" : "claude-opus"}
                                 onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
                         </div>
                         <div>
@@ -216,21 +329,27 @@ export default function AdminAiNodesPage() {
                                 onChange={e => setForm(f => ({ ...f, displayName: e.target.value }))} />
                         </div>
                         <div>
-                            <label style={label}>GPU label</label>
-                            <input style={field} value={form.gpuLabel} placeholder="2× RX 580 · 16 GB"
+                            <label style={label}>{isLocal ? "GPU label" : "Vendor label"}</label>
+                            <input style={field} value={form.gpuLabel}
+                                placeholder={isLocal ? "2× RX 580 · 16 GB" : "Anthropic"}
                                 onChange={e => setForm(f => ({ ...f, gpuLabel: e.target.value }))} />
                         </div>
                         <div>
                             <label style={label}>Access tier</label>
                             <select style={field} value={form.tier}
-                                onChange={e => setForm(f => ({ ...f, tier: e.target.value as "STANDARD" | "PREMIUM" }))}>
+                                onChange={e => setForm(f => ({ ...f, tier: e.target.value as Tier }))}>
                                 <option value="STANDARD">STANDARD — all users</option>
                                 <option value="PREMIUM">PREMIUM — admins only</option>
                             </select>
                         </div>
                         <div>
-                            <label style={label}>Base URL</label>
-                            <input style={field} value={form.baseUrl} placeholder="http://10.0.1.50:1234/v1"
+                            <label style={label}>
+                                {isLocal ? "Base URL" : "API URL (optional override)"}
+                            </label>
+                            <input style={field} value={form.baseUrl}
+                                placeholder={isLocal
+                                    ? "http://10.0.1.50:1234/v1"
+                                    : "leave blank for the vendor's own endpoint"}
                                 onChange={e => setForm(f => ({ ...f, baseUrl: e.target.value }))} />
                         </div>
                         <div>
@@ -249,45 +368,133 @@ export default function AdminAiNodesPage() {
                                 onChange={e => setForm(f => ({ ...f, maxTokens: Number(e.target.value) }))} />
                         </div>
                         <div>
-                            <label style={label}>API key (optional)</label>
-                            <input style={field} type="password" value={form.apiKey} placeholder="usually blank"
+                            <label style={label}>
+                                API key {isLocal ? "(optional)" : "(required)"}
+                            </label>
+                            <input style={field} type="password" value={form.apiKey}
+                                placeholder={isLocal ? "usually blank" : "sk-ant-… / AIza…"}
                                 onChange={e => setForm(f => ({ ...f, apiKey: e.target.value }))} />
                         </div>
                     </div>
 
-                    <label style={{
-                        display: "flex", alignItems: "flex-start", gap: 10, marginTop: 18,
-                        cursor: "pointer", maxWidth: 620,
-                    }}>
-                        <input
-                            type="checkbox"
-                            checked={form.reasoningControl}
-                            onChange={e => setForm(f => ({ ...f, reasoningControl: e.target.checked }))}
-                            style={{ marginTop: 3, accentColor: t.accentPrimary, cursor: "pointer" }}
-                        />
-                        <span>
-                            <span style={{ display: "block", fontSize: "0.83rem", fontWeight: 600, color: t.textPrimary }}>
-                                Runtime honours reasoning_effort
+                    <div style={{ display: "grid", gap: 14, marginTop: 18, maxWidth: 700 }}>
+                        <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
+                            <input
+                                type="checkbox"
+                                checked={form.reasoningControl}
+                                onChange={e => setForm(f => ({ ...f, reasoningControl: e.target.checked }))}
+                                style={{ marginTop: 3, accentColor: t.accentPrimary, cursor: "pointer" }}
+                            />
+                            <span>
+                                <span style={{ display: "block", fontSize: "0.83rem", fontWeight: 600, color: t.textPrimary }}>
+                                    Runtime honours reasoning effort
+                                </span>
+                                <span style={{ display: "block", fontSize: "0.76rem", color: t.textMuted, marginTop: 3, lineHeight: 1.5 }}>
+                                    {isLocal
+                                        ? "Leave off unless you have confirmed it. LM Studio silently ignores this "
+                                          + "for some models — gemma-4-26b-a4b-qat produced identical reasoning at "
+                                          + "every effort level — and a control that does nothing is worse than none. "
+                                          + "Users always get the show/hide toggle regardless."
+                                        : "Claude maps the effort control onto its own thinking budget. Gemini "
+                                          + "decides for itself, so leave this off there."}
+                                </span>
                             </span>
-                            <span style={{ display: "block", fontSize: "0.76rem", color: t.textMuted, marginTop: 3, lineHeight: 1.5 }}>
-                                Leave off unless you have confirmed it. LM Studio silently ignores this
-                                for some models — gemma-4-26b-a4b-qat produced identical reasoning at
-                                every effort level — and an control that does nothing is worse than none.
-                                Users always get the show/hide toggle regardless.
-                            </span>
-                        </span>
-                    </label>
+                        </label>
+
+                        {form.provider === "ANTHROPIC" && (
+                            <>
+                                <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={form.serverSandbox}
+                                        onChange={e => setForm(f => ({ ...f, serverSandbox: e.target.checked }))}
+                                        style={{ marginTop: 3, accentColor: t.accentPrimary, cursor: "pointer" }}
+                                    />
+                                    <span>
+                                        <span style={{ display: "block", fontSize: "0.83rem", fontWeight: 600, color: t.textPrimary }}>
+                                            Let Claude run code in its own sandbox
+                                        </span>
+                                        <span style={{ display: "block", fontSize: "0.76rem", color: t.textMuted, marginTop: 3, lineHeight: 1.5 }}>
+                                            Claude decides on its own when a task needs code — analysis,
+                                            file processing, arithmetic it should not do in its head — and
+                                            runs it in an Anthropic-hosted container. Nothing executes on
+                                            our infrastructure. It is billed compute and an execution
+                                            surface, which is why it is off by default.
+                                        </span>
+                                    </span>
+                                </label>
+
+                                <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={form.serverWebAccess}
+                                        onChange={e => setForm(f => ({ ...f, serverWebAccess: e.target.checked }))}
+                                        style={{ marginTop: 3, accentColor: t.accentPrimary, cursor: "pointer" }}
+                                    />
+                                    <span>
+                                        <span style={{ display: "block", fontSize: "0.83rem", fontWeight: 600, color: t.textPrimary }}>
+                                            Allow hosted web search and fetch
+                                        </span>
+                                        <span style={{ display: "block", fontSize: "0.76rem", color: t.textMuted, marginTop: 3, lineHeight: 1.5 }}>
+                                            Egress happens on Anthropic&rsquo;s side, not from our network.
+                                            These tool versions carry their own execution environment, so
+                                            enabling this supersedes the sandbox switch above rather than
+                                            stacking with it.
+                                        </span>
+                                    </span>
+                                </label>
+                            </>
+                        )}
+
+                        {form.provider === "GOOGLE" && (
+                            <label style={{ display: "flex", alignItems: "flex-start", gap: 10, cursor: "pointer" }}>
+                                <input
+                                    type="checkbox"
+                                    checked={form.serverWebAccess}
+                                    onChange={e => setForm(f => ({ ...f, serverWebAccess: e.target.checked }))}
+                                    style={{ marginTop: 3, accentColor: t.accentPrimary, cursor: "pointer" }}
+                                />
+                                <span>
+                                    <span style={{ display: "block", fontSize: "0.83rem", fontWeight: 600, color: t.textPrimary }}>
+                                        Allow Google Search grounding
+                                    </span>
+                                    <span style={{ display: "block", fontSize: "0.76rem", color: t.textMuted, marginTop: 3, lineHeight: 1.5 }}>
+                                        Gemini may search the web to ground an answer. Requests leave from
+                                        Google&rsquo;s infrastructure.
+                                    </span>
+                                </span>
+                            </label>
+                        )}
+                    </div>
+
+                    {!isLocal && (
+                        <p style={{
+                            marginTop: 16, padding: "11px 13px", maxWidth: 700,
+                            borderRadius: t.buttonRadius,
+                            border: `1px solid ${t.borderPrimary}`,
+                            background: t.bgTertiary,
+                            fontSize: "0.76rem", lineHeight: 1.55, color: t.textMuted,
+                        }}>
+                            The key is encrypted at rest and only ever decrypted server-side —
+                            it is never returned by any route and never reaches a browser.
+                            Creating the node spends one token verifying that the key, the model
+                            id and the network path all agree; a reachability check alone would
+                            go green on an invalid key.
+                            {" "}Retrieval stays local either way: the knowledge base is embedded
+                            on your own hardware and is never sent to a hosted embedding API.
+                        </p>
+                    )}
 
                     <button
                         onClick={save}
-                        disabled={saving || !form.name || !form.baseUrl || !form.modelId}
+                        disabled={saving || !canCreate}
                         style={{
                             marginTop: 20, padding: "10px 20px",
                             borderRadius: t.buttonRadius, border: "none",
                             background: t.accentPrimary, color: t.textInverse,
                             fontSize: "0.85rem", fontWeight: 700,
                             cursor: saving ? "wait" : "pointer",
-                            opacity: (!form.name || !form.baseUrl || !form.modelId) ? 0.5 : 1,
+                            opacity: canCreate ? 1 : 0.5,
                             fontFamily: t.fontFamily,
                         }}
                     >
@@ -329,6 +536,17 @@ export default function AdminAiNodesPage() {
                                                 {node.displayName}
                                             </span>
                                             <span style={{
+                                                display: "inline-flex", alignItems: "center", gap: 4,
+                                                fontSize: "0.63rem", fontWeight: 800, letterSpacing: "0.06em",
+                                                padding: "2px 8px", borderRadius: 20,
+                                                background: t.bgTertiary, color: t.textSecondary,
+                                            }}>
+                                                {node.provider === "LOCAL"
+                                                    ? <Server style={{ width: 9, height: 9 }} />
+                                                    : <Cloud style={{ width: 9, height: 9 }} />}
+                                                {node.provider}
+                                            </span>
+                                            <span style={{
                                                 fontSize: "0.63rem", fontWeight: 800, letterSpacing: "0.06em",
                                                 padding: "2px 8px", borderRadius: 20,
                                                 display: "inline-flex", alignItems: "center", gap: 4,
@@ -349,11 +567,14 @@ export default function AdminAiNodesPage() {
                                         </div>
 
                                         <p style={{ fontSize: "0.78rem", color: t.textMuted, fontFamily: t.fontMono, marginBottom: 4 }}>
-                                            {node.name} · {node.gpuLabel} · {node.baseUrl}
+                                            {node.name} · {node.gpuLabel}
+                                            {node.baseUrl ? ` · ${node.baseUrl}` : " · vendor endpoint"}
                                         </p>
                                         <p style={{ fontSize: "0.78rem", color: t.textMuted }}>
                                             {node.modelId} · {(node.contextLen / 1024).toFixed(0)}k context · max {node.maxTokens} tok
                                             {node.hasApiKey && " · key set"}
+                                            {node.serverSandbox && " · sandbox"}
+                                            {node.serverWebAccess && " · web"}
                                         </p>
 
                                         <p style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.75rem", color: t.textMuted, marginTop: 8 }}>
@@ -374,27 +595,15 @@ export default function AdminAiNodesPage() {
                                                 background: t.bgTertiary,
                                                 fontSize: "0.76rem", color: t.textSecondary,
                                             }}>
-                                                {p.online ? (
-                                                    <>
-                                                        <span style={{ display: "flex", alignItems: "center", gap: 6, color: t.statusSuccess, fontWeight: 600 }}>
-                                                            <Check style={{ width: 12, height: 12 }} /> Reachable
-                                                        </span>
-                                                        {p.loadedModels.length > 0 && (
-                                                            <p style={{ marginTop: 6, fontFamily: t.fontMono }}>
-                                                                Loaded: {p.loadedModels.join(", ")}
-                                                            </p>
-                                                        )}
-                                                        {!p.modelMatches && (
-                                                            <p style={{ marginTop: 6, color: t.statusWarning }}>
-                                                                Configured model id is not in the loaded list — chats will fail.
-                                                            </p>
-                                                        )}
-                                                    </>
-                                                ) : (
-                                                    <span style={{ display: "flex", alignItems: "center", gap: 6, color: t.statusError, fontWeight: 600 }}>
-                                                        <X style={{ width: 12, height: 12 }} /> {p.lastError ?? "Unreachable"}
-                                                    </span>
-                                                )}
+                                                <span style={{
+                                                    display: "flex", alignItems: "flex-start", gap: 6, fontWeight: 600,
+                                                    color: p.online ? t.statusSuccess : t.statusError,
+                                                }}>
+                                                    {p.online
+                                                        ? <Check style={{ width: 12, height: 12, flexShrink: 0, marginTop: 2 }} />
+                                                        : <X style={{ width: 12, height: 12, flexShrink: 0, marginTop: 2 }} />}
+                                                    <span style={{ wordBreak: "break-word" }}>{p.detail}</span>
+                                                </span>
                                             </div>
                                         )}
                                     </div>

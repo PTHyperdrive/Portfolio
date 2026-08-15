@@ -6,11 +6,16 @@ import { useThemeTokens } from "@/lib/useThemeTokens";
 import type { AiNodeSummary } from "./types";
 
 /**
- * Model selector.
+ * Model selector, grouped by vendor.
  *
  * Only nodes the API returned are listed — a user never receives PREMIUM
  * entries at all, so there is nothing here to disable or hide client-side.
  * The PREMIUM badge exists for admins, who see both tiers.
+ *
+ * Switching model mid-conversation is deliberate, not an edge case: the thread
+ * is shared, and each model sees the others' turns attributed to them. The
+ * footer note says so, because otherwise switching looks like it would lose
+ * the history.
  */
 export default function ModelPicker({
     nodes,
@@ -37,6 +42,16 @@ export default function ModelPicker({
     }, [open]);
 
     const selected = nodes.find(n => n.id === selectedId) ?? null;
+
+    // Group by vendor, preserving the order the API sent (cheapest tier first)
+    // so "Local" stays at the top for users who only have local nodes.
+    const groups = nodes.reduce<Map<string, AiNodeSummary[]>>((acc, node) => {
+        const list = acc.get(node.vendor);
+        if (list) list.push(node);
+        else acc.set(node.vendor, [node]);
+        return acc;
+    }, new Map());
+    const multiVendor = groups.size > 1;
 
     return (
         <div ref={ref} style={{ position: "relative" }}>
@@ -91,7 +106,20 @@ export default function ModelPicker({
                         </p>
                     )}
 
-                    {nodes.map(node => {
+                    {[...groups].map(([vendor, group]) => (
+                        <div key={vendor}>
+                            {multiVendor && (
+                                <div style={{
+                                    padding: "8px 14px 4px",
+                                    fontSize: "0.64rem", fontWeight: 800, letterSpacing: "0.08em",
+                                    color: t.textMuted, textTransform: "uppercase",
+                                    background: t.bgSecondary,
+                                    borderTop: `1px solid ${t.borderPrimary}`,
+                                }}>
+                                    {vendor}
+                                </div>
+                            )}
+                            {group.map(node => {
                         const active = node.id === selectedId;
                         return (
                             <button
@@ -126,6 +154,7 @@ export default function ModelPicker({
                                     </span>
                                     <span style={{ display: "block", fontSize: "0.73rem", color: t.textMuted, marginTop: 2 }}>
                                         {node.gpuLabel} · {(node.contextLen / 1024).toFixed(0)}k context
+                                        {node.acceptsDocuments && " · PDFs"}
                                         {!node.online && " · offline"}
                                     </span>
                                 </span>
@@ -142,7 +171,21 @@ export default function ModelPicker({
                                 )}
                             </button>
                         );
-                    })}
+                            })}
+                        </div>
+                    ))}
+
+                    {multiVendor && (
+                        <p style={{
+                            padding: "9px 14px",
+                            borderTop: `1px solid ${t.borderPrimary}`,
+                            background: t.bgSecondary,
+                            fontSize: "0.7rem", lineHeight: 1.5, color: t.textMuted,
+                        }}>
+                            Switching mid-conversation keeps the thread. Each model sees the
+                            others&rsquo; replies, labelled with who wrote them.
+                        </p>
+                    )}
                 </div>
             )}
         </div>

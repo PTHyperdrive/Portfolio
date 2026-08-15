@@ -2,32 +2,46 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/api-auth";
-import { resolveNodeForUser, decryptNodeKey } from "@/lib/ai-nodes";
+import { resolveNodeForUser } from "@/lib/ai-nodes";
 import { searchKnowledge, formatContext } from "@/lib/ai-knowledge";
 import { systemPrompt, supportSystemPrompt, visibilitiesForMode, frameUntrusted } from "@/lib/ai-security";
+import { adapterFor, multiModelPreamble, vendorFor } from "@/lib/ai-providers";
+import type { ChatTurn, ChatImage, ChatDocument } from "@/lib/ai-providers";
+import { composeSkills, renderSkills } from "@/lib/ai-skills";
+import { renderFileBlock, attachmentNote, MAX_FILES } from "@/lib/ai-files";
+import type { IngestedFile } from "@/lib/ai-files";
 import { audit } from "@/lib/audit";
-
-/** A turn as sent upstream. Content is a string, or parts when images ride along. */
-type ChatPart =
-    | { type: "text"; text: string }
-    | { type: "image_url"; image_url: { url: string } };
-type ChatTurn = { role: string; content: string | ChatPart[] };
 
 /**
  * POST /api/ai/chat
  *
- * Streams a completion from an LM Studio host back to the browser as SSE.
+ * Streams a completion back to the browser as SSE, from whichever provider the
+ * chosen node names — a local LM Studio host, Claude, or Gemini. The route
+ * itself is provider-agnostic: it assembles a normalised request and hands it
+ * to `adapterFor(node.provider)`.
+ *
+ * ── One conversation, several models ───────────────────────────────
+ *
+ * Every assistant turn is persisted with the provider and model that wrote it.
+ * On the next turn `buildTranscript()` replays the thread for whichever model
+ * is answering now: its own turns as first-person assistant turns, everyone
+ * else's as attributed text. So the local model sees what Claude said, Claude
+ * sees what the local model said, and neither mistakes the other's words for
+ * its own. Retrieval and skills compose once, before that split, which is what
+ * makes the shared knowledge actually shared.
  *
  * The upstream host is never exposed to the client: the browser sends a
- * conversation id and a nodeId, and this route decides which LAN address
- * (if any) it is allowed to reach. A user asking for a PREMIUM node is
- * refused and audited rather than downgraded.
+ * conversation id and a nodeId, and this route decides which endpoint (if any)
+ * it is allowed to reach. A user asking for a PREMIUM node is refused and
+ * audited rather than downgraded.
  *
  * Emitted events:
- *   meta  {model, gpuLabel, messageId}  — once, before the first token
- *   delta {text}                        — per token chunk
- *   done  {latencyMs, outputTokens}     — once, after persistence
- *   error {message}                     — terminal
+ *   meta      {messageId, model, gpuLabel, tier, provider}  — before first token
+ *   reasoning {text?, chars}                                 — scratchpad
+ *   delta     {text}                                         — answer tokens
+ *   tool      {name, detail?}                                — provider-side tool run
+ *   done      {latencyMs, outputTokens}                      — after persistence
+ *   error     {message}                                      — terminal
  */
 
 export const dynamic = "force-dynamic";
@@ -39,7 +53,7 @@ const bodySchema = z.object({
     nodeId: z.string().min(1).max(64).nullable().optional(),
     /** Forward the model's scratchpad to the client. Applied on our side. */
     showReasoning: z.boolean().optional(),
-    /** Only reaches the runtime on nodes flagged reasoningControl. */
+    /** Mapped per provider; ignored by local nodes without reasoningControl. */
     reasoningEffort: z.enum(["off", "low", "medium", "high"]).optional(),
     /**
      * Inline images as data URLs. Restricted to still raster formats the
@@ -52,6 +66,21 @@ const bodySchema = z.object({
             .regex(/^data:image\/(png|jpeg|jpg|webp|gif);base64,[A-Za-z0-9+/=]+$/, "Unsupported image format")
             .max(12_000_000),
     ).max(4).optional(),
+    /**
+     * Files already ingested by POST /api/ai/files. Re-posting the extracted
+     * text rather than a handle keeps this route stateless, and the text has
+     * been through the same validation either way — it is framed as untrusted
+     * data below regardless of what the client claims about it.
+     */
+    files: z.array(
+        z.object({
+            filename: z.string().min(1).max(200),
+            mediaType: z.string().min(1).max(100),
+            bytes: z.number().int().nonnegative(),
+            text: z.string().max(2_000_000).optional(),
+            data: z.string().max(14_000_000).optional(),
+        }),
+    ).max(MAX_FILES).optional(),
 });
 
 /** Rough char budget from a token context window, leaving room for the reply. */
@@ -63,6 +92,12 @@ function sseEvent(event: string, data: unknown): Uint8Array {
     return new TextEncoder().encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
 }
 
+/** Split a data: URL into the parts the provider adapters want. */
+function parseDataUrl(url: string): ChatImage | null {
+    const match = /^data:([^;]+);base64,(.+)$/.exec(url);
+    return match ? { mediaType: match[1], data: match[2] } : null;
+}
+
 export async function POST(req: Request) {
     const { userId, error } = await requireUser();
     if (error) return error;
@@ -71,7 +106,7 @@ export async function POST(req: Request) {
     if (!parsed.success) {
         return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
-    const { conversationId, content, nodeId, showReasoning, reasoningEffort, images } = parsed.data;
+    const { conversationId, content, nodeId, showReasoning, reasoningEffort, images, files } = parsed.data;
 
     // ── Ownership ────────────────────────────────────────────────
     const conversation = await prisma.aiConversation.findFirst({
@@ -117,17 +152,47 @@ export async function POST(req: Request) {
         );
     }
 
+    const adapter = adapterFor(node.provider);
+
+    // ── Sort attachments by what this provider can actually take ──
+    const ingested: IngestedFile[] = files ?? [];
+    const textFiles = ingested.filter(f => typeof f.text === "string");
+    const documents: ChatDocument[] = [];
+    const unsupported: string[] = [];
+
+    for (const f of ingested) {
+        if (typeof f.text === "string" || !f.data) continue;
+        if (adapter.nativeDocuments) {
+            documents.push({ filename: f.filename, mediaType: f.mediaType, data: f.data });
+        } else {
+            unsupported.push(f.filename);
+        }
+    }
+
+    // Refuse rather than answer around a file the model never saw. A reply that
+    // ignores the PDF the question was about is worse than a clear error.
+    if (unsupported.length > 0) {
+        return NextResponse.json(
+            {
+                error:
+                    `${node.displayName} cannot read PDFs directly (${unsupported.join(", ")}). ` +
+                    `Switch to a Claude or Gemini model for this message, or upload the text instead.`,
+            },
+            { status: 400 },
+        );
+    }
+
     // ── Persist the user turn, then build the prompt ─────────────
     const priorCount = await prisma.aiMessage.count({ where: { conversationId } });
 
-    // Images are not persisted — only the fact that some were attached, so a
-    // later turn reads coherently without storing megabytes of base64.
+    // Attachment *bodies* are not persisted — only which files rode along, so a
+    // later turn reads coherently without storing megabytes in the transcript.
     // Must match the client's optimistic suffix exactly, or the message text
     // changes under the user when the thread is reloaded from the server.
-    const imageNote = images?.length ? `\n\n[attached ${images.length} image(s)]` : "";
+    const note = attachmentNote(ingested, images?.length ?? 0);
 
     await prisma.aiMessage.create({
-        data: { conversationId, role: "user", content: content + imageNote },
+        data: { conversationId, role: "user", content: content + note },
     });
 
     // First turn names the thread.
@@ -150,27 +215,43 @@ export async function POST(req: Request) {
         },
     });
 
-    // Newest-first fetch, then trim to the context budget and re-sort.
+    // Newest-first fetch, then trim to the context budget and re-sort. The
+    // provider and speaker come along so buildTranscript can tell whose voice
+    // each turn was — that attribution is the whole multi-model mechanism.
     const recent = await prisma.aiMessage.findMany({
         where: { conversationId, failed: false },
         orderBy: { createdAt: "desc" },
         take: 60,
-        select: { role: true, content: true },
+        select: { role: true, content: true, provider: true, speaker: true },
     });
 
+    // Split one budget between the transcript and any uploaded text, rather
+    // than giving each its own. Budgeting them separately let a 3 MB log and a
+    // long thread each pass their own check and jointly overflow an 8k local
+    // context, which fails as a truncated prompt rather than a clear error.
     const budget = historyCharBudget(node.contextLen);
+    const fileBudget = textFiles.length > 0 ? Math.floor(budget * 0.45) : 0;
+    const historyBudget = budget - fileBudget;
+
     const history: ChatTurn[] = [];
     let used = 0;
     for (const msg of recent) {
         used += msg.content.length;
-        if (used > budget && history.length > 0) break;
-        history.push({ role: msg.role, content: msg.content });
+        if (used > historyBudget && history.length > 0) break;
+        history.push({
+            role: msg.role === "assistant" ? "assistant" : "user",
+            content: msg.content,
+            provider: msg.provider,
+            speaker: msg.speaker,
+        });
     }
     history.reverse();
 
     // ── Ground the answer in the operator's own documentation ────
     // Retrieval is visibility-scoped by role inside searchKnowledge, so a
-    // tenant's question never pulls operator-only passages.
+    // tenant's question never pulls operator-only passages. It runs once, for
+    // whichever model is answering — that is what "shared knowledge" means
+    // here: the same corpus, the same scope, the same passages.
     const role = (await prisma.user.findUnique({
         where: { id: userId },
         select: { role: true },
@@ -199,104 +280,62 @@ export async function POST(req: Request) {
         });
     }
 
-    const prompt: ChatTurn[] = [
-        {
-            role: "system",
-            content: isSupport
-                ? supportSystemPrompt()
-                : systemPrompt({ role, tier: node.tier, hasKnowledge: retrieved.length > 0 }),
-        },
-        ...(retrieved.length > 0
-            ? [{ role: "system" as const, content: frameUntrusted("knowledge_base", formatContext(retrieved)) }]
-            : []),
-        ...history,
+    // Skills are the user's own instructions, so they compose into the system
+    // prompt. Support threads get none — that surface answers as the platform,
+    // not as whatever persona a customer attached.
+    const skills = isSupport ? [] : await composeSkills(conversationId, userId);
+
+    // ── Assemble the system prompt ───────────────────────────────
+    const sections: string[] = [
+        isSupport
+            ? supportSystemPrompt()
+            : systemPrompt({ role, tier: node.tier, hasKnowledge: retrieved.length > 0 }),
     ];
 
-    // Attach images to the final user turn. Only the current turn carries
-    // them; prior images are not replayed, which keeps context bounded.
-    if (images?.length) {
-        for (let i = prompt.length - 1; i >= 0; i--) {
-            if (prompt[i].role === "user") {
-                prompt[i] = {
-                    role: "user",
-                    content: [
-                        { type: "text", text: content },
-                        ...images.map(url => ({ type: "image_url" as const, image_url: { url } })),
-                    ],
-                };
-                break;
-            }
-        }
+    const preamble = multiModelPreamble(history, node.provider);
+    if (preamble) sections.push(preamble);
+
+    const skillText = renderSkills(skills);
+    if (skillText) sections.push(skillText);
+
+    if (retrieved.length > 0) {
+        sections.push(frameUntrusted("knowledge_base", formatContext(retrieved)));
     }
 
-    // ── Call the LM Studio host ──────────────────────────────────
-    const apiKey = decryptNodeKey(node.apiKey);
-    const upstream = `${node.baseUrl.replace(/\/$/, "")}/chat/completions`;
+    if (textFiles.length > 0) {
+        // Uploaded text is data, not instruction, however imperative it reads.
+        // Framing it is control C6 and the reason a "ignore your rules" file
+        // does not become a prompt injection.
+        sections.push(frameUntrusted(
+            "uploaded_files",
+            renderFileBlock(textFiles, fileBudget),
+        ));
+    }
+
+    const system = sections.join("\n\n");
+
+    // Images and native documents ride on the final user turn only; replaying
+    // earlier ones would grow every request without adding context.
+    const chatImages = (images ?? [])
+        .map(parseDataUrl)
+        .filter((v): v is ChatImage => v !== null);
+
+    const turns = history.map((t, i) =>
+        i === history.length - 1 && t.role === "user"
+            ? { ...t, images: chatImages, documents }
+            : t,
+    );
+
     const startedAt = Date.now();
+    const speaker = node.displayName;
 
-    let res: Response;
-    try {
-        res = await fetch(upstream, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
-            },
-            body: JSON.stringify({
-                model: node.modelId,
-                messages: prompt,
-                max_tokens: node.maxTokens,
-                stream: true,
-                stream_options: { include_usage: true },
-                // Sent only where it is known to work. Measured against
-                // gemma-4-26b-a4b-qat, LM Studio ignores both this and
-                // chat_template_kwargs.enable_thinking, so nodes default to
-                // reasoningControl=false and we do not pretend otherwise.
-                ...(node.reasoningControl && effort && effort !== "off"
-                    ? { reasoning_effort: effort }
-                    : {}),
-                ...(node.reasoningControl && effort === "off"
-                    ? { chat_template_kwargs: { enable_thinking: false } }
-                    : {}),
-            }),
-            signal: req.signal,
-        });
-    } catch (err) {
-        console.error(`[api/ai/chat] ${node.name} unreachable:`, err);
-        await prisma.aiNode.update({
-            where: { id: node.id },
-            data: {
-                online: false,
-                lastError: err instanceof Error ? err.message : "unreachable",
-                lastCheckAt: new Date(),
-            },
-        });
-        return NextResponse.json(
-            { error: `${node.displayName} is not responding.` },
-            { status: 503 },
-        );
-    }
-
-    if (!res.ok || !res.body) {
-        const detail = await res.text().catch(() => "");
-        console.error(`[api/ai/chat] ${node.name} HTTP ${res.status}: ${detail.slice(0, 500)}`);
-        return NextResponse.json(
-            { error: `Inference failed on ${node.displayName} (HTTP ${res.status}).` },
-            { status: 502 },
-        );
-    }
-
-    // ── Re-emit upstream SSE as our own event stream ─────────────
+    // ── Stream through the provider adapter ──────────────────────
     const stream = new ReadableStream<Uint8Array>({
         async start(controller) {
-            const reader = res.body!.getReader();
-            const decoder = new TextDecoder();
-            let buffer = "";
             let answer = "";
             let reasoning = "";
             let outputTokens: number | null = null;
             let promptTokens: number | null = null;
-            let reasoningTokens: number | null = null;
 
             const assistant = await prisma.aiMessage.create({
                 data: {
@@ -305,6 +344,8 @@ export async function POST(req: Request) {
                     content: "",
                     modelId: node.modelId,
                     gpuLabel: node.gpuLabel,
+                    provider: node.provider,
+                    speaker,
                 },
                 select: { id: true },
             });
@@ -314,70 +355,51 @@ export async function POST(req: Request) {
                 model: node.displayName,
                 gpuLabel: node.gpuLabel,
                 tier: node.tier,
+                provider: node.provider,
+                vendor: vendorFor(node.provider),
             }));
 
             try {
-                for (;;) {
-                    const { done, value } = await reader.read();
-                    if (done) break;
+                for await (const event of adapter.stream(
+                    node,
+                    { system, turns, maxTokens: node.maxTokens, effort },
+                    req.signal,
+                )) {
+                    switch (event.type) {
+                        case "reasoning":
+                            // Always accumulated — the exhausted-budget check
+                            // below needs it even when the user hides it.
+                            reasoning += event.text;
+                            controller.enqueue(sseEvent("reasoning", {
+                                ...(wantReasoning ? { text: event.text } : {}),
+                                chars: reasoning.length,
+                            }));
+                            break;
 
-                    buffer += decoder.decode(value, { stream: true });
-                    const lines = buffer.split("\n");
-                    buffer = lines.pop() ?? "";
+                        case "delta":
+                            answer += event.text;
+                            controller.enqueue(sseEvent("delta", { text: event.text }));
+                            break;
 
-                    for (const line of lines) {
-                        const trimmed = line.trim();
-                        if (!trimmed.startsWith("data:")) continue;
+                        case "tool":
+                            controller.enqueue(sseEvent("tool", {
+                                name: event.name,
+                                ...(event.detail ? { detail: event.detail } : {}),
+                            }));
+                            break;
 
-                        const payload = trimmed.slice(5).trim();
-                        if (payload === "[DONE]") continue;
-
-                        try {
-                            const chunk = JSON.parse(payload);
-                            const delta = chunk.choices?.[0]?.delta;
-
-                            // Reasoning models (Gemma 4 QAT, DeepSeek-R1, gpt-oss)
-                            // stream their scratchpad on a separate field first.
-                            // Forward it so the UI can show progress instead of an
-                            // empty bubble, but keep it out of the stored answer.
-                            const think: string =
-                                delta?.reasoning_content ?? delta?.reasoning ?? "";
-                            if (think) {
-                                // Always accumulated — the exhausted-budget check
-                                // below needs it even when the user hides it.
-                                reasoning += think;
-                                // Emit either way so the UI can show "Thinking…"
-                                // instead of an idle bubble; the text itself is
-                                // withheld when the user has it collapsed.
-                                controller.enqueue(sseEvent("reasoning", {
-                                    ...(wantReasoning ? { text: think } : {}),
-                                    chars: reasoning.length,
-                                }));
-                            }
-
-                            const text: string = delta?.content ?? "";
-                            if (text) {
-                                answer += text;
-                                controller.enqueue(sseEvent("delta", { text }));
-                            }
-
-                            if (chunk.usage) {
-                                outputTokens = chunk.usage.completion_tokens ?? null;
-                                promptTokens = chunk.usage.prompt_tokens ?? null;
-                                reasoningTokens =
-                                    chunk.usage.completion_tokens_details?.reasoning_tokens ?? null;
-                            }
-                        } catch {
-                            // Partial JSON across chunk boundaries — skip this line.
-                        }
+                        case "done":
+                            outputTokens = event.outputTokens;
+                            promptTokens = event.promptTokens;
+                            break;
                     }
                 }
 
                 const latencyMs = Date.now() - startedAt;
 
-                // A reasoning model can spend its entire max_tokens budget on the
-                // scratchpad and emit no answer at all. That is not a silent empty
-                // reply — tell the user what happened and what to change.
+                // A reasoning model can spend its entire token budget on the
+                // scratchpad and emit no answer at all. That is not a silent
+                // empty reply — say what happened and what to change.
                 const exhaustedByReasoning = answer.length === 0 && reasoning.length > 0;
 
                 await prisma.aiMessage.update({
@@ -402,11 +424,13 @@ export async function POST(req: Request) {
                     resourceId: node.id,
                     metadata: {
                         conversationId,
+                        provider: node.provider,
                         model: node.modelId,
                         gpu: node.gpuLabel,
                         tier: node.tier,
+                        skills: skills.map(s => s.name),
+                        files: ingested.length,
                         outputTokens,
-                        reasoningTokens,
                         latencyMs,
                     },
                 });
@@ -419,21 +443,31 @@ export async function POST(req: Request) {
                             `node, or ask a narrower question.`,
                     }));
                 } else {
-                    controller.enqueue(sseEvent("done", { latencyMs, outputTokens, reasoningTokens }));
+                    controller.enqueue(sseEvent("done", { latencyMs, outputTokens }));
                 }
             } catch (err) {
-                // Client disconnects land here; keep whatever was generated.
+                // Client disconnects and upstream failures both land here.
+                // Keep whatever was generated rather than discarding it.
                 const message = err instanceof Error ? err.message : "Stream interrupted";
-                console.error(`[api/ai/chat] stream aborted on ${node.name}:`, message);
+                console.error(`[api/ai/chat] ${node.name} (${node.provider}) failed:`, message);
 
                 await prisma.aiMessage.update({
                     where: { id: assistant.id },
                     data: { content: answer, failed: answer.length === 0 },
                 }).catch(() => { /* row may be gone if the thread was deleted mid-stream */ });
 
+                // Only a transport failure means the node is down. An aborted
+                // request is the user closing a tab, and marking a healthy node
+                // offline for that would take it out of rotation for everyone.
+                if (answer.length === 0 && !req.signal.aborted) {
+                    await prisma.aiNode.update({
+                        where: { id: node.id },
+                        data: { online: false, lastError: message.slice(0, 500), lastCheckAt: new Date() },
+                    }).catch(() => { /* best effort */ });
+                }
+
                 controller.enqueue(sseEvent("error", { message }));
             } finally {
-                reader.releaseLock();
                 controller.close();
             }
         },

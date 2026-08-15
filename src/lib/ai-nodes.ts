@@ -11,13 +11,17 @@
  * The browser never learns a node's baseUrl or apiKey.
  */
 
-import { createCipheriv, createDecipheriv, randomBytes } from "crypto";
 import { prisma } from "@/lib/db";
-import type { AiNode, AiTier } from "@/generated/prisma";
+import type { AiNode, AiProviderKind, AiTier } from "@/generated/prisma";
+import { adapterFor, vendorFor } from "@/lib/ai-providers";
+import { decryptNodeKey } from "@/lib/ai-node-crypto";
 
-const ALGORITHM = "aes-256-gcm";
-const IV_LENGTH = 12;
-const AUTH_TAG_LENGTH = 16;
+// Re-exported so the many existing importers of these from ai-nodes keep
+// working; the implementations moved to ai-node-crypto to break an import
+// cycle with the provider adapters.
+export {
+    NO_ENCRYPTION_KEY, nodeKeyEncryptionAvailable, encryptNodeKey, decryptNodeKey,
+} from "@/lib/ai-node-crypto";
 
 /** Tiers a role may reach. Admins get both; users get STANDARD only. */
 const TIERS_BY_ROLE: Record<string, AiTier[]> = {
@@ -29,58 +33,6 @@ export function tiersForRole(role: string | null | undefined): AiTier[] {
     return TIERS_BY_ROLE[role ?? "USER"] ?? TIERS_BY_ROLE.USER;
 }
 
-/* ─── API key encryption at rest ─────────────────────────────────── */
-
-/** Message surfaced to an admin who tries to store a key with no cipher key set. */
-export const NO_ENCRYPTION_KEY =
-    "AI_NODE_ENCRYPTION_KEY is not configured, so an upstream API key cannot be stored " +
-    "safely. Generate one with `openssl rand -hex 32`, or leave the API key blank — " +
-    "LM Studio does not require one by default.";
-
-/** True when node API keys can be encrypted at rest. */
-export function nodeKeyEncryptionAvailable(): boolean {
-    const hex = process.env.AI_NODE_ENCRYPTION_KEY || process.env.TOTP_ENCRYPTION_KEY;
-    return Boolean(hex && hex.length === 64);
-}
-
-function getKey(): Buffer {
-    const hex = process.env.AI_NODE_ENCRYPTION_KEY || process.env.TOTP_ENCRYPTION_KEY;
-    if (!hex || hex.length !== 64) {
-        throw new Error(NO_ENCRYPTION_KEY);
-    }
-    return Buffer.from(hex, "hex");
-}
-
-/** Encrypt an upstream API key. Returns "hex(iv):hex(ciphertext+tag)". */
-export function encryptNodeKey(plain: string): string {
-    const iv = randomBytes(IV_LENGTH);
-    const cipher = createCipheriv(ALGORITHM, getKey(), iv, { authTagLength: AUTH_TAG_LENGTH });
-    const ct = Buffer.concat([cipher.update(plain, "utf8"), cipher.final()]);
-    return `${iv.toString("hex")}:${Buffer.concat([ct, cipher.getAuthTag()]).toString("hex")}`;
-}
-
-/** Decrypt an upstream API key. Returns null rather than throwing — a bad
- *  key must degrade to "no auth header", not crash the chat request. */
-export function decryptNodeKey(encrypted: string | null): string | null {
-    if (!encrypted) return null;
-    try {
-        const idx = encrypted.indexOf(":");
-        if (idx === -1) return null;
-        const iv = Buffer.from(encrypted.slice(0, idx), "hex");
-        const blob = Buffer.from(encrypted.slice(idx + 1), "hex");
-        if (iv.length !== IV_LENGTH) return null;
-
-        const ct = blob.subarray(0, blob.length - AUTH_TAG_LENGTH);
-        const tag = blob.subarray(blob.length - AUTH_TAG_LENGTH);
-        const decipher = createDecipheriv(ALGORITHM, getKey(), iv, { authTagLength: AUTH_TAG_LENGTH });
-        decipher.setAuthTag(tag);
-        return Buffer.concat([decipher.update(ct), decipher.final()]).toString("utf8");
-    } catch {
-        console.error("[ai-nodes] Failed to decrypt node API key — sending request unauthenticated.");
-        return null;
-    }
-}
-
 /* ─── Node lookup ────────────────────────────────────────────────── */
 
 /** Shape sent to the browser. Deliberately omits baseUrl and apiKey. */
@@ -88,12 +40,17 @@ export interface PublicAiNode {
     id: string;
     displayName: string;
     gpuLabel: string;
+    provider: AiProviderKind;
+    /** "Local" | "Claude" | "Gemini" — grouping label for the picker. */
+    vendor: string;
     tier: AiTier;
     modelId: string;
     contextLen: number;
     maxTokens: number;
     /** Whether reasoning_effort actually does anything on this node. */
     reasoningControl: boolean;
+    /** True when the model can read PDFs. Drives the file picker's accept list. */
+    acceptsDocuments: boolean;
     online: boolean;
     lastCheckAt: Date | null;
 }
@@ -103,11 +60,14 @@ export function toPublicNode(node: AiNode): PublicAiNode {
         id: node.id,
         displayName: node.displayName,
         gpuLabel: node.gpuLabel,
+        provider: node.provider,
+        vendor: vendorFor(node.provider),
         tier: node.tier,
         modelId: node.modelId,
         contextLen: node.contextLen,
         maxTokens: node.maxTokens,
         reasoningControl: node.reasoningControl,
+        acceptsDocuments: adapterFor(node.provider).nativeDocuments,
         online: node.online,
         lastCheckAt: node.lastCheckAt,
     };
@@ -185,6 +145,22 @@ export async function probeNode(node: AiNode, timeoutMs = 4000): Promise<boolean
 
     let online = false;
     let lastError: string | null = null;
+
+    // Only LOCAL nodes expose an OpenAI-compatible /models endpoint. Hosted
+    // providers are probed through their adapter (see the admin probe route),
+    // which round-trips the real API instead of guessing at a URL shape.
+    if (!node.baseUrl) {
+        clearTimeout(timer);
+        await prisma.aiNode.update({
+            where: { id: node.id },
+            data: {
+                online: false,
+                lastError: "No baseUrl — probe this provider from Admin → AI Nodes.",
+                lastCheckAt: new Date(),
+            },
+        });
+        return false;
+    }
 
     try {
         const res = await fetch(`${node.baseUrl.replace(/\/$/, "")}/models`, {
