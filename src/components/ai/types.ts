@@ -1,6 +1,6 @@
 export type AiTier = "STANDARD" | "PREMIUM";
 
-export type AiProviderKind = "LOCAL" | "ANTHROPIC" | "GOOGLE" | "OPENAI";
+export type AiProviderKind = "LOCAL" | "ANTHROPIC" | "GOOGLE" | "OPENAI" | "DEEPSEEK";
 
 /** "off" is only meaningful on nodes whose runtime honours it. */
 export type ReasoningEffort = "off" | "low" | "medium" | "high";

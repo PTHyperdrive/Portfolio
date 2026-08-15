@@ -5,12 +5,13 @@ import { prisma } from "@/lib/db";
 import { requireAdmin } from "@/lib/api-auth";
 import { encryptNodeKey, nodeKeyEncryptionAvailable, NO_ENCRYPTION_KEY } from "@/lib/ai-nodes";
 import { REFRESH_COOKIE, clearOptions } from "@/lib/claude-oauth-flow";
+import { PROVIDER_KINDS, PROVIDER_REQUIREMENTS } from "@/lib/ai-provider-meta";
 import { audit } from "@/lib/audit";
 
 const patchSchema = z.object({
     displayName: z.string().trim().min(1).max(80).optional(),
     gpuLabel: z.string().trim().min(1).max(40).optional(),
-    provider: z.enum(["LOCAL", "ANTHROPIC", "GOOGLE", "OPENAI"]).optional(),
+    provider: z.enum(PROVIDER_KINDS).optional(),
     tier: z.enum(["STANDARD", "PREMIUM"]).optional(),
     /** "" clears the override so a hosted provider uses its own default. */
     baseUrl: z.string().trim().url().max(200).optional().or(z.literal("")),
@@ -51,11 +52,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const nextProvider = rest.provider ?? node.provider;
     const nextBaseUrl = baseUrl === undefined ? node.baseUrl : (baseUrl || null);
 
-    // A local node with no endpoint cannot be reached at all, so refuse the
-    // edit rather than saving a node that will fail on its next message.
-    if (nextProvider === "LOCAL" && !nextBaseUrl) {
+    // A node on the OpenAI-compatible adapter has no default endpoint to fall
+    // back on, so refuse the edit rather than saving something that will fail
+    // on its next message. Same table the create route and the form read.
+    if (PROVIDER_REQUIREMENTS[nextProvider].baseUrl && !nextBaseUrl) {
         return NextResponse.json(
-            { error: "A local node needs a base URL." },
+            { error: `A ${nextProvider} node needs a base URL.` },
             { status: 400 },
         );
     }

@@ -526,6 +526,10 @@ enum AiProviderKind {
   ANTHROPIC
   GOOGLE
   OPENAI
+  /// DeepSeek's hosted API. Speaks the OpenAI wire format, so it runs through
+  /// the same adapter as a local LM Studio host — it differs by needing a key
+  /// and by living at a fixed endpoint rather than on the LAN.
+  DEEPSEEK
 }
 
 /// One addressable model endpoint.

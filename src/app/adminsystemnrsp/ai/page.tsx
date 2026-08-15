@@ -7,7 +7,9 @@ import {
 } from "lucide-react";
 import { useThemeTokens } from "@/lib/useThemeTokens";
 
-type Provider = "LOCAL" | "ANTHROPIC" | "GOOGLE" | "OPENAI";
+import { PROVIDER_KINDS, PROVIDER_LABELS, PROVIDER_REQUIREMENTS, isConfigured } from "@/lib/ai-provider-meta";
+
+type Provider = (typeof PROVIDER_KINDS)[number];
 type Tier = "STANDARD" | "PREMIUM";
 
 interface AdminNode {
@@ -108,13 +110,17 @@ const PRESETS: Record<Provider, Partial<NodeForm>> = {
         displayName: "GPT", modelId: "",
         contextLen: 128_000, maxTokens: 8_000, reasoningControl: true,
     },
-};
-
-const PROVIDER_LABEL: Record<Provider, string> = {
-    LOCAL: "Local — LM Studio / vLLM / Ollama",
-    ANTHROPIC: "Anthropic — Claude",
-    GOOGLE: "Google — Gemini",
-    OPENAI: "OpenAI-compatible",
+    DEEPSEEK: {
+        gpuLabel: "DeepSeek", tier: "PREMIUM",
+        displayName: "DeepSeek V3", modelId: "deepseek-chat",
+        // The endpoint is fixed, so prefill it — it is not something to look up.
+        baseUrl: "https://api.deepseek.com/v1",
+        contextLen: 65_536, maxTokens: 8_192,
+        // DeepSeek does not honour reasoning_effort. deepseek-reasoner thinks
+        // on its own terms and streams the scratchpad on reasoning_content,
+        // which the OpenAI-compatible adapter already separates out.
+        reasoningControl: false,
+    },
 };
 
 /**
@@ -343,11 +349,12 @@ export default function AdminAiNodesPage() {
     };
 
     const isLocal = form.provider === "LOCAL";
-    // A local node is unreachable without an endpoint; a hosted one is
-    // unusable without a key. Mirrors the refinements on the API schema.
+    const needs = PROVIDER_REQUIREMENTS[form.provider];
+    // Same table the API refines on, so the form cannot enable a submission
+    // the server is going to reject.
     const canCreate = Boolean(
         form.name && form.displayName && form.gpuLabel && form.modelId
-        && (isLocal ? form.baseUrl : form.apiKey),
+        && isConfigured(form.provider, { baseUrl: form.baseUrl, apiKey: form.apiKey }),
     );
 
     return (
@@ -414,7 +421,7 @@ export default function AdminAiNodesPage() {
                     <div style={{ marginBottom: 18 }}>
                         <label style={label}>Provider</label>
                         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                            {(Object.keys(PROVIDER_LABEL) as Provider[]).map(p => (
+                            {PROVIDER_KINDS.map(p => (
                                 <button
                                     key={p}
                                     onClick={() => pickProvider(p)}
@@ -431,7 +438,7 @@ export default function AdminAiNodesPage() {
                                     {p === "LOCAL"
                                         ? <Server style={{ width: 13, height: 13 }} />
                                         : <Cloud style={{ width: 13, height: 13 }} />}
-                                    {PROVIDER_LABEL[p]}
+                                    {PROVIDER_LABELS[p]}
                                 </button>
                             ))}
                         </div>
@@ -465,12 +472,14 @@ export default function AdminAiNodesPage() {
                         </div>
                         <div>
                             <label style={label}>
-                                {isLocal ? "Base URL" : "API URL (optional override)"}
+                                {needs.baseUrl ? "Base URL (required)" : "API URL (optional override)"}
                             </label>
                             <input style={field} value={form.baseUrl}
                                 placeholder={isLocal
                                     ? "http://10.0.1.50:1234/v1"
-                                    : "leave blank for the vendor's own endpoint"}
+                                    : needs.baseUrl
+                                        ? "https://api.deepseek.com/v1"
+                                        : "leave blank for the vendor's own endpoint"}
                                 onChange={e => setForm(f => ({ ...f, baseUrl: e.target.value }))} />
                         </div>
                         <div>
@@ -490,10 +499,10 @@ export default function AdminAiNodesPage() {
                         </div>
                         <div>
                             <label style={label}>
-                                {form.provider === "ANTHROPIC" ? "Subscription Token / API key" : "API key"} {isLocal ? "(optional)" : "(required)"}
+                                {form.provider === "ANTHROPIC" ? "Subscription Token / API key" : "API key"} {needs.apiKey ? "(required)" : "(optional)"}
                             </label>
                             <input style={field} type="password" value={form.apiKey}
-                                placeholder={isLocal ? "usually blank" : form.provider === "ANTHROPIC" ? "sk-ant-oat… / sk-ant-sid… / sk-ant-api…" : "AIza…"}
+                                placeholder={!needs.apiKey ? "usually blank" : form.provider === "ANTHROPIC" ? "sk-ant-oat… / sk-ant-sid… / sk-ant-api…" : form.provider === "DEEPSEEK" ? "sk-…" : "AIza…"}
                                 onChange={e => setForm(f => ({ ...f, apiKey: e.target.value }))} />
 
                             {form.provider === "ANTHROPIC" && (

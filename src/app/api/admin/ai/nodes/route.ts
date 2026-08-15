@@ -6,13 +6,14 @@ import { requireAdmin } from "@/lib/api-auth";
 import { encryptNodeKey, nodeKeyEncryptionAvailable, NO_ENCRYPTION_KEY } from "@/lib/ai-nodes";
 import { adapterFor } from "@/lib/ai-providers";
 import { REFRESH_COOKIE, clearOptions } from "@/lib/claude-oauth-flow";
+import { PROVIDER_KINDS, PROVIDER_REQUIREMENTS } from "@/lib/ai-provider-meta";
 import { audit } from "@/lib/audit";
 
 const createSchema = z.object({
     name: z.string().trim().regex(/^[a-z0-9-]{3,40}$/, "Use lowercase letters, digits and hyphens"),
     displayName: z.string().trim().min(1).max(80),
     gpuLabel: z.string().trim().min(1).max(40),
-    provider: z.enum(["LOCAL", "ANTHROPIC", "GOOGLE", "OPENAI"]).default("LOCAL"),
+    provider: z.enum(PROVIDER_KINDS).default("LOCAL"),
     tier: z.enum(["STANDARD", "PREMIUM"]),
     /**
      * Required for LOCAL, where it is the only way to find the runtime.
@@ -28,11 +29,13 @@ const createSchema = z.object({
     serverSandbox: z.boolean().default(false),
     serverWebAccess: z.boolean().default(false),
     active: z.boolean().default(true),
-}).refine(v => v.provider !== "LOCAL" || Boolean(v.baseUrl), {
-    message: "A local node needs a base URL — the OpenAI-compatible endpoint, e.g. http://10.10.0.100:1234/v1",
+}).refine(v => !PROVIDER_REQUIREMENTS[v.provider].baseUrl || Boolean(v.baseUrl), {
+    message:
+        "This provider needs a base URL — the OpenAI-compatible endpoint. " +
+        "Local: http://10.10.0.100:1234/v1 · DeepSeek: https://api.deepseek.com/v1",
     path: ["baseUrl"],
-}).refine(v => v.provider === "LOCAL" || Boolean(v.apiKey), {
-    message: "A hosted provider needs a Claude Subscription Token or API key.",
+}).refine(v => !PROVIDER_REQUIREMENTS[v.provider].apiKey || Boolean(v.apiKey), {
+    message: "This provider needs an API key.",
     path: ["apiKey"],
 });
 

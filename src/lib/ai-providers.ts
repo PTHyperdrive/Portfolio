@@ -33,6 +33,7 @@ import type { AiNode, AiProviderKind } from "@/generated/prisma";
 import { prisma } from "@/lib/db";
 import { decryptNodeKey, encryptNodeKey } from "@/lib/ai-node-crypto";
 import { isSubscriptionToken, normaliseToken, refreshClaudeToken } from "@/lib/claude-oauth";
+import { PROVIDER_VENDORS } from "@/lib/ai-provider-meta";
 
 /* ─── Normalised request / stream shapes ─────────────────────────── */
 
@@ -169,12 +170,7 @@ export function multiModelPreamble(turns: ChatTurn[], target: AiProviderKind): s
 }
 
 export function vendorFor(kind: AiProviderKind): string {
-    switch (kind) {
-        case "ANTHROPIC": return "Claude";
-        case "GOOGLE": return "Gemini";
-        case "OPENAI": return "OpenAI";
-        default: return "Local";
-    }
+    return PROVIDER_VENDORS[kind] ?? "Local";
 }
 
 /* ─── Adapter registry ───────────────────────────────────────────── */
@@ -185,7 +181,12 @@ import { googleAdapter } from "@/lib/ai-provider-google";
 
 const ADAPTERS: Partial<Record<AiProviderKind, ProviderAdapter>> = {
     LOCAL: localAdapter,
-    OPENAI: localAdapter, // same wire format; the tier gate is what differs
+    // Same wire format as a local runtime, so the same adapter serves all
+    // three. What differs is the tier gate and whether a key is mandatory —
+    // see PROVIDER_REQUIREMENTS. DeepSeek's reasoner streams its scratchpad on
+    // `reasoning_content`, which that adapter already separates from the answer.
+    OPENAI: localAdapter,
+    DEEPSEEK: localAdapter,
     ANTHROPIC: anthropicAdapter,
     GOOGLE: googleAdapter,
 };
