@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Terminal, Copy, Check, AlertTriangle } from "lucide-react";
+import { Terminal, Copy, Check, AlertTriangle, Eye, Loader2 } from "lucide-react";
 import { useThemeTokens } from "@/lib/useThemeTokens";
 
 type Shell = "powershell" | "cmd" | "linux" | "macos";
@@ -37,10 +37,37 @@ export default function RelaySetup({ host }: { host: string }) {
     const t = useThemeTokens();
     const [shell, setShell] = useState<Shell>("powershell");
     const [copied, setCopied] = useState(false);
+    const [token, setToken] = useState<string | null>(null);
+    const [revealing, setRevealing] = useState(false);
+    const [tokenError, setTokenError] = useState<string | null>(null);
 
     const wsUrl = `wss://${host}/api/relay/agent`;
     const srcUrl = `https://${host}/api/relay/agent-source`;
-    const TOKEN = "PASTE_RELAY_AGENT_TOKEN";
+
+    /**
+     * Fetch the real token on request.
+     *
+     * A placeholder in the snippet is worse than it looks: copied verbatim it
+     * produces a 401, curl writes the error body into claude-relay.mjs, and
+     * node then reports a syntax error in what appears to be the agent. Three
+     * steps removed from the actual mistake.
+     */
+    const reveal = async () => {
+        setRevealing(true);
+        setTokenError(null);
+        try {
+            const res = await fetch("/api/admin/relay/token");
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Could not read the token");
+            setToken(data.token);
+        } catch (err) {
+            setTokenError(err instanceof Error ? err.message : "Could not read the token");
+        } finally {
+            setRevealing(false);
+        }
+    };
+
+    const TOKEN = token ?? "PASTE_RELAY_AGENT_TOKEN";
 
     const snippets: Record<Shell, string> = {
         powershell: `mkdir claude-relay
@@ -57,7 +84,7 @@ node claude-relay.mjs`,
 cd claude-relay
 npm init -y
 npm install ws
-curl -H "Authorization: Bearer ${TOKEN}" "${srcUrl}" -o claude-relay.mjs
+curl -f -H "Authorization: Bearer ${TOKEN}" "${srcUrl}" -o claude-relay.mjs
 set RELAY_URL=${wsUrl}
 set RELAY_AGENT_TOKEN=${TOKEN}
 set RELAY_AGENT_NAME=workstation
@@ -141,11 +168,44 @@ node claude-relay.mjs`,
                 </strong>
             </div>
             <p style={{ marginBottom: 12, color: t.textMuted }}>
-                No checkout needed — the agent downloads itself. Node 20+ is the only prerequisite.
-                Replace <code style={code}>{TOKEN}</code> with the value of{" "}
-                <code style={code}>RELAY_AGENT_TOKEN</code> from the server&rsquo;s{" "}
-                <code style={code}>.env</code>.
+                No checkout needed — the agent downloads itself. Node 20+ is the only prerequisite.{" "}
+                {token
+                    ? "The snippet below is complete: copy it and run it as it stands."
+                    : "Press the button below to drop your token straight into the snippet, rather than substituting it by hand in three places."}
             </p>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+                {!token ? (
+                    <button
+                        onClick={() => void reveal()}
+                        disabled={revealing}
+                        style={{
+                            display: "inline-flex", alignItems: "center", gap: 6,
+                            padding: "6px 13px", borderRadius: t.buttonRadius,
+                            border: `1px solid ${t.accentPrimary}`,
+                            background: t.accentPrimaryMuted, color: t.accentPrimary,
+                            fontSize: "0.76rem", fontWeight: 700, cursor: "pointer",
+                            fontFamily: t.fontFamily,
+                        }}
+                    >
+                        {revealing
+                            ? <Loader2 style={{ width: 12, height: 12, animation: "relaySpin 0.9s linear infinite" }} />
+                            : <Eye style={{ width: 12, height: 12 }} />}
+                        Fill in my token
+                    </button>
+                ) : (
+                    <span style={{
+                        display: "inline-flex", alignItems: "center", gap: 6,
+                        fontSize: "0.75rem", fontWeight: 600, color: t.statusSuccess,
+                    }}>
+                        <Check style={{ width: 12, height: 12 }} />
+                        Token filled in below — copy and run as-is
+                    </span>
+                )}
+                {tokenError && (
+                    <span style={{ fontSize: "0.75rem", color: t.statusError }}>{tokenError}</span>
+                )}
+            </div>
 
             <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
                 {(Object.keys(LABELS) as Shell[]).map(k => (
@@ -220,6 +280,24 @@ node claude-relay.mjs`,
 
             <p style={{ marginTop: 10 }}>{ptyNote[shell]}</p>
 
+            <p style={{
+                marginTop: 10, display: "flex", alignItems: "flex-start", gap: 8,
+                color: t.textMuted,
+            }}>
+                <AlertTriangle style={{ width: 13, height: 13, flexShrink: 0, marginTop: 3 }} />
+                <span>
+                    <strong style={{ color: t.textPrimary }}>
+                        If node reports a syntax error on line 1:
+                    </strong>{" "}
+                    the download failed and the error was written into the file instead of the
+                    agent. Open <code style={code}>claude-relay.mjs</code> — if it says{" "}
+                    <code style={code}>{"{"}&quot;error&quot;:&quot;Unauthorized&quot;{"}"}</code>{" "}
+                    the token was wrong, usually the placeholder above left unreplaced. The{" "}
+                    <code style={code}>-f</code> on curl makes it fail loudly instead, but a file
+                    from an earlier attempt will still be sitting there.
+                </span>
+            </p>
+
             <p style={{ marginTop: 10 }}>
                 <strong style={{ color: t.textPrimary }}>Several machines:</strong> repeat this on
                 each, giving every one a different <code style={code}>RELAY_AGENT_NAME</code>. They
@@ -243,6 +321,8 @@ node claude-relay.mjs`,
                     is a quick way to go and find that path.
                 </span>
             </p>
+
+            <style>{`@keyframes relaySpin { to { transform: rotate(360deg) } }`}</style>
         </div>
     );
 }
