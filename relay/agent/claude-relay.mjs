@@ -74,21 +74,46 @@ if (!RELAY_URL || !TOKEN) {
 
 /* ─── Preflight ──────────────────────────────────────────────────── */
 
-/** Locate an executable the way the shell would, on either platform. */
+/**
+ * Locate an executable the way the shell would.
+ *
+ * On Windows this has to be choosier than "first line of `where`". npm installs
+ * a command as two files side by side — an extensionless shell script for
+ * Git Bash and a .cmd wrapper for the native shells — and `where` lists the
+ * extensionless one first. Handing that to a pty spawns something Windows
+ * cannot execute, which exits 1 immediately and, with a reconnecting agent,
+ * turns into an endless restart loop that says only "claude exited (1)".
+ *
+ * So prefer an extension Windows will actually run, in PATHEXT order.
+ */
 function resolveCommand(cmd) {
     if (cmd.includes("/") || cmd.includes("\\")) {
         return existsSync(cmd) ? cmd : null;
     }
-    const probe = IS_WINDOWS
-        ? spawnSync("where", [cmd], { encoding: "utf8", shell: true })
-        : spawnSync("sh", ["-lc", `command -v ${JSON.stringify(cmd)}`], { encoding: "utf8" });
-    const out = (probe.stdout || "").split(/\r?\n/).find(Boolean);
-    return probe.status === 0 && out ? out.trim() : null;
+
+    if (!IS_WINDOWS) {
+        const probe = spawnSync("sh", ["-lc", `command -v ${JSON.stringify(cmd)}`], { encoding: "utf8" });
+        const out = (probe.stdout || "").split(/\r?\n/).find(Boolean);
+        return probe.status === 0 && out ? out.trim() : null;
+    }
+
+    // shell:false with an explicit argument list — the arg is not concatenated
+    // into a command line, which also silences DEP0190.
+    const probe = spawnSync("where.exe", [cmd], { encoding: "utf8" });
+    const hits = (probe.stdout || "").split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (probe.status !== 0 || hits.length === 0) return null;
+
+    const runnable = [".com", ".exe", ".bat", ".cmd"];
+    const preferred = hits.find(h => runnable.includes(h.slice(h.lastIndexOf(".")).toLowerCase()));
+    return preferred || hits[0];
 }
 
 function versionOf(bin) {
     try {
-        const r = spawnSync(bin, ["--version"], { encoding: "utf8", timeout: 8000, shell: IS_WINDOWS });
+        // shell:false: `bin` is already a fully resolved path with a runnable
+        // extension, so no shell is needed to find it — and passing args with
+        // shell:true is what DEP0190 warns about.
+        const r = spawnSync(bin, ["--version"], { encoding: "utf8", timeout: 8000 });
         return (r.stdout || r.stderr || "").trim().split(/\r?\n/)[0] || null;
     } catch {
         return null;
@@ -112,6 +137,12 @@ const preflight = {
 console.log(`[agent] name        ${NAME}`);
 console.log(`[agent] platform    ${preflight.platform}, node ${preflight.node}`);
 console.log(`[agent] command     ${COMMAND} -> ${resolved ?? "NOT FOUND on PATH"}`);
+if (IS_WINDOWS && resolved && !/\.(com|exe|bat|cmd)$/i.test(resolved)) {
+    console.warn(
+        `[agent] that path has no executable extension. Windows cannot run it directly,\n` +
+        `        so it will exit immediately. Point RELAY_COMMAND at the .cmd instead.`,
+    );
+}
 if (preflight.commandVersion) console.log(`[agent] version     ${preflight.commandVersion}`);
 console.log(`[agent] cwd         ${CWD}${preflight.cwdExists ? "" : "  (does not exist!)"}`);
 
@@ -173,7 +204,6 @@ async function openTerminal() {
                 cwd: preflight.cwdExists ? CWD : process.cwd(),
                 env: { ...process.env, TERM: "dumb" },
                 stdio: ["pipe", "pipe", "pipe"],
-                shell: IS_WINDOWS,
             });
 
         return {

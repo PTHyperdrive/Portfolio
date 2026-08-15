@@ -160,8 +160,14 @@ export default function AdminRelayPage() {
             attachedRef.current = null;
             setAttached(null);
             setPhase(ev.code === 1000 ? "closed" : "error");
-            if (ev.code === 4401 || ev.code === 1006) {
-                setError(prev => prev ?? "The relay refused the connection — the ticket may have expired.");
+            // 4401 is the server actually rejecting us. 1006 is an abnormal
+            // close with no close frame, which usually means the connection was
+            // cut rather than refused — blaming the ticket for that sent the
+            // last debugging session in the wrong direction entirely.
+            if (ev.code === 4401) {
+                setError(prev => prev ?? "The relay refused this ticket. Press Attach to get a new one.");
+            } else if (ev.code !== 1000) {
+                setError(prev => prev ?? `The relay connection dropped (code ${ev.code}). Press Attach to reconnect.`);
             }
         };
     }, [attach, syncSize]);
