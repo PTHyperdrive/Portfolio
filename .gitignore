@@ -62,3 +62,15 @@ next-env.d.ts
 infra/
 scripts/seed-ai-knowledge.cjs
 
+
+# ─── mTLS key material ─────────────────────────────────────────────
+# The CA key, client keys, and the PKCS#12 bundles are credentials:
+# whoever holds a .p12 and its password is an administrator. They are
+# generated on the server by mtls/mkcerts.sh and never leave it except
+# to be imported into a browser. Only the script and its notes are
+# tracked here.
+mtls/*.key
+mtls/*.crt
+mtls/*.csr
+mtls/*.p12
+mtls/*.srl

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { securityHeaders } from '@/lib/security';
+import { mtlsEnforced, isProtectedPath, checkClientCertificate } from '@/lib/mtls';
 
 /** Check for an active session token (works in both dev and prod). */
 function getSessionToken(request: NextRequest): string | undefined {
@@ -70,6 +71,29 @@ export function middleware(request: NextRequest) {
         target.host = `www.${APEX_HOST}`;
         target.port = '';
         return NextResponse.redirect(target, 301);
+    }
+
+    // ── Mutual TLS on the administrative surface ──
+    // Ahead of session handling on purpose: without a client certificate there
+    // is nothing to discuss, whatever cookie or token the caller holds. nginx
+    // has already validated the certificate against the CA; this only reads
+    // the verdict and checks the fingerprint against the allowlist.
+    //
+    // Safe to trust those headers only because nginx sets them on every
+    // proxied request and Next listens on 127.0.0.1, so nothing can reach it
+    // without passing through nginx first.
+    if (mtlsEnforced() && isProtectedPath(pathname)) {
+        const verdict = checkClientCertificate(request.headers);
+        if (!verdict.ok) {
+            console.warn(`[mtls] refused ${pathname}: ${verdict.reason}`);
+            // 403 with no detail about which check failed, and no redirect to
+            // a login page — a caller without a certificate should not learn
+            // what lives here.
+            return new NextResponse(
+                JSON.stringify({ error: 'Forbidden' }),
+                { status: 403, headers: { 'Content-Type': 'application/json' } },
+            );
+        }
     }
 
     // ── Block GET /api/auth/csrf ──
