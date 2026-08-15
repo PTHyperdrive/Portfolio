@@ -117,6 +117,36 @@ const PROVIDER_LABEL: Record<Provider, string> = {
     OPENAI: "OpenAI-compatible",
 };
 
+/**
+ * Turn whatever an API returned in `error` into something a human can read.
+ *
+ * Anthropic reports failures as `{"error": {"type": …, "message": …}}`, so the
+ * obvious `new Error(data.error)` renders the useless string "[object Object]".
+ * Every error path in this page goes through here so that cannot come back:
+ * a string is used as-is, an object gives up its `message`, and anything else
+ * is serialised rather than coerced.
+ */
+function errorText(value: unknown, fallback: string): string {
+    if (typeof value === "string" && value.trim()) return value;
+
+    if (value && typeof value === "object") {
+        const record = value as Record<string, unknown>;
+        for (const field of ["message", "error_description", "detail"]) {
+            if (typeof record[field] === "string" && record[field]) return record[field] as string;
+        }
+        // A nested { error: { message } }, which is Anthropic's shape.
+        if (record.error) return errorText(record.error, fallback);
+        try {
+            const json = JSON.stringify(value);
+            if (json && json !== "{}") return json;
+        } catch {
+            // Circular or otherwise unserialisable — fall through.
+        }
+    }
+
+    return fallback;
+}
+
 export default function AdminAiNodesPage() {
     const t = useThemeTokens();
 
@@ -153,7 +183,7 @@ export default function AdminAiNodesPage() {
                 body: JSON.stringify({ code, state }),
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "Failed to exchange code");
+            if (!res.ok) throw new Error(errorText(data.error, "Failed to exchange code"));
 
             setForm(f => ({ ...f, apiKey: data.accessToken }));
             setOauthSuccess(
@@ -183,7 +213,7 @@ export default function AdminAiNodesPage() {
             if (e.data.code) {
                 void exchangeClaudeCode(e.data.code, e.data.state ?? undefined);
             } else if (e.data.error) {
-                setOauthError(String(e.data.error));
+                setOauthError(errorText(e.data.error, "Login failed"));
             }
         };
         window.addEventListener("message", handleMessage);
@@ -197,7 +227,7 @@ export default function AdminAiNodesPage() {
         try {
             const res = await fetch("/api/admin/ai/claude-oauth/start", { method: "POST" });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "Failed to initialize login");
+            if (!res.ok) throw new Error(errorText(data.error, "Failed to initialize login"));
 
             setOauthModal(true);
 
@@ -251,7 +281,7 @@ export default function AdminAiNodesPage() {
                 }),
             });
             const data = await res.json();
-            if (!res.ok) throw new Error(data.error ?? "Failed to create node");
+            if (!res.ok) throw new Error(errorText(data.error, "Failed to create node"));
             setForm(BLANK);
             setShowForm(false);
             load();

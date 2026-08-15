@@ -37,7 +37,15 @@ export async function POST(req: Request) {
     if (!parsed.success) {
         return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
-    const { code, state } = parsed.data;
+    let { code, state } = parsed.data;
+
+    if (code.includes("#") && !code.startsWith("sk-ant-")) {
+        const parts = code.split("#");
+        code = parts[0].trim();
+        if (!state && parts[1]) {
+            state = parts[1].trim();
+        }
+    }
 
     const jar = await cookies();
     const flow = readFlowState(jar.get(FLOW_COOKIE)?.value);
@@ -92,10 +100,14 @@ export async function POST(req: Request) {
 
         return res;
     } catch (err) {
-        return NextResponse.json(
-            { error: err instanceof Error ? err.message : "Failed to exchange authorization code" },
-            { status: 400 },
-        );
+        const message = err instanceof Error
+            ? err.message
+            : "Failed to exchange authorization code";
+        // Also record it server-side: the browser shows one line, and when the
+        // provider's reason is unexpected the pm2 log is where you go looking.
+        // Only the failure branch reaches here, so no token is ever logged.
+        console.error("[claude-oauth/exchange] token exchange failed:", message);
+        return NextResponse.json({ error: message }, { status: 400 });
     }
 }
 

@@ -97,9 +97,10 @@ function findTokenInObj(obj: unknown): string | null {
 
 /**
  * Extract authorization code or token from raw string, JSON object, full URL, or URL fragment.
+ * Supports code#state format (e.g., ZECJ496LUiUG2FQ21nxx...#fecf38a1aa...).
  */
 export function extractAuthCode(input: string): string {
-    const trimmed = input.trim();
+    let trimmed = input.trim();
     if (!trimmed) return "";
 
     // Direct token string passed
@@ -120,15 +121,20 @@ export function extractAuthCode(input: string): string {
         // Try parsing as URL
         const parsed = new URL(trimmed);
         const code = parsed.searchParams.get("code");
-        if (code) return code;
+        if (code) return code.split("#")[0].trim();
     } catch {
         // Search regex pattern for code parameter
         const match = /[?&#]code=([A-Za-z0-9._-]+)/.exec(trimmed);
-        if (match) return match[1];
+        if (match) return match[1].split("#")[0].trim();
 
         // Regex search for sk-ant-oat/sid token inside pasted text/JSON
         const tokenMatch = /(sk-ant-(?:oat|sid)[A-Za-z0-9_-]+)/.exec(trimmed);
         if (tokenMatch) return tokenMatch[1];
+    }
+
+    // If input is code#state (e.g. ZECJ496LUiUG2FQ21nxx...#fecf38a1aa...)
+    if (trimmed.includes("#") && !trimmed.startsWith("sk-ant-")) {
+        return trimmed.split("#")[0].trim();
     }
 
     return trimmed;
@@ -157,6 +163,26 @@ function readTokenResponse(data: Record<string, unknown>): ClaudeTokens {
             : undefined,
         refreshToken: data.refresh_token as string | undefined,
     };
+}
+
+function formatOAuthErrorMessage(data: Record<string, unknown>, fallbackStatus: number): string {
+    if (typeof data.error_description === "string" && data.error_description) {
+        return data.error_description;
+    }
+    if (typeof data.error === "string" && data.error) {
+        return data.error;
+    }
+    if (data.error && typeof data.error === "object") {
+        const errObj = data.error as Record<string, unknown>;
+        if (typeof errObj.message === "string" && errObj.message) {
+            return errObj.message;
+        }
+        return JSON.stringify(errObj);
+    }
+    if (typeof data.message === "string" && data.message) {
+        return data.message;
+    }
+    return `OAuth request failed with HTTP ${fallbackStatus}`;
 }
 
 /**
@@ -192,12 +218,10 @@ export async function exchangeClaudeCode(params: {
         }).toString(),
     });
 
-    const data = await res.json().catch(() => ({}));
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
 
     if (!res.ok) {
-        throw new Error(
-            data.error_description || data.error || `Token exchange failed with HTTP ${res.status}`,
-        );
+        throw new Error(formatOAuthErrorMessage(data, res.status));
     }
 
     return readTokenResponse(data);
@@ -224,12 +248,10 @@ export async function refreshClaudeToken(refreshToken: string): Promise<ClaudeTo
         }).toString(),
     });
 
-    const data = await res.json().catch(() => ({}));
+    const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
 
     if (!res.ok) {
-        throw new Error(
-            data.error_description || data.error || `Token refresh failed with HTTP ${res.status}`,
-        );
+        throw new Error(formatOAuthErrorMessage(data, res.status));
     }
 
     const tokens = readTokenResponse(data);
