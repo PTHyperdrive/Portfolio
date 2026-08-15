@@ -16,7 +16,7 @@ import { readFileSync } from "node:fs";
 import next from "next";
 import { WebSocketServer } from "ws";
 import pkg from "@next/env";
-import { verifyTicket, verifyAgentToken } from "./lib/relay-ticket.mjs";
+import { consumeTicket, verifyAgentToken } from "./lib/relay-ticket.mjs";
 import { registerAgent, registerViewer } from "./lib/relay-hub.mjs";
 const { loadEnvConfig } = pkg;
 
@@ -101,7 +101,8 @@ app.prepare().then(() => {
         // Browser console. The ticket is minted by an admin-only API route, so
         // a valid signature is proof of an admin session without this server
         // needing to understand NextAuth at all.
-        const userId = verifyTicket(params.get("ticket") || "");
+        // Redeemed, not just checked: a ticket opens one socket and no more.
+        const userId = consumeTicket(params.get("ticket") || "");
         if (!userId) {
             console.warn("[relay] ✘ console rejected: invalid or expired ticket");
             return denyUpgrade(socket, 401, "Unauthorized");
