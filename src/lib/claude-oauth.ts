@@ -7,9 +7,11 @@ export const CLAUDE_OAUTH_TOKEN_URL = "https://console.anthropic.com/v1/oauth/to
 export const CLAUDE_OAUTH_REDIRECT_URI = "https://platform.claude.com/oauth/code/callback";
 
 const CLAUDE_TOKEN_ENDPOINTS = [
+    "https://platform.claude.com/v1/oauth/token",
+    "https://platform.claude.com/oauth/token",
     "https://console.anthropic.com/v1/oauth/tokens",
-    "https://api.anthropic.com/v1/oauth/tokens",
     "https://console.anthropic.com/v1/oauth/token",
+    "https://api.anthropic.com/v1/oauth/tokens",
     "https://api.anthropic.com/v1/oauth/token",
 ];
 
@@ -226,7 +228,7 @@ export async function exchangeClaudeCode(params: {
                 }).toString(),
             });
 
-            if (res.status === 404) continue;
+            if (res.status === 404 || res.status === 403) continue;
 
             const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
 
@@ -236,15 +238,12 @@ export async function exchangeClaudeCode(params: {
 
             return readTokenResponse(data);
         } catch (err) {
-            if (err instanceof Error && err.message.includes("404")) continue;
+            if (err instanceof Error && (err.message.includes("404") || err.message.includes("403"))) continue;
             lastError = err instanceof Error ? err : new Error(String(err));
-            if (!(err instanceof Error && err.message.includes("HTTP 404"))) {
-                throw err;
-            }
         }
     }
 
-    throw lastError || new Error("OAuth token endpoint returned HTTP 404. Verify authorization code.");
+    throw lastError || new Error("OAuth token exchange failed across all endpoints. Verify authorization code.");
 }
 
 /**
@@ -269,7 +268,7 @@ export async function refreshClaudeToken(refreshToken: string): Promise<ClaudeTo
                 }).toString(),
             });
 
-            if (res.status === 404) continue;
+            if (res.status === 404 || res.status === 403) continue;
 
             const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
 
@@ -280,13 +279,10 @@ export async function refreshClaudeToken(refreshToken: string): Promise<ClaudeTo
             const tokens = readTokenResponse(data);
             return { ...tokens, refreshToken: tokens.refreshToken ?? refreshToken };
         } catch (err) {
-            if (err instanceof Error && err.message.includes("404")) continue;
+            if (err instanceof Error && (err.message.includes("404") || err.message.includes("403"))) continue;
             lastError = err instanceof Error ? err : new Error(String(err));
-            if (!(err instanceof Error && err.message.includes("HTTP 404"))) {
-                throw err;
-            }
         }
     }
 
-    throw lastError || new Error("OAuth refresh token endpoint returned HTTP 404.");
+    throw lastError || new Error("OAuth refresh token endpoint returned HTTP error.");
 }
