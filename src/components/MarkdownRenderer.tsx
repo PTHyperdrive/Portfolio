@@ -1,127 +1,59 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useRef, useCallback } from "react";
 import { useThemeTokens } from "@/lib/useThemeTokens";
+import { renderMarkdown } from "@/lib/markdown";
 
 /**
  * MarkdownRenderer
  *
- * Converts markdown content to styled HTML. Supports:
- * - Headings (h1-h4) with anchor links
- * - Bold, italic, inline code
- * - Code blocks with syntax-highlighted background
- * - Custom callout blocks: > [!NOTE], > [!WARNING], > [!CAUTION]
- * - Images with border styling
- * - Links
- * - Unordered and ordered lists
- * - Horizontal rules
+ * Converts markdown to styled HTML with pure string work — no parser
+ * dependency. Supports headings, bold/italic/strikethrough, inline code,
+ * fenced code blocks with a copy button, tables, blockquotes, callouts
+ * (> [!NOTE] etc.), images, links, lists and rules.
  *
- * Uses pure string replacement — no external markdown library.
+ * ── Why code is extracted before anything else ─────────────────────
+ *
+ * Every other rule here is a regex over the whole document, and source code is
+ * full of characters those rules claim. A shell script's `# comment` became an
+ * <h1>; a YAML list's `- item` became an <li>; `---` became an <hr>; and
+ * `int *ptr` or `a * b` was silently turned into italics. So fenced and inline
+ * code are lifted out into placeholders first, the markdown rules run over
+ * what remains, and the code is put back untouched at the end.
+ *
+ * ── Unterminated fences ────────────────────────────────────────────
+ *
+ * In a chat the closing ``` has not arrived yet while the answer is streaming.
+ * A regex requiring both fences leaves the half-written block as raw text,
+ * which then gets mangled by the rules above — so every code answer looked
+ * broken until the moment it finished. The scanner below closes an open block
+ * at end of input instead, and renders it as code straight away.
  */
 export default function MarkdownRenderer({ content }: { content: string }) {
     const t = useThemeTokens();
+    const hostRef = useRef<HTMLDivElement>(null);
 
-    const html = useMemo(() => {
-        if (!content) return "";
-
-        let text = content;
-
-        // ── Escape HTML entities ──
-        text = text
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;");
-
-        // ── Code blocks (must be processed first before inline) ──
-        text = text.replace(/```(\w*)\n([\s\S]*?)```/g, (_m, lang, code) => {
-            const langLabel = lang ? `<span class="md-code-lang">${lang}</span>` : "";
-            return `<div class="md-codeblock">${langLabel}<pre><code>${code.trim()}</code></pre></div>`;
+    /** Copy handled by delegation — the HTML is injected, so it has no React handlers. */
+    const onClick = useCallback((e: React.MouseEvent) => {
+        const button = (e.target as HTMLElement).closest<HTMLElement>(".md-copy");
+        if (!button) return;
+        const code = button.parentElement?.querySelector("code")?.textContent ?? "";
+        void navigator.clipboard.writeText(code).then(() => {
+            const previous = button.getAttribute("data-label") ?? "Copy";
+            button.textContent = "Copied";
+            setTimeout(() => { button.textContent = previous; }, 1500);
         });
+    }, []);
 
-        // ── Callout blocks: > [!NOTE], > [!WARNING], > [!CAUTION] ──
-        text = text.replace(
-            /&gt; \[!(NOTE|WARNING|CAUTION|TIP|IMPORTANT)\]\n((?:&gt; .*(?:\n|$))*)/g,
-            (_m, type, body) => {
-                const clean = body.replace(/&gt; ?/g, "").trim();
-                return `<div class="md-callout md-callout-${type.toLowerCase()}">\n<span class="md-callout-label">${type}</span>\n<span>${clean}</span>\n</div>`;
-            }
-        );
+    const html = useMemo(() => renderMarkdown(content), [content]);
 
-        // ── URL sanitization ──
-        // Block javascript:/vbscript:/etc. URIs — only http(s)/mailto and
-        // relative paths are allowed. Returns null for unsafe URLs.
-        const safeUrl = (raw: string, allowDataImage = false): string | null => {
-            // Strip control chars + spaces so "java\tscript:" can't slip past.
-            const u = raw.replace(/[\u0000-\u0020]/g, "");
-            const scheme = u.match(/^([a-z][a-z0-9+.\-]*):/i)?.[1]?.toLowerCase();
-            if (scheme) {
-                if (["http", "https", "mailto"].includes(scheme)) return u;
-                if (allowDataImage && /^data:image\//i.test(u)) return u;
-                return null;
-            }
-            return u; // relative path / anchor
-        };
-
-        // ── Images ──
-        text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_m, alt, src) => {
-            const safe = safeUrl(src, true);
-            return safe ? `<img class="md-img" src="${safe}" alt="${alt}" />` : "";
-        });
-
-        // ── Links ──
-        text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label, href) => {
-            const safe = safeUrl(href);
-            return safe
-                ? `<a class="md-link" href="${safe}" target="_blank" rel="noopener noreferrer">${label}</a>`
-                : label;
-        });
-
-        // ── Headings ──
-        text = text.replace(/^#### (.+)$/gm, (_m, h) => {
-            const id = h.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-            return `<h4 id="${id}" class="md-h4">${h}</h4>`;
-        });
-        text = text.replace(/^### (.+)$/gm, (_m, h) => {
-            const id = h.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-            return `<h3 id="${id}" class="md-h3">${h}</h3>`;
-        });
-        text = text.replace(/^## (.+)$/gm, (_m, h) => {
-            const id = h.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-            return `<h2 id="${id}" class="md-h2">${h}</h2>`;
-        });
-        text = text.replace(/^# (.+)$/gm, (_m, h) => {
-            const id = h.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-            return `<h1 id="${id}" class="md-h1">${h}</h1>`;
-        });
-
-        // ── Bold / Italic ──
-        text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-        text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
-
-        // ── Inline code ──
-        text = text.replace(/`([^`]+)`/g, '<code class="md-inline-code">$1</code>');
-
-        // ── Horizontal rules ──
-        text = text.replace(/^---$/gm, '<hr class="md-hr" />');
-
-        // ── Unordered lists ──
-        text = text.replace(/^- (.+)$/gm, '<li class="md-li">$1</li>');
-        text = text.replace(/((?:<li class="md-li">.*<\/li>\n?)+)/g, '<ul class="md-ul">$1</ul>');
-
-        // ── Ordered lists ──
-        text = text.replace(/^\d+\. (.+)$/gm, '<li class="md-oli">$1</li>');
-        text = text.replace(/((?:<li class="md-oli">.*<\/li>\n?)+)/g, '<ol class="md-ol">$1</ol>');
-
-        // ── Paragraphs (remaining lines) ──
-        text = text.replace(/^(?!<[a-z/])((?!$).+)$/gm, '<p class="md-p">$1</p>');
-
-        return text;
-    }, [content]);
 
     return (
         <>
             <div
+                ref={hostRef}
                 className="md-renderer"
+                onClick={onClick}
                 dangerouslySetInnerHTML={{ __html: html }}
             />
             <style>{`
@@ -146,37 +78,75 @@ export default function MarkdownRenderer({ content }: { content: string }) {
                     font-family: ${t.fontMono};
                     font-size: 0.88em;
                     color: ${t.accentPrimary};
+                    word-break: break-all;
                 }
                 .md-codeblock {
                     position: relative;
-                    background: ${t.isMono ? (t.isLight ? "#f5f5f5" : "#0a0a0a") : "#0d1117"};
+                    background: ${t.isMono ? (t.isLight ? "#f5f5f5" : "#0a0a0a") : (t.isLight ? "#f6f8fa" : "#0d1117")};
                     border: 1px solid ${t.borderPrimary};
                     border-radius: ${t.cardRadius}px;
                     margin: 16px 0;
-                    overflow-x: auto;
                 }
                 .md-codeblock pre {
                     margin: 0;
                     padding: 16px 20px;
                     overflow-x: auto;
+                    /* Code must scroll inside its own box, never widen the page. */
+                    max-width: 100%;
                 }
                 .md-codeblock code {
                     font-family: ${t.fontMono};
                     font-size: 0.86rem;
                     line-height: 1.6;
-                    color: ${t.textPrimary};
+                    color: ${t.isLight ? t.textPrimary : "#e6edf3"};
+                    white-space: pre;
+                    tab-size: 4;
                 }
                 .md-code-lang {
                     position: absolute;
-                    top: 6px;
-                    right: 10px;
+                    top: 7px;
+                    left: 12px;
                     font-size: 0.65rem;
                     font-weight: 700;
                     color: ${t.textMuted};
                     text-transform: uppercase;
                     letter-spacing: 0.08em;
                     font-family: ${t.fontMono};
+                    pointer-events: none;
                 }
+                .md-codeblock:has(.md-code-lang) pre { padding-top: 26px; }
+                .md-copy, .md-code-streaming {
+                    position: absolute;
+                    top: 5px;
+                    right: 8px;
+                    font-size: 0.68rem;
+                    font-weight: 600;
+                    font-family: ${t.fontFamily};
+                    padding: 3px 9px;
+                    border-radius: ${t.buttonRadius}px;
+                    border: 1px solid ${t.borderPrimary};
+                    background: ${t.bgCard};
+                    color: ${t.textMuted};
+                }
+                .md-copy { cursor: pointer; opacity: 0; transition: opacity 0.15s, color 0.15s; }
+                .md-codeblock:hover .md-copy, .md-copy:focus-visible { opacity: 1; }
+                .md-copy:hover { color: ${t.textPrimary}; }
+                .md-code-streaming { border-style: dashed; opacity: 0.75; }
+                .md-quote {
+                    margin: 14px 0;
+                    padding: 4px 0 4px 14px;
+                    border-left: 3px solid ${t.borderPrimary};
+                    color: ${t.textMuted};
+                }
+                .md-table-wrap { overflow-x: auto; margin: 16px 0; max-width: 100%; }
+                .md-table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+                .md-th, .md-td {
+                    border: 1px solid ${t.borderPrimary};
+                    padding: 7px 12px;
+                    text-align: left;
+                    white-space: nowrap;
+                }
+                .md-th { background: ${t.bgTertiary}; color: ${t.textPrimary}; font-weight: 700; }
                 .md-callout {
                     border-radius: ${t.cardRadius}px;
                     padding: 14px 18px;
